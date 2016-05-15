@@ -2,7 +2,7 @@ __all__ = []
 
 from socket import create_connection
 from urlparse import urlparse
-from pyasn1.codec.ber import encoder as BEREncoder
+from pyasn1.codec.ber import encoder as BEREncoder, decoder as BERDecoder
 
 from rfc4511 import LDAPDN, Scope as _Scope, AttributeSelection, DerefAliases as _DerefAliases
 from rfc4511 import SearchRequest, LDAPString, NonNegativeInteger, univ
@@ -35,6 +35,9 @@ class MultipleSearchResults(UnexpectedSearchResults):
 class UnexpectedDN(UnexpectedSearchResults):
     pass
 
+class UnexpectedResponseType(LDAPError):
+    pass
+
 class LDAPObject(dict):
     def __init__(self, dn, attrs):
         self.dn = dn
@@ -42,6 +45,8 @@ class LDAPObject(dict):
 
     def __getattr__(self, key):
         return self[key]
+
+RECV_BUFFER = 1024
 
 class LDAP(object):
     ## global defaults
@@ -53,8 +58,8 @@ class LDAP(object):
     NO_ATTRS = '1.1'
     ALL_USER_ATTRS = '*'
 
-    def __init__(self, hostURI, searchTimeout=LDAP.DEFAULT_SEARCH_TIMEOUT,
-        derefAliases=LDAP.DEFAULT_DEREF_ALIASES, connectTimeout=5):
+    def __init__(self, hostURI, searchTimeout=DEFAULT_SEARCH_TIMEOUT,
+        derefAliases=DEFAULT_DEREF_ALIASES, connectTimeout=5):
 
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
@@ -82,6 +87,11 @@ class LDAP(object):
         lm.setComponentByName('protocolOp', po)
         self._messageID += 1
         self.sock.sendall(BEREncoder.encode(lm))
+
+    def _recvResponse(self):
+        # TODO: this will obviously fail in case of objects larger than the buffer
+        raw = self.sock.recv(RECV_BUFFER)
+        return BERDecoder.decode(raw)
 
     def simpleBind(self, user, pw):
         ## prepare bind request
@@ -128,6 +138,27 @@ class LDAP(object):
         ## send request
         self._sendMessage('searchRequest', req)
 
-        ## receive response
-
-        ## process response
+        ## receive and process response
+        searchResults = []
+        while True:
+            po = self._recvResponse().getComponentByName('protocolOp')
+            if po.getComponentByName('searchResDone') is not None:
+                # received all results
+                break
+            entry = po.getComponentByName('searchResEntry')
+            if entry is not None:
+                DN = entry.getComponentByName('objectName')
+                attrs = {}
+                _attrs = entry.getComponentName('attributes')
+                for i in range(0, len(_attrs)):
+                    _attr = _attrs.getComponentByPosition(i)
+                    attrType = unicode(_attr.getComponentByName('type'))
+                    _vals = _attr.getComponentByName('vals')
+                    vals = []
+                    for j in range(0, len(_vals)):
+                        vals.append(unicode(_vals.getComponentByPosition(j)))
+                    attrs[attrType] = vals
+                searchResults.append(LDAPObject(DN, attrs))
+            else:
+                raise UnexpectedResponseType()
+        return searchResults

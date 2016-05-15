@@ -89,7 +89,7 @@ class BindRequest(univ.Sequence):
         namedtype.NamedType('authentication', AuthenticationChoice())
     )
 
-class LDAPResultCode(univ.Enumerated): # not in spec
+class LDAPResultCode(univ.Enumerated): # unnamed inline in spec
     namedValues = namedval.NamedValues(
         ('success', 0),
         ('operationsError', 1),
@@ -292,9 +292,10 @@ class SearchRequest(univ.Sequence):
         namedtype.NamedType('attributes', AttributeSelection())
     )
 
+class PartialAttributeVals(univ.SetOf): # unnamed inline in spec
+    componentType = AttributeValue()
+
 class PartialAttribute(univ.Sequence):
-    class PartialAttributeVals(univ.SetOf):
-        componentType = AttributeValue()
     componentType = namedtype.NamedTypes(
         namedtype.NamedType('type', AttributeDescription()),
         namedtype.NamedType('vals', PartialAttributeVals())
