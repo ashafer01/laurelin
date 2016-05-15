@@ -222,7 +222,7 @@ class MatchingRuleAssertion(univ.Sequence):
 class Filter(univ.Choice):
     pass
 
-class FilterSet(NonEmptySetOf): # not in spec
+class FilterSet(NonEmptySetOf): # unnamed inline in spec
     componentType = Filter()
 
 Filter.componentType = namedtype.NamedTypes(
@@ -262,14 +262,14 @@ class AttributeSelection(univ.SequenceOf):
     componentType = LDAPString()
     # The LDAPString is constrained to <attributeSelector> in Section 4.5.1.8
 
-class Scope(univ.Enumerated): # not in spec
+class Scope(univ.Enumerated): # unnamed inline in spec
     namedValues = namedval.NamedValues(
         ('baseObject', 0),
         ('singleLevel', 1),
         ('wholeSubtree', 2)
     )
 
-class DerefAliases(univ.Enumerated): # not in spec
+class DerefAliases(univ.Enumerated): # unnamed inline in spec
     namedValues = namedval.NamedValues(
         ('neverDerefAliases', 0),
         ('derefInSearching', 1),

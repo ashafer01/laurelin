@@ -20,25 +20,43 @@ def findClosingParen(text):
             parens -= 1
     return i
 
-def parseFilterSet(filterStr):
+escapeMap = [
+    ('(', '\\28'),
+    (')', '\\29'),
+    ('&', '\\26'),
+    ('|', '\\7c'),
+    ('!', '\\21'),
+    ('=', '\\3d'),
+    ('<', '\\3c'),
+    ('>', '\\3e'),
+    ('~', '\\7e'),
+    ('*', '\\2a'),
+    ('/', '\\2f')
+]
+def escape(text):
+    for rep in escapeMap:
+        text = text.replace(*rep)
+    return text
+
+def parseSet(filterStr):
     fset = FilterSet()
     i = 0
     while len(filterStr) > 0:
         end = findClosingParen(filterStr)+1
-        fset.setComponentByPosition(i, parseFilter(filterStr[0:end]))
+        fset.setComponentByPosition(i, parse(filterStr[0:end]))
         filterStr = filterStr[end:]
         i += 1
     return fset
 
-def parseFilter(filterStr):
+def parse(filterStr):
     fil = Filter()
     chunk = filterStr[1:findClosingParen(filterStr)]
     if chunk[0] == '&':
-        fil.setComponentByName('and', parseFilterSet(chunk[1:]))
+        fil.setComponentByName('and', parseSet(chunk[1:]))
     elif chunk[0] == '|':
-        fil.setComponentByName('or', parseFilterSet(chunk[1:]))
+        fil.setComponentByName('or', parseSet(chunk[1:]))
     elif chunk[0] == '!':
-        fil.setComponentByName('not', parseFilter(chunk[1:]))
+        fil.setComponentByName('not', parse(chunk[1:]))
     else:
         attr, val = chunk.split('=', 1)
         if attr[-1] == '>':
