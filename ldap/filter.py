@@ -3,7 +3,9 @@
 ## 
 ## Filter parser
 
-from rfc4511 import Filter, FilterSet, AttributeValueAssertion, AttributeDescription, AssertionValue, SubstringFilter, AttributeDescription
+from rfc4511 import Filter, FilterSet, AssertionValue
+from rfc4511 import AttributeValueAssertion, AttributeDescription
+from rfc4511 import SubstringFilter, SubstringChunk, SubstringChunks
 
 def findClosingParen(text):
     if text[0] != '(':
@@ -42,23 +44,41 @@ def parseFilter(filterStr):
         if attr[-1] == '>':
             ava = AttributeValueAssertion()
             ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1]))
-            ava.setComponentByName('assertionValue', AttributeValue(val))
+            ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('greaterOrEqual', ava)
         elif attr[-1] == '<':
             ava = AttributeValueAssertion()
             ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1]))
-            ava.setComponentByName('assertionValue', AttributeValue(val))
+            ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('lessOrEqual', ava)
         elif attr[-1] == '~':
             ava = AttributeValueAssertion()
             ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1]))
-            ava.setComponentByName('assertionValue', AttributeValue(val))
+            ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('approxMatch', ava)
         elif val == '*':
             fil.setComponentByName('present', AttributeDescription(attr))
         elif '*' in val:
-            # substrings
-            pass
+            subf = SubstringFilter()
+            subf.setComponentByName('type', AttributeDescription(attr))
+            subs = SubstringChunks()
+            sublist = val.split('*')
+            if sublist[0] != '':
+                c = SubstringChunk()
+                c.setComponentByName('initial', AssertionValue(sublist[0]))
+                subs.setComponentByPosition(0, c)
+            if sublist[-1] != '':
+                c = SubstringChunk()
+                c.setComponentByName('final', AssertionValue(sublist[-1]))
+                subs.setComponentByPosition(len(sublist)-1, c)
+            i = 1
+            while i < len(sublist)-1:
+                c = SubstringChunk()
+                c.setComponentByName('any', AssertionValue(sublist[i]))
+                subs.setComponentByPosition(i, c)
+                i += 1
+            subf.setComponentByName('substrings', subs)
+            fil.setComponentByName('substrings', subf)
         else:
             ava = AttributeValueAssertion()
             ava.setComponentByName('attributeDesc', AttributeDescription(attr))

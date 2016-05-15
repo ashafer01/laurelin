@@ -178,25 +178,26 @@ class UnbindRequest(univ.Null):
         tag.Tag(tag.tagClassApplication, tag.tagFormatSimple, 2)
     )
 
-class SubstringFilter(univ.Sequence):
-    class SeqOfSubstringChoice(NonEmptySequenceOf):
-        class SubstringChoice(univ.Choice):
-            componentType = namedtype.NamedTypes(
-                namedtype.NamedType('initial', AssertionValue().subtype( # can occur at most once
-                    implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 0)
-                )),
-                namedtype.NamedType('any', AssertionValue().subtype(
-                    implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 1)
-                )),
-                namedtype.NamedType('final', AssertionValue().subtype( # can occur at most once
-                    implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 2)
-                ))
-            )
-        componentType = SubstringChoice()
+class SubstringChunk(univ.Choice): # unnamed inline in spec
+    componentType = namedtype.NamedTypes(
+        namedtype.NamedType('initial', AssertionValue().subtype( # can occur at most once
+            implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 0)
+        )),
+        namedtype.NamedType('any', AssertionValue().subtype(
+            implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 1)
+        )),
+        namedtype.NamedType('final', AssertionValue().subtype( # can occur at most once
+            implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 2)
+        ))
+    )
 
+class SubstringChunks(NonEmptySequenceOf): # unnamed inline in spec
+    componentType = SubstringChunk()
+
+class SubstringFilter(univ.Sequence):
     componentType = namedtype.NamedTypes(
         namedtype.NamedType('type', AttributeDescription()),
-        namedtype.NamedType('substrings', SeqOfSubstringChoice())
+        namedtype.NamedType('substrings', SubstringChunks())
     )
 
 class MatchingRuleId(LDAPString):
