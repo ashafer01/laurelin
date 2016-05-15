@@ -5,7 +5,7 @@ from urlparse import urlparse
 from pyasn1.codec.ber import encoder as BEREncoder, decoder as BERDecoder
 
 from rfc4511 import LDAPDN, Scope as _Scope, AttributeSelection, DerefAliases as _DerefAliases
-from rfc4511 import SearchRequest, LDAPString, NonNegativeInteger, univ
+from rfc4511 import SearchRequest, LDAPString, LDAPResultCode, NonNegativeInteger, univ
 from rfc4511 import BindRequest, AuthenticationChoice, LDAPMessage, MessageID, ProtocolOp
 from filter import parse as parseFilter
 
@@ -104,6 +104,18 @@ class LDAP(object):
 
         ## send request
         self._sendMessage('bindRequest', br)
+
+        ## receive and handle response
+        po = self._recvResponse().getComponentByName('protocolOp')
+        bindRes = po.getComponentByName('bindResponse')
+        if bindRes is not None:
+            bindResCode = bindRes.getComponentByName('resultCode')
+            if bindResCode == LDAPResultCode('success'):
+                return True
+            else:
+                raise LDAPError('Bind failure, got response {0}'.format(repr(bindResCode)))
+        else:
+            raise UnexpectedResponseType()
 
     def search(self, baseDN, scope, filterStr=None, attrList=None, searchTimeout=None,
         limit=0, derefAliases=None, attrsOnly=False):
