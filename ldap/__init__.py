@@ -4,21 +4,11 @@ from socket import create_connection
 from urlparse import urlparse
 from pyasn1.codec.ber import encoder as BEREncoder, decoder as BERDecoder
 
-from rfc4511 import LDAPDN, Scope as _Scope, AttributeSelection, DerefAliases as _DerefAliases
-from rfc4511 import SearchRequest, LDAPString, LDAPResultCode, NonNegativeInteger, univ
-from rfc4511 import BindRequest, AuthenticationChoice, LDAPMessage, MessageID, ProtocolOp
+from rfc4511 import LDAPDN, LDAPString, LDAPResultCode, NonNegativeInteger, univ
+from rfc4511 import SearchRequest, AttributeSelection, BindRequest, AuthenticationChoice
+from rfc4511 import LDAPMessage, MessageID, ProtocolOp
 from filter import parse as parseFilter
-
-class Scope:
-    BASE = _Scope('baseObject')
-    ONELEVEL = _Scope('singleLevel')
-    SUBTREE = _Scope('wholeSubtree')
-
-class DerefAliases:
-    NEVER = _DerefAliases('neverDerefAliases')
-    SEARCH = _DerefAliases('derefInSearching')
-    BASE = _DerefAliases('derefFindingBaseObj')
-    ALWAYS = _DerefAliases('derefAlways')
+from base import Scope, DerefAliases
 
 class LDAPError(Exception):
     pass
@@ -42,9 +32,6 @@ class LDAPObject(dict):
     def __init__(self, dn, attrs):
         self.dn = dn
         dict.__init__(self, attrs)
-
-    def __getattr__(self, key):
-        return self[key]
 
 RECV_BUFFER = 1024
 
