@@ -1,12 +1,18 @@
 __all__ = []
 
+import logging
+logger = logging.getLogger(__name__)
+
 from socket import create_connection
 from urlparse import urlparse
-from pyasn1.codec.ber import encoder as BEREncoder, decoder as BERDecoder
+from pyasn1.type import tag, univ
+from pyasn1.codec.ber.encoder import encode as BEREncode
+from pyasn1.codec.ber.decoder import decode as BERDecode
+from pyasn1.error import SubstrateUnderrunError
 
-from rfc4511 import LDAPDN, LDAPString, LDAPResultCode, NonNegativeInteger, univ
+from rfc4511 import LDAPDN, LDAPString, ResultCode, Integer0ToMax as NonNegativeInteger
 from rfc4511 import SearchRequest, AttributeSelection, BindRequest, AuthenticationChoice
-from rfc4511 import LDAPMessage, MessageID, ProtocolOp
+from rfc4511 import LDAPMessage, MessageID, ProtocolOp, Version as VersionInteger
 from filter import parse as parseFilter
 from base import Scope, DerefAliases
 
@@ -33,7 +39,10 @@ class LDAPObject(dict):
         self.dn = dn
         dict.__init__(self, attrs)
 
-RECV_BUFFER = 1024
+    def __repr__(self):
+        return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, dict.__repr__(self))
+
+RECV_BUFFER = 4096
 
 class LDAP(object):
     ## global defaults
@@ -73,31 +82,41 @@ class LDAP(object):
         po.setComponentByName(op, obj)
         lm.setComponentByName('protocolOp', po)
         self._messageID += 1
-        self.sock.sendall(BEREncoder.encode(lm))
+        raw = BEREncode(lm)
+        self.sock.sendall(raw)
 
-    def _recvResponse(self):
-        # TODO: this will obviously fail in case of objects larger than the buffer
-        raw = self.sock.recv(RECV_BUFFER)
-        return BERDecoder.decode(raw)
+    def _recvResponse(self, raw=''):
+        ret = []
+        try:
+            raw += self.sock.recv(RECV_BUFFER)
+            while len(raw) > 0:
+                response, raw = BERDecode(raw, asn1Spec=LDAPMessage())
+                ret.append(response)
+            return ret
+        except SubstrateUnderrunError:
+            ret += self._recvResponse(raw)
+            return ret
 
     def simpleBind(self, user, pw):
         ## prepare bind request
         br = BindRequest()
-        br.setComponentByName('version', univ.Integer(3))
-        br.setComponentByName('name', LDAPDN(user))
+        br.setComponentByName('version', VersionInteger(3))
+        br.setComponentByName('name', LDAPDN(unicode(user)))
         ac = AuthenticationChoice()
-        ac.setComponentByName('simple', univ.OctetString(pw))
+        ac.setComponentByName('simple', univ.OctetString(unicode(pw)).subtype(
+            implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 0)
+        ))
         br.setComponentByName('authentication', ac)
 
         ## send request
         self._sendMessage('bindRequest', br)
 
         ## receive and handle response
-        po = self._recvResponse().getComponentByName('protocolOp')
+        po = self._recvResponse()[0].getComponentByName('protocolOp')
         bindRes = po.getComponentByName('bindResponse')
         if bindRes is not None:
             bindResCode = bindRes.getComponentByName('resultCode')
-            if bindResCode == LDAPResultCode('success'):
+            if bindResCode == ResultCode('success'):
                 return True
             else:
                 raise LDAPError('Bind failure, got response {0}'.format(repr(bindResCode)))
@@ -139,16 +158,16 @@ class LDAP(object):
 
         ## receive and process response
         searchResults = []
-        while True:
-            po = self._recvResponse().getComponentByName('protocolOp')
+        for res in self._recvResponse():
+            po = res.getComponentByName('protocolOp')
             if po.getComponentByName('searchResDone') is not None:
                 # received all results
                 break
             entry = po.getComponentByName('searchResEntry')
             if entry is not None:
-                DN = entry.getComponentByName('objectName')
+                DN = unicode(entry.getComponentByName('objectName'))
                 attrs = {}
-                _attrs = entry.getComponentName('attributes')
+                _attrs = entry.getComponentByName('attributes')
                 for i in range(0, len(_attrs)):
                     _attr = _attrs.getComponentByPosition(i)
                     attrType = unicode(_attr.getComponentByName('type'))

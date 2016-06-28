@@ -3,9 +3,11 @@
 ## 
 ## Filter parser
 
-from rfc4511 import Filter, FilterSet, AssertionValue
-from rfc4511 import AttributeValueAssertion, AttributeDescription
-from rfc4511 import SubstringFilter, SubstringChunk, SubstringChunks
+from pyasn1.type import tag
+
+from rfc4511 import Filter, And, Or, Not, EqualityMatch, SubstringFilter, GreaterOrEqual
+from rfc4511 import LessOrEqual, Present, ApproxMatch, ExtensibleMatch
+from rfc4511 import AttributeValue, AttributeDescription, Substrings, Substring, AssertionValue
 
 def findClosingParen(text):
     if text[0] != '(':
@@ -38,8 +40,8 @@ def escape(text):
         text = text.replace(*rep)
     return text
 
-def parseSet(filterStr):
-    fset = FilterSet()
+def parseSet(filterStr, cls):
+    fset = cls()
     i = 0
     while len(filterStr) > 0:
         end = findClosingParen(filterStr)+1
@@ -52,53 +54,55 @@ def parse(filterStr):
     fil = Filter()
     chunk = filterStr[1:findClosingParen(filterStr)]
     if chunk[0] == '&':
-        fil.setComponentByName('and', parseSet(chunk[1:]))
+        fil.setComponentByName('and', parseSet(chunk[1:], And))
     elif chunk[0] == '|':
-        fil.setComponentByName('or', parseSet(chunk[1:]))
+        fil.setComponentByName('or', parseSet(chunk[1:], Or))
     elif chunk[0] == '!':
-        fil.setComponentByName('not', parse(chunk[1:]))
+        notFilter = Not()
+        notFilter.setComponentByName('innerNotFilter', parse(chunk[1:]))
+        fil.setComponentByName('notFilter', notFilter)
     else:
         attr, val = chunk.split('=', 1)
         if attr[-1] == '>':
-            ava = AttributeValueAssertion()
+            ava = GreaterOrEqual()
             ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1]))
             ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('greaterOrEqual', ava)
         elif attr[-1] == '<':
-            ava = AttributeValueAssertion()
+            ava = LessOrEqual()
             ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1]))
             ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('lessOrEqual', ava)
         elif attr[-1] == '~':
-            ava = AttributeValueAssertion()
+            ava = ApproxMatch()
             ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1]))
             ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('approxMatch', ava)
         elif val == '*':
-            fil.setComponentByName('present', AttributeDescription(attr))
+            fil.setComponentByName('present', Present(attr))
         elif '*' in val:
             subf = SubstringFilter()
             subf.setComponentByName('type', AttributeDescription(attr))
-            subs = SubstringChunks()
+            subs = Substrings()
             sublist = val.split('*')
             if sublist[0] != '':
-                c = SubstringChunk()
+                c = Substring()
                 c.setComponentByName('initial', AssertionValue(sublist[0]))
                 subs.setComponentByPosition(0, c)
             if sublist[-1] != '':
-                c = SubstringChunk()
+                c = Substring()
                 c.setComponentByName('final', AssertionValue(sublist[-1]))
                 subs.setComponentByPosition(len(sublist)-1, c)
             i = 1
             while i < len(sublist)-1:
-                c = SubstringChunk()
+                c = Substring()
                 c.setComponentByName('any', AssertionValue(sublist[i]))
                 subs.setComponentByPosition(i, c)
                 i += 1
             subf.setComponentByName('substrings', subs)
             fil.setComponentByName('substrings', subf)
         else:
-            ava = AttributeValueAssertion()
+            ava = EqualityMatch()
             ava.setComponentByName('attributeDesc', AttributeDescription(attr))
             ava.setComponentByName('assertionValue', AttributeValue(val))
             fil.setComponentByName('equalityMatch', ava)
