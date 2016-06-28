@@ -6,6 +6,7 @@
 from rfc4511 import Filter, And, Or, Not, EqualityMatch, SubstringFilter, GreaterOrEqual
 from rfc4511 import LessOrEqual, Present, ApproxMatch, ExtensibleMatch
 from rfc4511 import AttributeValue, AttributeDescription, Substrings, Substring, AssertionValue
+from rfc4511 import Initial, Any, Final
 
 def findClosingParen(text):
     if text[0] != '(':
@@ -85,16 +86,16 @@ def parse(filterStr):
             sublist = val.split('*')
             if sublist[0] != '':
                 c = Substring()
-                c.setComponentByName('initial', AssertionValue(sublist[0]))
+                c.setComponentByName('initial', Initial(sublist[0]))
                 subs.setComponentByPosition(0, c)
             if sublist[-1] != '':
                 c = Substring()
-                c.setComponentByName('final', AssertionValue(sublist[-1]))
+                c.setComponentByName('final', Final(sublist[-1]))
                 subs.setComponentByPosition(len(sublist)-1, c)
             i = 1
             while i < len(sublist)-1:
                 c = Substring()
-                c.setComponentByName('any', AssertionValue(sublist[i]))
+                c.setComponentByName('any', Any(sublist[i]))
                 subs.setComponentByPosition(i, c)
                 i += 1
             subf.setComponentByName('substrings', subs)
