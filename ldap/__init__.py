@@ -1,11 +1,8 @@
 __all__ = []
 
-import logging
-logger = logging.getLogger(__name__)
-
 from socket import create_connection
 from urlparse import urlparse
-from pyasn1.type import tag, univ
+
 from pyasn1.codec.ber.encoder import encode as BEREncode
 from pyasn1.codec.ber.decoder import decode as BERDecode
 from pyasn1.error import SubstrateUnderrunError
@@ -13,6 +10,7 @@ from pyasn1.error import SubstrateUnderrunError
 from rfc4511 import LDAPDN, LDAPString, ResultCode, Integer0ToMax as NonNegativeInteger
 from rfc4511 import SearchRequest, AttributeSelection, BindRequest, AuthenticationChoice
 from rfc4511 import LDAPMessage, MessageID, ProtocolOp, Version as VersionInteger
+from rfc4511 import Simple as SimpleCreds, TypesOnly
 from filter import parse as parseFilter
 from base import Scope, DerefAliases
 
@@ -44,6 +42,8 @@ class LDAPObject(dict):
 
 RECV_BUFFER = 4096
 
+_sockets = {}
+
 class LDAP(object):
     ## global defaults
     DEFAULT_FILTER = '(objectClass=*)'
@@ -55,14 +55,15 @@ class LDAP(object):
     ALL_USER_ATTRS = '*'
 
     def __init__(self, hostURI, searchTimeout=DEFAULT_SEARCH_TIMEOUT,
-        derefAliases=DEFAULT_DEREF_ALIASES, connectTimeout=5):
+        derefAliases=DEFAULT_DEREF_ALIASES, connectTimeout=5, reuseConnection=True):
 
+        ## setup
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
 
         self._messageID = 1
 
-        ## connect
+        ## handle URI
         parsedURI = urlparse(hostURI)
         if parsedURI.scheme == 'ldap':
             ap = parsedURI.netloc.split(':', 1)
@@ -73,7 +74,15 @@ class LDAP(object):
                 port = int(ap[1])
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
-        self.sock = create_connection((address, port), connectTimeout)
+        addr = (address, port)
+
+        ## connect
+        if reuseConnection:
+            if addr not in _sockets:
+                _sockets[addr] = create_connection(addr, connectTimeout)
+            self.sock = _sockets[addr]
+        else:
+            self.sock = create_connection(addr, connectTimeout)
 
     def _sendMessage(self, op, obj):
         lm = LDAPMessage()
@@ -103,9 +112,7 @@ class LDAP(object):
         br.setComponentByName('version', VersionInteger(3))
         br.setComponentByName('name', LDAPDN(unicode(user)))
         ac = AuthenticationChoice()
-        ac.setComponentByName('simple', univ.OctetString(unicode(pw)).subtype(
-            implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 0)
-        ))
+        ac.setComponentByName('simple', SimpleCreds(unicode(pw)))
         br.setComponentByName('authentication', ac)
 
         ## send request
@@ -123,10 +130,22 @@ class LDAP(object):
         else:
             raise UnexpectedResponseType()
 
+    # get a specific object by DN
+    def get(self, DN, attrList=None):
+        results = self.search(DN, Scope.BASE, attrList=attrList, limit=2)
+        n = len(results)
+        if n == 0:
+            raise NoSearchResults()
+        elif n > 1:
+            raise MultipleSearchResults()
+        else:
+            return results[0]
+
+    # do a search and return a list of objects
     def search(self, baseDN, scope, filterStr=None, attrList=None, searchTimeout=None,
         limit=0, derefAliases=None, attrsOnly=False):
-        ## prepare search request
 
+        ## prepare search request
         req = SearchRequest()
         if filterStr is None:
             filterStr = LDAP.DEFAULT_FILTER
@@ -139,7 +158,7 @@ class LDAP(object):
         req.setComponentByName('derefAliases', derefAliases)
         req.setComponentByName('sizeLimit', NonNegativeInteger(limit))
         req.setComponentByName('timeLimit', NonNegativeInteger(searchTimeout))
-        req.setComponentByName('typesOnly', univ.Boolean(attrsOnly))
+        req.setComponentByName('typesOnly', TypesOnly(attrsOnly))
         req.setComponentByName('filter', parseFilter(filterStr))
 
         attrs = AttributeSelection()
@@ -160,9 +179,6 @@ class LDAP(object):
         searchResults = []
         for res in self._recvResponse():
             po = res.getComponentByName('protocolOp')
-            if po.getComponentByName('searchResDone') is not None:
-                # received all results
-                break
             entry = po.getComponentByName('searchResEntry')
             if entry is not None:
                 DN = unicode(entry.getComponentByName('objectName'))
@@ -177,6 +193,8 @@ class LDAP(object):
                         vals.append(unicode(_vals.getComponentByPosition(j)))
                     attrs[attrType] = vals
                 searchResults.append(LDAPObject(DN, attrs))
+            elif po.getComponentByName('searchResDone') is not None:
+                break
             else:
                 raise UnexpectedResponseType()
         return searchResults

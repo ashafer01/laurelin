@@ -3,8 +3,6 @@
 ## 
 ## Filter parser
 
-from pyasn1.type import tag
-
 from rfc4511 import Filter, And, Or, Not, EqualityMatch, SubstringFilter, GreaterOrEqual
 from rfc4511 import LessOrEqual, Present, ApproxMatch, ExtensibleMatch
 from rfc4511 import AttributeValue, AttributeDescription, Substrings, Substring, AssertionValue
