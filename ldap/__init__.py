@@ -90,8 +90,7 @@ def _unpack(ops, ldapMessage):
         ret = po.getComponentByName(op)
         if ret is not None:
             return ret
-        else:
-            raise UnexpectedResponseType()
+    raise UnexpectedResponseType()
 
 # for storing reusable sockets
 _sockets = {}
