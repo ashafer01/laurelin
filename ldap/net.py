@@ -31,6 +31,7 @@ class LDAPSocket(object):
         self.ID = _nextSockID
         _nextSockID += 1
         self.URI = hostURI
+        self.bound = False
         self.unbound = False
 
     def sendMessage(self, op, obj):
