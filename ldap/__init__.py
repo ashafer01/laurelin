@@ -38,17 +38,6 @@ class UnboundConnectionError(LDAPError):
 class AbandonedAsyncError(LDAPError):
     pass
 
-# unpack an object from an LDAPMessage envelope
-def _unpack(ops, ldapMessage):
-    if not hasattr(ops, '__iter__'):
-        ops = [ops]
-    po = ldapMessage.getComponentByName('protocolOp')
-    for op in ops:
-        ret = po.getComponentByName(op)
-        if ret is not None:
-            return ret
-    raise UnexpectedResponseType()
-
 # for storing reusable sockets
 _sockets = {}
 
@@ -59,34 +48,6 @@ class LDAPObject(dict):
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, dict.__repr__(self))
-
-class AsyncHandle(object):
-    def __init__(self, sock, messageID, postProcess=None):
-        self.messageID = messageID
-        self.sock = sock
-        self.postProcess = postProcess
-        self.abandoned = False
-
-    def wait(self, min=1):
-        if self.sock.unbound:
-            raise UnboundConnectionError()
-        if self.abandoned:
-            raise AbandonedAsyncError()
-        logger.debug('Waiting for at least {0} object(s) for messageID={1}'.format(min, self.messageID))
-        ret = []
-        while len(ret) < min:
-            ret += self.sock.recvResponse(self.messageID)
-        if self.postProcess is not None:
-            ret = self.postProcess(ret)
-        logger.debug('Done waiting for messageID={0}'.format(self.messageID))
-        return ret
-
-    def abandon(self):
-        if self.sock.unbound:
-            raise UnboundConnectionError()
-        logger.debug('Abandoning messageID={0}'.format(self.messageID))
-        self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
-        self.abandoned = True
 
 class LDAP(object):
     ## global defaults
@@ -251,6 +212,17 @@ class LDAP(object):
         logger.debug('Abandoning messageID={0}'.format(messageID))
         self.sock.sendMessage('abandonRequest', AbandonRequest(messageID))
 
+# unpack an object from an LDAPMessage envelope
+def _unpack(ops, ldapMessage):
+    if not hasattr(ops, '__iter__'):
+        ops = [ops]
+    po = ldapMessage.getComponentByName('protocolOp')
+    for op in ops:
+        ret = po.getComponentByName(op)
+        if ret is not None:
+            return ret
+    raise UnexpectedResponseType()
+
 # convert a list of rfc4511.LDAPMessage containing search results to a list of LDAPObject
 def _processSearchResults(ldapMessages):
     searchResults = []
@@ -282,3 +254,31 @@ def _processSearchResults(ldapMessages):
             else:
                 raise UnexpectedResponseType()
     return searchResults
+
+class AsyncHandle(object):
+    def __init__(self, sock, messageID, postProcess=None):
+        self.messageID = messageID
+        self.sock = sock
+        self.postProcess = postProcess
+        self.abandoned = False
+
+    def wait(self, min=1):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
+        if self.abandoned:
+            raise AbandonedAsyncError()
+        logger.debug('Waiting for at least {0} object(s) for messageID={1}'.format(min, self.messageID))
+        ret = []
+        while len(ret) < min:
+            ret += self.sock.recvResponse(self.messageID)
+        if self.postProcess is not None:
+            ret = self.postProcess(ret)
+        logger.debug('Done waiting for messageID={0}'.format(self.messageID))
+        return ret
+
+    def abandon(self):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
+        logger.debug('Abandoning messageID={0}'.format(self.messageID))
+        self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
+        self.abandoned = True
