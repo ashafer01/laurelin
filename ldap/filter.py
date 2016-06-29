@@ -59,7 +59,7 @@ def parse(filterStr):
     elif chunk[0] == '!':
         notFilter = Not()
         notFilter.setComponentByName('innerNotFilter', parse(chunk[1:]))
-        fil.setComponentByName('notFilter', notFilter)
+        fil.setComponentByName('not', notFilter)
     else:
         attr, val = chunk.split('=', 1)
         if attr[-1] == '>':

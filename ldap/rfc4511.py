@@ -643,7 +643,7 @@ class Filter(Choice):
     #          ...  }
     componentType = NamedTypes(NamedType('and', And()),
                                NamedType('or', Or()),
-                               NamedType('notFilter', Not()),
+                               NamedType('not', Not()),
                                NamedType('equalityMatch', EqualityMatch()),
                                NamedType('substringFilter', SubstringFilter()),
                                NamedType('greaterOrEqual', GreaterOrEqual()),

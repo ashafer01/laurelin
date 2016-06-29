@@ -6,7 +6,7 @@
 from base import Scope
 
 class LDAPTreeNode(object):
-    def __init__(self, dn, root, tag=None, dnAttr=None, searchScope=None):
+    def __init__(self, dn, root, tag=None, dnAttr=None, searchScope=None, delegate=None):
         self.dn = dn
         self.root = root
         self.nodes = []
@@ -15,6 +15,8 @@ class LDAPTreeNode(object):
             searchScope = Scope.ONELEVEL
         self.searchScope = searchScope
         self.dnAttr = dnAttr
+        if delegate is None:
+            self.delegate = self.root.delegate
 
     def addNode(self, dnPrefix, tag=None, dnAttr=None, searchScope=None):
         dn = self.childDN(dnPrefix)

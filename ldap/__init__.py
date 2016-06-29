@@ -9,8 +9,9 @@ from pyasn1.error import SubstrateUnderrunError
 
 from rfc4511 import LDAPDN, LDAPString, ResultCode, Integer0ToMax as NonNegativeInteger
 from rfc4511 import SearchRequest, AttributeSelection, BindRequest, AuthenticationChoice
-from rfc4511 import LDAPMessage, MessageID, ProtocolOp, Version as VersionInteger
-from rfc4511 import Simple as SimpleCreds, TypesOnly
+from rfc4511 import LDAPMessage, MessageID, ProtocolOp, Version, UnbindRequest, CompareRequest
+from rfc4511 import Simple as SimpleCreds, TypesOnly, AttributeValueAssertion
+from rfc4511 import AttributeDescription, AssertionValue, AbandonRequest
 from filter import parse as parseFilter
 from base import Scope, DerefAliases
 
@@ -32,38 +33,14 @@ class UnexpectedDN(UnexpectedSearchResults):
 class UnexpectedResponseType(LDAPError):
     pass
 
-class LDAPObject(dict):
-    def __init__(self, dn, attrs):
-        self.dn = dn
-        dict.__init__(self, attrs)
+class UnboundConnectionError(LDAPError):
+    def __init__(self):
+        LDAPError.__init__(self, 'The connection has been unbound')
 
-    def __repr__(self):
-        return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, dict.__repr__(self))
+def LDAPSocket(object):
+    RECV_BUFFER = 4096
 
-RECV_BUFFER = 4096
-
-_sockets = {}
-
-class LDAP(object):
-    ## global defaults
-    DEFAULT_FILTER = '(objectClass=*)'
-    DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
-    DEFAULT_SEARCH_TIMEOUT = 0
-
-    ## other constants
-    NO_ATTRS = '1.1'
-    ALL_USER_ATTRS = '*'
-
-    def __init__(self, hostURI, searchTimeout=DEFAULT_SEARCH_TIMEOUT,
-        derefAliases=DEFAULT_DEREF_ALIASES, connectTimeout=5, reuseConnection=True):
-
-        ## setup
-        self.defaultSearchTimeout = searchTimeout
-        self.defaultDerefAliases = derefAliases
-
-        self._messageID = 1
-
-        ## handle URI
+    def __init__(self, hostURI, connectTimeout=5):
         parsedURI = urlparse(hostURI)
         if parsedURI.scheme == 'ldap':
             ap = parsedURI.netloc.split(':', 1)
@@ -74,27 +51,22 @@ class LDAP(object):
                 port = int(ap[1])
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
-        addr = (address, port)
+        self.addr = (address, port)
+        self.sock = create_connection(self.addr, connectTimeout)
+        self.unbound = False
 
-        ## connect
-        if reuseConnection:
-            if addr not in _sockets:
-                _sockets[addr] = create_connection(addr, connectTimeout)
-            self.sock = _sockets[addr]
-        else:
-            self.sock = create_connection(addr, connectTimeout)
-
-    def _sendMessage(self, op, obj):
+    def sendMessage(self, op, obj):
+        mID = self._messageID
         lm = LDAPMessage()
-        lm.setComponentByName('messageID', self._messageID)
+        lm.setComponentByName('messageID', MessageID(mID))
         po = ProtocolOp()
         po.setComponentByName(op, obj)
         lm.setComponentByName('protocolOp', po)
         self._messageID += 1
-        raw = BEREncode(lm)
-        self.sock.sendall(raw)
+        self.sock.sendall(BEREncode(lm))
+        return mID
 
-    def _recvResponse(self, raw=''):
+    def recvResponse(self, raw=''):
         ret = []
         try:
             raw += self.sock.recv(RECV_BUFFER)
@@ -103,35 +75,108 @@ class LDAP(object):
                 ret.append(response)
             return ret
         except SubstrateUnderrunError:
-            ret += self._recvResponse(raw)
+            ret += self.recvResponse(raw)
             return ret
 
+    def close(self):
+        return self.sock.close()
+
+# unpack an object from an LDAPMessage envelope
+def _unpack(ops, ldapMessage):
+    if not hasattr(ops, '__iter__'):
+        ops = [ops]
+    po = ldapMessage.getComponentByName('protocolOp')
+    for op in ops:
+        ret = po.getComponentByName(op)
+        if ret is not None:
+            return ret
+        else:
+            raise UnexpectedResponseType()
+
+# for storing reusable sockets
+_sockets = {}
+
+class LDAPObject(dict):
+    def __init__(self, dn, attrs):
+        self.dn = dn
+        dict.__init__(self, attrs)
+
+    def __repr__(self):
+        return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, dict.__repr__(self))
+
+class LDAP(object):
+    ## global defaults
+    DEFAULT_FILTER = '(objectClass=*)'
+    DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
+    DEFAULT_SEARCH_TIMEOUT = 0
+    DEFAULT_CONNECT_TIMEOUT = 5
+
+    ## other constants
+    NO_ATTRS = '1.1'
+    ALL_USER_ATTRS = '*'
+
+    def __init__(self, hostURI,
+        reuseConnection=True,
+        reuseConnectionFrom=None
+        connectTimeout=DEFAULT_CONNECT_TIMEOUT,
+        searchTimeout=DEFAULT_SEARCH_TIMEOUT,
+        derefAliases=DEFAULT_DEREF_ALIASES,
+        ):
+
+        ## setup
+        self.defaultSearchTimeout = searchTimeout
+        self.defaultDerefAliases = derefAliases
+        self._messageID = 1
+
+        ## connect
+        if reuseConnectionFrom is not None:
+            self.sock = reuseConnectionFrom.sock
+        elif reuseConnection:
+            if self.sockAddr not in _sockets:
+                _sockets[hostURI] = LDAPSocket(hostURI, connectTimeout)
+            self.sock  = _sockets[hostURI]
+        else:
+            self.sock = LDAPSocket(hostURI, connectTimeout)
+
     def simpleBind(self, user, pw):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
+
         ## prepare bind request
         br = BindRequest()
-        br.setComponentByName('version', VersionInteger(3))
+        br.setComponentByName('version', Version(3))
         br.setComponentByName('name', LDAPDN(unicode(user)))
         ac = AuthenticationChoice()
         ac.setComponentByName('simple', SimpleCreds(unicode(pw)))
         br.setComponentByName('authentication', ac)
 
         ## send request
-        self._sendMessage('bindRequest', br)
+        self.sock.sendMessage('bindRequest', br)
 
         ## receive and handle response
-        po = self._recvResponse()[0].getComponentByName('protocolOp')
-        bindRes = po.getComponentByName('bindResponse')
-        if bindRes is not None:
-            bindResCode = bindRes.getComponentByName('resultCode')
-            if bindResCode == ResultCode('success'):
-                return True
-            else:
-                raise LDAPError('Bind failure, got response {0}'.format(repr(bindResCode)))
+        bindRes = _unpack('bindResponse', self.sock.recvResponse()[0])
+        bindResCode = bindRes.getComponentByName('resultCode')
+        if bindResCode == ResultCode('success'):
+            return True
         else:
-            raise UnexpectedResponseType()
+            raise LDAPError('Bind failure, got response {0}'.format(repr(bindResCode)))
+
+    def unbind(self):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
+
+        self.sock.sendMessage('unbindRequest', UnbindRequest())
+        self.sock.close()
+        self.sock.unbound = True
+        try:
+            _sockets.pop(self.sockAddr)
+        except KeyError:
+            pass
 
     # get a specific object by DN
     def get(self, DN, attrList=None):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
         results = self.search(DN, Scope.BASE, attrList=attrList, limit=2)
         n = len(results)
         if n == 0:
@@ -141,9 +186,13 @@ class LDAP(object):
         else:
             return results[0]
 
-    # do a search and return a list of objects
-    def search(self, baseDN, scope, filterStr=None, attrList=None, searchTimeout=None,
+    # do a search and run a callback on each result object
+    # useful for large result sets which do not need to be stored in memory
+    # if callback returns non-None, this will be stored in a list and returned
+    def searchCallback(self, callback, baseDN, scope, filterStr=None, attrList=None, searchTimeout=None,
         limit=0, derefAliases=None, attrsOnly=False):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
 
         ## prepare search request
         req = SearchRequest()
@@ -173,11 +222,11 @@ class LDAP(object):
         req.setComponentByName('attributes', attrs)
 
         ## send request
-        self._sendMessage('searchRequest', req)
+        self.sock.sendMessage('searchRequest', req)
 
         ## receive and process response
         searchResults = []
-        for res in self._recvResponse():
+        for res in self.sock.recvResponse():
             po = res.getComponentByName('protocolOp')
             entry = po.getComponentByName('searchResEntry')
             if entry is not None:
@@ -192,9 +241,46 @@ class LDAP(object):
                     for j in range(0, len(_vals)):
                         vals.append(unicode(_vals.getComponentByPosition(j)))
                     attrs[attrType] = vals
-                searchResults.append(LDAPObject(DN, attrs))
+                processed = callback(LDAPObject(DN, attrs))
+                if processed is not None:
+                    searchResults.append(processed)
             elif po.getComponentByName('searchResDone') is not None:
                 break
             else:
                 raise UnexpectedResponseType()
         return searchResults
+
+    # do a search and read all results into memory
+    def search(self, *args, **kwds):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
+        def storeRes(obj):
+            return obj
+        return self.searchCallback(storeRes, *args, **kwds)
+
+    # return True if the object identified by DN has the given attr=value
+    def compare(self, DN, attr, value):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
+
+        cr = CompareRequest()
+        cr.setComponentByName('entry', LDAPDN(unicode(DN)))
+        ava = AttributeValueAssertion()
+        ava.setComponentByName('attributeDesc', AttributeDescription(unicode(attr)))
+        ava.setComponentByName('assertionValue', AssertionValue(unicode(value)))
+        cr.setComponentByName('ava', ava)
+
+        self.sock.sendMessage('compareRequest', cr)
+        res = _unpack('compareResponse', self.sock.recvResponse()[0]).getComponentByName('resultCode')
+        if res == ResultCode('compareTrue'):
+            return True
+        elif res == ResultCode('compareFalse'):
+            return False
+        else:
+            raise LDAPError('Got compare result {0}'.format(repr(res)))
+
+    def abandon(self, messageID):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
+
+        self.sock.sendMessage('abandonRequest', AbandonRequest(messageID))
