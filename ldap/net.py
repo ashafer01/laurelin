@@ -63,7 +63,7 @@ class LDAPSocket(object):
                     ret.append(response)
             return ret
         except SubstrateUnderrunError:
-            ret += self.recvResponse(messageID, raw)
+            ret += self.recvResponse(wantMessageID, raw)
             return ret
 
     def close(self):

@@ -168,8 +168,9 @@ class LDAP(object):
         req.setComponentByName('attributes', attrs)
 
         ## send request
-        logger.debug('Sending search request: baseDN={0}, scope={1}, filterStr={2}'.format(baseDN, scope, filterStr))
-        return self.sock.sendMessage('searchRequest', req)
+        mID = self.sock.sendMessage('searchRequest', req)
+        logger.debug('Sent search request: messageID={0}, baseDN={1}, scope={2}, filterStr={3}'.format(mID, baseDN, scope, filterStr))
+        return mID
 
     # syncronous search
     def search(self, *args, **kwds):
@@ -204,13 +205,6 @@ class LDAP(object):
             return False
         else:
             raise LDAPError('Got compare result {0}'.format(repr(res)))
-
-    def abandon(self, messageID):
-        if self.sock.unbound:
-            raise UnboundConnectionError()
-
-        logger.debug('Abandoning messageID={0}'.format(messageID))
-        self.sock.sendMessage('abandonRequest', AbandonRequest(messageID))
 
 # unpack an object from an LDAPMessage envelope
 def _unpack(ops, ldapMessage):
