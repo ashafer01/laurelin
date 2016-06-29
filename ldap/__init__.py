@@ -1,7 +1,7 @@
 __all__ = []
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('pyldap')
 stderrHandler = logging.StreamHandler()
 stderrHandler.setFormatter(logging.Formatter('[%(asctime)s] %(name)s %(levelname)s : %(message)s'))
 logger.addHandler(stderrHandler)
@@ -35,6 +35,9 @@ class UnboundConnectionError(LDAPError):
     def __init__(self):
         LDAPError.__init__(self, 'The connection has been unbound')
 
+class AbandonedAsyncError(LDAPError):
+    pass
+
 # unpack an object from an LDAPMessage envelope
 def _unpack(ops, ldapMessage):
     if not hasattr(ops, '__iter__'):
@@ -56,6 +59,34 @@ class LDAPObject(dict):
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, dict.__repr__(self))
+
+class AsyncHandle(object):
+    def __init__(self, sock, messageID, postProcess=None):
+        self.messageID = messageID
+        self.sock = sock
+        self.postProcess = postProcess
+        self.abandoned = False
+
+    def wait(self, min=1):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
+        if self.abandoned:
+            raise AbandonedAsyncError()
+        logger.debug('Waiting for at least {0} object(s) for messageID={1}'.format(min, self.messageID))
+        ret = []
+        while len(ret) < min:
+            ret += self.sock.recvResponse(self.messageID)
+        if self.postProcess is not None:
+            ret = self.postProcess(ret)
+        logger.debug('Done waiting for messageID={0}'.format(self.messageID))
+        return ret
+
+    def abandon(self):
+        if self.sock.unbound:
+            raise UnboundConnectionError()
+        logger.debug('Abandoning messageID={0}'.format(self.messageID))
+        self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
+        self.abandoned = True
 
 class LDAP(object):
     ## global defaults
@@ -89,6 +120,7 @@ class LDAP(object):
             self.sock  = _sockets[hostURI]
         else:
             self.sock = LDAPSocket(hostURI, connectTimeout)
+        logger.debug('Connected to {0} (#{1})'.format(hostURI, self.sock.ID))
 
     def simpleBind(self, user, pw):
         if self.sock.unbound:
@@ -103,7 +135,7 @@ class LDAP(object):
         br.setComponentByName('authentication', ac)
 
         ## send request
-        logger.debug('Binding on {0} as {1}'.format(self.sock.URI, user))
+        logger.debug('Binding on {0} (#{1}) as {2}'.format(self.sock.URI, self.sock.ID, user))
         self.sock.sendMessage('bindRequest', br)
 
         ## receive and handle response
@@ -122,9 +154,9 @@ class LDAP(object):
         self.sock.sendMessage('unbindRequest', UnbindRequest())
         self.sock.close()
         self.sock.unbound = True
-        logger.debug('Unbound on {1}'.format(self.sock.URI))
+        logger.debug('Unbound on {0} (#{1})'.format(self.sock.URI, self.sock.ID))
         try:
-            _sockets.pop(self.sockAddr)
+            _sockets.pop(self.sock.URI)
         except KeyError:
             pass
 
@@ -141,8 +173,8 @@ class LDAP(object):
         else:
             return results[0]
 
-    # do a search and return a list of LDAPObjects
-    def search(self, baseDN, scope, filterStr=None, attrList=None, searchTimeout=None,
+    # send a search request
+    def _sendSearch(self, baseDN, scope, filterStr=None, attrList=None, searchTimeout=None,
         limit=0, derefAliases=None, attrsOnly=False):
         if self.sock.unbound:
             raise UnboundConnectionError()
@@ -176,38 +208,17 @@ class LDAP(object):
 
         ## send request
         logger.debug('Sending search request: baseDN={0}, scope={1}, filterStr={2}'.format(baseDN, scope, filterStr))
-        self.sock.sendMessage('searchRequest', req)
+        return self.sock.sendMessage('searchRequest', req)
 
-        ## receive and process response
-        searchResults = []
-        for res in self.sock.recvResponse():
-            po = res.getComponentByName('protocolOp')
-            entry = po.getComponentByName('searchResEntry')
-            if entry is not None:
-                DN = unicode(entry.getComponentByName('objectName'))
-                attrs = {}
-                _attrs = entry.getComponentByName('attributes')
-                for i in range(0, len(_attrs)):
-                    _attr = _attrs.getComponentByPosition(i)
-                    attrType = unicode(_attr.getComponentByName('type'))
-                    _vals = _attr.getComponentByName('vals')
-                    vals = []
-                    for j in range(0, len(_vals)):
-                        vals.append(unicode(_vals.getComponentByPosition(j)))
-                    attrs[attrType] = vals
-                searchResults.append(LDAPObject(DN, attrs))
-                logger.debug('Got search result object {0}'.format(DN))
-            else:
-                done = po.getComponentByName('searchResDone')
-                if done is not None:
-                    result = done.getComponentByName('resultCode')
-                    if result == ResultCode('success'):
-                        logger.debug('Search completed successfully')
-                    else:
-                        raise LDAPError('Search returned {0}'.format(repr(result)))
-                else:
-                    raise UnexpectedResponseType()
-        return searchResults
+    # syncronous search
+    def search(self, *args, **kwds):
+        mID = self._sendSearch(*args, **kwds)
+        return _processSearchResults(self.sock.recvResponse(mID))
+
+    # asyncronous search
+    def searchAsync(self, *args, **kwds):
+        mID = self._sendSearch(*args, **kwds)
+        return AsyncHandle(self.sock, mID, _processSearchResults)
 
     # return True if the object identified by DN has the given attr=value
     def compare(self, DN, attr, value):
@@ -239,3 +250,35 @@ class LDAP(object):
 
         logger.debug('Abandoning messageID={0}'.format(messageID))
         self.sock.sendMessage('abandonRequest', AbandonRequest(messageID))
+
+# convert a list of rfc4511.LDAPMessage containing search results to a list of LDAPObject
+def _processSearchResults(ldapMessages):
+    searchResults = []
+    for res in ldapMessages:
+        po = res.getComponentByName('protocolOp')
+        entry = po.getComponentByName('searchResEntry')
+        if entry is not None:
+            DN = unicode(entry.getComponentByName('objectName'))
+            attrs = {}
+            _attrs = entry.getComponentByName('attributes')
+            for i in range(0, len(_attrs)):
+                _attr = _attrs.getComponentByPosition(i)
+                attrType = unicode(_attr.getComponentByName('type'))
+                _vals = _attr.getComponentByName('vals')
+                vals = []
+                for j in range(0, len(_vals)):
+                    vals.append(unicode(_vals.getComponentByPosition(j)))
+                attrs[attrType] = vals
+            searchResults.append(LDAPObject(DN, attrs))
+            logger.debug('Got search result object {0}'.format(DN))
+        else:
+            done = po.getComponentByName('searchResDone')
+            if done is not None:
+                result = done.getComponentByName('resultCode')
+                if result == ResultCode('success'):
+                    logger.debug('Search completed successfully')
+                else:
+                    raise LDAPError('Search returned {0}'.format(repr(result)))
+            else:
+                raise UnexpectedResponseType()
+    return searchResults

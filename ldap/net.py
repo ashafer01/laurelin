@@ -7,6 +7,8 @@ from pyasn1.error import SubstrateUnderrunError
 from rfc4511 import LDAPMessage, MessageID, ProtocolOp
 from base import LDAPError
 
+_nextSockID = 0
+
 class LDAPSocket(object):
     RECV_BUFFER = 4096
 
@@ -21,34 +23,48 @@ class LDAPSocket(object):
                 port = int(ap[1])
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
+        self._sock = create_connection((address, port), connectTimeout)
+        self._messageQueue = []
+        self._nextMessageID = 1
+
+        global _nextSockID
+        self.ID = _nextSockID
+        _nextSockID += 1
         self.URI = hostURI
-        self.addr = (address, port)
-        self.sock = create_connection(self.addr, connectTimeout)
         self.unbound = False
-        self.messageID = 1
 
     def sendMessage(self, op, obj):
-        mID = self.messageID
+        mID = self._nextMessageID
         lm = LDAPMessage()
         lm.setComponentByName('messageID', MessageID(mID))
         po = ProtocolOp()
         po.setComponentByName(op, obj)
         lm.setComponentByName('protocolOp', po)
-        self.messageID += 1
-        self.sock.sendall(berEncode(lm))
+        self._nextMessageID += 1
+        self._sock.sendall(berEncode(lm))
         return mID
 
-    def recvResponse(self, raw=''):
+    def recvResponse(self, wantMessageID=0, raw=''):
         ret = []
+        for obj in self._messageQueue:
+            if (wantMessageID <= 0) or (obj.getComponentByName('messageID') == wantMessageID):
+                ret.append(obj)
+                self._messageQueue.remove(obj)
         try:
-            raw += self.sock.recv(LDAPSocket.RECV_BUFFER)
+            raw += self._sock.recv(LDAPSocket.RECV_BUFFER)
             while len(raw) > 0:
                 response, raw = berDecode(raw, asn1Spec=LDAPMessage())
-                ret.append(response)
+                if wantMessageID > 0:
+                    if wantMessageID == response.getComponentByName('messageID'):
+                        ret.append(response)
+                    else:
+                        self._messageQueue.append(response)
+                else:
+                    ret.append(response)
             return ret
         except SubstrateUnderrunError:
-            ret += self.recvResponse(raw)
+            ret += self.recvResponse(messageID, raw)
             return ret
 
     def close(self):
-        return self.sock.close()
+        return self._sock.close()
