@@ -5,6 +5,18 @@ class Scope:
     ONELEVEL = _Scope('singleLevel')
     SUBTREE = _Scope('wholeSubtree')
 
+    # translate RFC4516 URL scope strings to constant
+    @staticmethod
+    def string(str):
+        if str == 'base':
+            return Scope.BASE
+        elif str == 'one':
+            return Scope.ONELEVEL
+        elif str == 'sub':
+            return Scope.SUBTREE
+        else:
+            raise ValueError()
+
 class DerefAliases:
     NEVER = _DerefAliases('neverDerefAliases')
     SEARCH = _DerefAliases('derefInSearching')

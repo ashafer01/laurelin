@@ -1,6 +1,8 @@
 __all__ = []
 
+from urlparse import urlparse
 import logging
+import random
 logger = logging.getLogger('pyldap')
 stderrHandler = logging.StreamHandler()
 stderrHandler.setFormatter(logging.Formatter('[%(asctime)s] %(name)s %(levelname)s : %(message)s'))
@@ -25,7 +27,9 @@ def _unpack(op, ldapMessage):
     else:
         raise UnexpectedResponseType()
 
-# recv all objects from given LDAPSocket until we get a SearchResultDone; return a list of LDAPObject
+# recv all objects from given LDAPSocket until we get a SearchResultDone; return a list of
+# LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
+# TODO this may block indefinitely if abandoned
 def _recvSearchResults(sock, messageID):
     ret = []
     logger.debug('Receiving all search results for messageID={0}'.format(messageID))
@@ -47,13 +51,21 @@ def _recvSearchResults(sock, messageID):
                 ret.append(LDAPObject(DN, attrs))
                 logger.debug('Got search result object {0}'.format(DN))
             except UnexpectedResponseType:
-                done = _unpack('searchResDone', msg)
-                result = done.getComponentByName('resultCode')
-                if result == ResultCode('success'):
-                    logger.debug('Search completed successfully')
-                    return ret
-                else:
-                    raise LDAPError('Search returned {0}'.format(repr(result)))
+                try:
+                    done = _unpack('searchResDone', msg)
+                    result = done.getComponentByName('resultCode')
+                    if result == ResultCode('success'):
+                        logger.debug('Search completed successfully')
+                        return ret
+                    else:
+                        raise LDAPError('Search returned {0}'.format(repr(result)))
+                except UnexpectedResponseType:
+                    resref = _unpack('searchResRef', msg)
+                    URIs = []
+                    for i in range(0, len(resref)):
+                        URIs.append(unicode(resref.getComponentByPosition(i)))
+                    logger.debug('Got search reference to: {0}'.format(' | '.join(URIs)))
+                    ret.append(SearchReferenceHandle(URIs))
 
 # convert compare result codes to boolean
 def _processCompareResults(ldapMessages):
@@ -66,6 +78,30 @@ def _processCompareResults(ldapMessages):
         return False
     else:
         raise LDAPError('Got compare result {0}'.format(repr(res)))
+
+# perform a search based on an RFC4516 URI
+def searchByURI(uri):
+    parsedURI = urlparse(uri)
+    hostURI = '{0}://{1}'.format(parsedURI.scheme, parsedURL.netloc)
+    ldap = LDAP(hostURI, reuseConnection=False)
+    DN = parsedURI.path
+    params = parsedURI.query.split('?')
+    nparams = len(params)
+    if (nparams > 0) and (len(params[0]) > 0):
+        attrList = params[0].split(',')
+    else:
+        attrList = [LDAP.ALL_USER_ATTRS]
+    if (nparams > 1) and (len(params[1]) > 0):
+        scope = Scope.string(params[1])
+    else:
+        scope = Scope.BASE
+    if (nparams > 2) and (len(params[2]) > 0):
+        filter = params[2]
+    else:
+        filter = LDAP.DEFAULT_FILTER
+    if (nparams > 3) and (len(params[3]) > 0):
+        raise LDAPError('Extensions for searchByURL not yet implemented')
+    return ldap.search(DN, scope, filterStr=filter, attrList=attrList)
 
 # for storing reusable sockets
 _sockets = {}
@@ -267,6 +303,15 @@ class AsyncSearchHandle(AsyncHandle):
         if self.abandoned:
             raise AbandonedAsyncError()
         return _recvSearchResults(self.sock, self.messageID)
+
+class SearchReferenceHandle(object):
+    def __init__(self, URIs):
+        # If multiple URIs are present, the client assumes that any supported URI
+        # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
+        self.URI = random.choice(URIs)
+
+    def get(self):
+        return searchByURI(self.URI)
 
 class UnexpectedResponseType(LDAPError):
     pass
