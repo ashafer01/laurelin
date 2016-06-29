@@ -7,23 +7,14 @@ stderrHandler.setFormatter(logging.Formatter('[%(asctime)s] %(name)s %(levelname
 logger.addHandler(stderrHandler)
 logger.setLevel(logging.DEBUG)
 
-from socket import create_connection
-from urlparse import urlparse
-
-from pyasn1.codec.ber.encoder import encode as BEREncode
-from pyasn1.codec.ber.decoder import decode as BERDecode
-from pyasn1.error import SubstrateUnderrunError, PyAsn1Error
-
 from rfc4511 import LDAPDN, LDAPString, ResultCode, Integer0ToMax as NonNegativeInteger
 from rfc4511 import SearchRequest, AttributeSelection, BindRequest, AuthenticationChoice
 from rfc4511 import LDAPMessage, MessageID, ProtocolOp, Version, UnbindRequest, CompareRequest
 from rfc4511 import Simple as SimpleCreds, TypesOnly, AttributeValueAssertion
 from rfc4511 import AttributeDescription, AssertionValue, AbandonRequest
 from filter import parse as parseFilter
-from base import Scope, DerefAliases
-
-class LDAPError(Exception):
-    pass
+from base import Scope, DerefAliases, LDAPError
+from net import LDAPSocket
 
 class UnexpectedSearchResults(LDAPError):
     pass
@@ -43,52 +34,6 @@ class UnexpectedResponseType(LDAPError):
 class UnboundConnectionError(LDAPError):
     def __init__(self):
         LDAPError.__init__(self, 'The connection has been unbound')
-
-class LDAPSocket(object):
-    RECV_BUFFER = 4096
-
-    def __init__(self, hostURI, connectTimeout=5):
-        parsedURI = urlparse(hostURI)
-        if parsedURI.scheme == 'ldap':
-            ap = parsedURI.netloc.split(':', 1)
-            address = ap[0]
-            if len(ap) == 1:
-                port = 389
-            else:
-                port = int(ap[1])
-        else:
-            raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
-        self.URI = hostURI
-        self.addr = (address, port)
-        self.sock = create_connection(self.addr, connectTimeout)
-        self.unbound = False
-        self.messageID = 1
-
-    def sendMessage(self, op, obj):
-        mID = self.messageID
-        lm = LDAPMessage()
-        lm.setComponentByName('messageID', MessageID(mID))
-        po = ProtocolOp()
-        po.setComponentByName(op, obj)
-        lm.setComponentByName('protocolOp', po)
-        self.messageID += 1
-        self.sock.sendall(BEREncode(lm))
-        return mID
-
-    def recvResponse(self, raw=''):
-        ret = []
-        try:
-            raw += self.sock.recv(LDAPSocket.RECV_BUFFER)
-            while len(raw) > 0:
-                response, raw = BERDecode(raw, asn1Spec=LDAPMessage())
-                ret.append(response)
-            return ret
-        except SubstrateUnderrunError:
-            ret += self.recvResponse(raw)
-            return ret
-
-    def close(self):
-        return self.sock.close()
 
 # unpack an object from an LDAPMessage envelope
 def _unpack(ops, ldapMessage):

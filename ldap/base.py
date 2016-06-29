@@ -10,3 +10,6 @@ class DerefAliases:
     SEARCH = _DerefAliases('derefInSearching')
     BASE = _DerefAliases('derefFindingBaseObj')
     ALWAYS = _DerefAliases('derefAlways')
+
+class LDAPError(Exception):
+    pass
