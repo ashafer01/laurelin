@@ -52,13 +52,8 @@ def _recvSearchResults(sock, messageID):
                 logger.debug('Got search result object {0}'.format(DN))
             except UnexpectedResponseType:
                 try:
-                    done = _unpack('searchResDone', msg)
-                    result = done.getComponentByName('resultCode')
-                    if result == ResultCode('success'):
-                        logger.debug('Search completed successfully')
-                        return ret
-                    else:
-                        raise LDAPError('Search returned {0}'.format(repr(result)))
+                    _checkResultCode(msg, 'searchResDone')
+                    return ret
                 except UnexpectedResponseType:
                     resref = _unpack('searchResRef', msg)
                     URIs = []
@@ -112,7 +107,9 @@ def searchByURI(uri):
         filter = LDAP.DEFAULT_FILTER
     if (nparams > 3) and (len(params[3]) > 0):
         raise LDAPError('Extensions for searchByURL not yet implemented')
-    return ldap.search(DN, scope, filterStr=filter, attrList=attrList)
+    ret = ldap.search(DN, scope, filterStr=filter, attrList=attrList)
+    ldap.unbind()
+    return ret
 
 # for storing reusable sockets
 _sockets = {}
@@ -136,9 +133,10 @@ class LDAP(object):
     NO_ATTRS = '1.1'
     ALL_USER_ATTRS = '*'
 
-    def __init__(self, hostURI,
+    def __init__(self,
+        hostURI=None,
         reuseConnection=True,
-        reuseConnectionFrom=None,
+        reuseFrom=None,
         connectTimeout=DEFAULT_CONNECT_TIMEOUT,
         searchTimeout=DEFAULT_SEARCH_TIMEOUT,
         derefAliases=DEFAULT_DEREF_ALIASES,
@@ -149,15 +147,20 @@ class LDAP(object):
         self.defaultDerefAliases = derefAliases
 
         ## connect
-        if reuseConnectionFrom is not None:
-            self.sock = reuseConnectionFrom.sock
-        elif reuseConnection:
-            if hostURI not in _sockets:
-                _sockets[hostURI] = LDAPSocket(hostURI, connectTimeout)
-            self.sock  = _sockets[hostURI]
+        if hostURI is not None:
+            self.hostURI = hostURI
+            if reuseConnection:
+                if hostURI not in _sockets:
+                    _sockets[hostURI] = LDAPSocket(hostURI, connectTimeout)
+                self.sock  = _sockets[hostURI]
+            else:
+                self.sock = LDAPSocket(hostURI, connectTimeout)
+        elif reuseFrom is not None:
+            self.hostURI = reuseFrom.hostURI
+            self.sock = reuseFrom.sock
         else:
-            self.sock = LDAPSocket(hostURI, connectTimeout)
-        logger.debug('Connected to {0} (#{1})'.format(hostURI, self.sock.ID))
+            raise TypeError('Must supply at least one of: hostURI, reuseFrom')
+        logger.debug('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
 
     def simpleBind(self, user, pw):
         if self.sock.unbound:
@@ -336,7 +339,7 @@ class LDAP_rw(LDAP):
         if self.sock.unbound:
             raise ConnectionUnbound()
         mID = self.sock.sendMessage('delRequest', DelRequest(DN))
-        logger.debug('Sent delete request (ID {0}) for DN {1}'.format(mID, DN)
+        logger.debug('Sent delete request (ID {0}) for DN {1}'.format(mID, DN))
         return mID
 
     def delete(self, DN):
