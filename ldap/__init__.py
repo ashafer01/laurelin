@@ -133,10 +133,8 @@ class LDAP(object):
     NO_ATTRS = '1.1'
     ALL_USER_ATTRS = '*'
 
-    def __init__(self,
-        hostURI=None,
+    def __init__(self, connectTo,
         reuseConnection=True,
-        reuseFrom=None,
         connectTimeout=DEFAULT_CONNECT_TIMEOUT,
         searchTimeout=DEFAULT_SEARCH_TIMEOUT,
         derefAliases=DEFAULT_DEREF_ALIASES,
@@ -147,19 +145,19 @@ class LDAP(object):
         self.defaultDerefAliases = derefAliases
 
         ## connect
-        if hostURI is not None:
-            self.hostURI = hostURI
+        if isinstance(connectTo, basestring):
+            self.hostURI = connectTo
             if reuseConnection:
-                if hostURI not in _sockets:
-                    _sockets[hostURI] = LDAPSocket(hostURI, connectTimeout)
-                self.sock  = _sockets[hostURI]
+                if self.hostURI not in _sockets:
+                    _sockets[self.hostURI] = LDAPSocket(self.hostURI, connectTimeout)
+                self.sock  = _sockets[self.hostURI]
             else:
-                self.sock = LDAPSocket(hostURI, connectTimeout)
-        elif reuseFrom is not None:
-            self.hostURI = reuseFrom.hostURI
-            self.sock = reuseFrom.sock
+                self.sock = LDAPSocket(self.hostURI, connectTimeout)
+        elif isinstance(connectTo, LDAP):
+            self.hostURI = connectTo.hostURI
+            self.sock = connectTo.sock
         else:
-            raise TypeError('Must supply at least one of: hostURI, reuseFrom')
+            raise TypeError('Must supply URI string or LDAP instance for connectTo')
         logger.debug('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
 
     def simpleBind(self, user, pw):
@@ -168,7 +166,6 @@ class LDAP(object):
         if self.sock.bound:
             raise ConnectionAlreadyBound()
 
-        ## prepare bind request
         br = BindRequest()
         br.setComponentByName('version', Version(3))
         br.setComponentByName('name', LDAPDN(unicode(user)))
@@ -176,19 +173,9 @@ class LDAP(object):
         ac.setComponentByName('simple', SimpleCreds(unicode(pw)))
         br.setComponentByName('authentication', ac)
 
-        ## send request
-        logger.debug('Binding on {0} (#{1}) as {2}'.format(self.sock.URI, self.sock.ID, user))
-        self.sock.sendMessage('bindRequest', br)
-
-        ## receive and handle response
-        bindRes = _unpack('bindResponse', self.sock.recvResponse()[0])
-        bindResCode = bindRes.getComponentByName('resultCode')
-        if bindResCode == ResultCode('success'):
-            logger.debug('Bind successful')
-            self.sock.bound = True
-            return True
-        else:
-            raise LDAPError('Bind failure, got response {0}'.format(repr(bindResCode)))
+        mID = self.sock.sendMessage('bindRequest', br)
+        logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID, self.sock.ID, user))
+        return _checkResultCode(self.sock.recvResponse()[0], 'bindResponse')
 
     def unbind(self):
         if self.sock.unbound:
