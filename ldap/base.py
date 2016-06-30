@@ -8,6 +8,7 @@ class Scope:
     # translate RFC4516 URL scope strings to constant
     @staticmethod
     def string(str):
+        str = str.lower()
         if str == 'base':
             return Scope.BASE
         elif str == 'one':

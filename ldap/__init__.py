@@ -12,8 +12,9 @@ logger.setLevel(logging.DEBUG)
 from rfc4511 import LDAPDN, LDAPString, ResultCode, Integer0ToMax as NonNegativeInteger
 from rfc4511 import SearchRequest, AttributeSelection, BindRequest, AuthenticationChoice
 from rfc4511 import LDAPMessage, MessageID, ProtocolOp, Version, UnbindRequest, CompareRequest
-from rfc4511 import Simple as SimpleCreds, TypesOnly, AttributeValueAssertion
-from rfc4511 import AttributeDescription, AssertionValue, AbandonRequest
+from rfc4511 import Simple as SimpleCreds, TypesOnly, AttributeValueAssertion, AddRequest
+from rfc4511 import AttributeDescription, AssertionValue, AbandonRequest, AttributeList, Attribute
+from rfc4511 import AttributeValue, Vals
 from filter import parse as parseFilter
 from base import Scope, DerefAliases, LDAPError
 from net import LDAPSocket
@@ -69,15 +70,26 @@ def _recvSearchResults(sock, messageID):
 
 # convert compare result codes to boolean
 def _processCompareResults(ldapMessages):
+    mID = ldapMessages[0].getComponentByName('messageID')
     res = _unpack('compareResponse', ldapMessages[0]).getComponentByName('resultCode')
     if res == ResultCode('compareTrue'):
-        logger.debug('Compared True')
+        logger.debug('Compared True (ID {0})'.format(mID))
         return True
     elif res == ResultCode('compareFalse'):
-        logger.debug('Compared False')
+        logger.debug('Compared False (ID {0})'.format(mID))
         return False
     else:
-        raise LDAPError('Got compare result {0}'.format(repr(res)))
+        raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
+
+# check for success result
+def _checkResultCode(ldapMessage, operation):
+    mID = ldapMessage.getComponentByName('messageID')
+    res = _unpack(operation, ldapMessage).getComponentByName('resultCode')
+    if res == ResultCode('success'):
+        logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
+        return True
+    else:
+        raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
 
 # perform a search based on an RFC4516 URI
 def searchByURI(uri):
@@ -270,6 +282,56 @@ class LDAP(object):
         mID = self._sendCompare(*args)
         return AsyncHandle(self.sock, mID, _processCompareResults)
 
+class LDAP_rw(LDAP):
+    # send a request to add a new object
+    # pass either (DN, attrs) or an LDAPObject
+    def _sendAdd(self, *args):
+        if self.sock.unbound:
+            raise ConnectionUnbound()
+
+        if (len(args) == 1):
+            if not isinstance(args[0], LDAPObject):
+                raise TypeError('Single argument must be LDAPObject')
+            DN = args[0].dn
+            attrs = args[0]
+        elif (len(args) == 2):
+            if not isinstance(args[0], basestring):
+                raise TypeError('DN must be string type')
+            if not isinstance(args[1], dict):
+                raise TypeError('attrs must be dict')
+            DN = args[0]
+            attrs = args[1]
+        else:
+            raise TypeError('expected 1 or 2 arguments, got {0}'.format(len(args)))
+
+        ar = AddRequest()
+        ar.setComponentByName('entry', LDAPDN(DN))
+        al = AttributeList()
+        i = 0
+        for attrType, attrVals in attrs.iteritems():
+            attr = Attribute()
+            attr.setComponentByName('type', AttributeDescription(attrType))
+            vals = Vals()
+            j = 0
+            for val in attrVals:
+                vals.setComponentByPosition(j, AttributeValue(val))
+                j += 1
+            attr.setComponentByName('vals', vals)
+            al.setComponentByPosition(i, attr)
+            i += 1
+        ar.setComponentByName('attributes', al)
+        mID = self.sock.sendMessage('addRequest', ar)
+        logger.debug('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
+        return mID
+
+    def add(self, *args):
+        mID = self._sendAdd(*args)
+        return _checkResultCode(self.sock.recvResponse(mID)[0], 'addResponse')
+
+    def addAsync(self, *args):
+        mID = self._sendAdd(*args)
+        return AsyncResultHandle(sock, mID, 'addResponse')
+
 class AsyncHandle(object):
     def __init__(self, sock, messageID, postProcess=lambda x: x):
         self.messageID = messageID
@@ -303,6 +365,15 @@ class AsyncSearchHandle(AsyncHandle):
         if self.abandoned:
             raise AbandonedAsyncError()
         return _recvSearchResults(self.sock, self.messageID)
+
+class AsyncResultHandle(AsyncHandle):
+    def __init__(self, sock, messageID, operation):
+        AsyncHandle.__init__(self, sock, messageID)
+        self.operation = operation
+
+    def wait(self):
+        msg = AsyncHandle.wait(self)[0]
+        return _checkResultCode(msg, self.operation)
 
 class SearchReferenceHandle(object):
     def __init__(self, URIs):
