@@ -27,6 +27,16 @@ def _unpack(op, ldapMessage):
     else:
         raise UnexpectedResponseType()
 
+# check for success result
+def _checkResultCode(ldapMessage, operation):
+    mID = ldapMessage.getComponentByName('messageID')
+    res = _unpack(operation, ldapMessage).getComponentByName('resultCode')
+    if res == ResultCode('success'):
+        logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
+        return True
+    else:
+        raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
+
 # recv all objects from given LDAPSocket until we get a SearchResultDone; return a list of
 # LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
 # TODO this may block indefinitely if abandoned
@@ -74,16 +84,6 @@ def _processCompareResults(ldapMessages):
         return False
     else:
         raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
-
-# check for success result
-def _checkResultCode(ldapMessage, operation):
-    mID = ldapMessage.getComponentByName('messageID')
-    res = _unpack(operation, ldapMessage).getComponentByName('resultCode')
-    if res == ResultCode('success'):
-        logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
-        return True
-    else:
-        raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
 
 # perform a search based on an RFC4516 URI
 def searchByURI(uri):
