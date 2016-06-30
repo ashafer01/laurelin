@@ -1,4 +1,4 @@
-from socket import create_connection
+from socket import create_connection, error as SocketError
 from urlparse import urlparse
 from pyasn1.codec.ber.encoder import encode as berEncode
 from pyasn1.codec.ber.decoder import decode as berDecode
@@ -23,7 +23,10 @@ class LDAPSocket(object):
                 port = int(ap[1])
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
-        self._sock = create_connection((address, port), connectTimeout)
+        try:
+            self._sock = create_connection((address, port), connectTimeout)
+        except SocketError as e:
+            raise LDAPConnectionError('{0} ({1})'.format(e.strerror, e.errno))
         self._messageQueue = []
         self._nextMessageID = 1
 
@@ -69,3 +72,6 @@ class LDAPSocket(object):
 
     def close(self):
         return self._sock.close()
+
+class LDAPConnectionError(LDAPError):
+    pass

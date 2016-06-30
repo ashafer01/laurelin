@@ -2,7 +2,6 @@ __all__ = []
 
 from urlparse import urlparse
 import logging
-import random
 logger = logging.getLogger('pyldap')
 stderrHandler = logging.StreamHandler()
 stderrHandler.setFormatter(logging.Formatter('[%(asctime)s] %(name)s %(levelname)s : %(message)s'))
@@ -14,10 +13,10 @@ from rfc4511 import SearchRequest, AttributeSelection, BindRequest, Authenticati
 from rfc4511 import LDAPMessage, MessageID, ProtocolOp, Version, UnbindRequest, CompareRequest
 from rfc4511 import Simple as SimpleCreds, TypesOnly, AttributeValueAssertion, AddRequest
 from rfc4511 import AttributeDescription, AssertionValue, AbandonRequest, AttributeList, Attribute
-from rfc4511 import AttributeValue, Vals
+from rfc4511 import AttributeValue, Vals, DelRequest
 from filter import parse as parseFilter
 from base import Scope, DerefAliases, LDAPError
-from net import LDAPSocket
+from net import LDAPSocket, LDAPConnectionError
 
 # unpack an object from an LDAPMessage envelope
 def _unpack(op, ldapMessage):
@@ -330,7 +329,23 @@ class LDAP_rw(LDAP):
 
     def addAsync(self, *args):
         mID = self._sendAdd(*args)
-        return AsyncResultHandle(sock, mID, 'addResponse')
+        return AsyncResultHandle(self.sock, mID, 'addResponse')
+
+    # delete an object
+    def _sendDelete(self, DN):
+        if self.sock.unbound:
+            raise ConnectionUnbound()
+        mID = self.sock.sendMessage('delRequest', DelRequest(DN))
+        logger.debug('Sent delete request (ID {0}) for DN {1}'.format(mID, DN)
+        return mID
+
+    def delete(self, DN):
+        mID = self._sendDelete(DN)
+        return _checkResultCode(self.sock.recvResponse(mID)[0], 'delResponse')
+
+    def deleteAsync(self, DN):
+        mID = self._sendDelete(DN)
+        return AsyncResultHandle(self.sock, mID, 'delResponse')
 
 class AsyncHandle(object):
     def __init__(self, sock, messageID, postProcess=lambda x: x):
@@ -377,12 +392,18 @@ class AsyncResultHandle(AsyncHandle):
 
 class SearchReferenceHandle(object):
     def __init__(self, URIs):
-        # If multiple URIs are present, the client assumes that any supported URI
-        # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
-        self.URI = random.choice(URIs)
+        self.URIs = URIs
 
     def get(self):
-        return searchByURI(self.URI)
+        # If multiple URIs are present, the client assumes that any supported URI
+        # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
+        for uri in self.URIs:
+            try:
+                return searchByURI(uri)
+            except LDAPConnectionError as e:
+                logger.warning('Error connecting to URI {0} ({1})'.format(uri, e.message))
+        logger.error('No more URIs to try')
+        raise LDAPError('Could not complete reference URI search with any supplied URIs')
 
 class UnexpectedResponseType(LDAPError):
     pass
