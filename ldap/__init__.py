@@ -107,7 +107,7 @@ def searchByURI(uri):
     else:
         filter = LDAP.DEFAULT_FILTER
     if (nparams > 3) and (len(params[3]) > 0):
-        raise LDAPError('Extensions for searchByURL not yet implemented')
+        raise LDAPError('Extensions for searchByURI not yet implemented')
     ret = ldap.search(DN, scope, filterStr=filter, attrList=attrList)
     ldap.unbind()
     return ret
@@ -138,6 +138,19 @@ class LDAPObject(dict):
             return True
         else:
             raise RuntimeError('No LDAP object')
+
+    def compare(self, attr, value):
+        if attr in self:
+            logger.debug('Doing local compare for {0} ({1} = {2})'.format(self.dn, attr, value))
+            return (value in self[attr])
+        elif isinstance(self.ldapObj, LDAP):
+            return self.ldapObj.compare(self.dn, attr, value)
+        else:
+            raise RuntimeError('No LDAP object')
+
+    ## these call the LDAP_rw methods of the same name, passing the object's DN as the first
+    ## argument, then update the local attributes dictionary after a successful request to the
+    ## server
 
     def addAttrs(self, attrsDict):
         if isinstance(self.ldapObj, LDAP_rw):
@@ -261,7 +274,7 @@ class LDAP(object):
             if reuseConnection:
                 if self.hostURI not in _sockets:
                     _sockets[self.hostURI] = LDAPSocket(self.hostURI, connectTimeout)
-                self.sock  = _sockets[self.hostURI]
+                self.sock = _sockets[self.hostURI]
             else:
                 self.sock = LDAPSocket(self.hostURI, connectTimeout)
         elif isinstance(connectTo, LDAP):
@@ -285,7 +298,8 @@ class LDAP(object):
         br.setComponentByName('authentication', ac)
 
         mID = self.sock.sendMessage('bindRequest', br)
-        logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID, self.sock.ID, user))
+        logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
+            self.sock.ID, user))
         return _checkResultCode(self.sock.recvResponse()[0], 'bindResponse')
 
     def unbind(self):
@@ -347,7 +361,8 @@ class LDAP(object):
         req.setComponentByName('attributes', attrs)
 
         mID = self.sock.sendMessage('searchRequest', req)
-        logger.debug('Sent search request (ID {0}): baseDN={1}, scope={2}, filterStr={3}'.format(mID, baseDN, scope, filterStr))
+        logger.debug('Sent search request (ID {0}): baseDN={1}, scope={2}, filterStr={3}'.format(
+            mID, baseDN, scope, filterStr))
         return mID
 
     def search(self, *args, **kwds):
@@ -384,25 +399,14 @@ class LDAP(object):
 
 class LDAP_rw(LDAP):
     # send a request to add a new object
-    # pass either (DN, attrs) or an LDAPObject
-    def _sendAdd(self, *args):
+    def _sendAdd(self, DN, attrs):
         if self.sock.unbound:
             raise ConnectionUnbound()
 
-        if (len(args) == 1):
-            if not isinstance(args[0], LDAPObject):
-                raise TypeError('Single argument must be LDAPObject')
-            DN = args[0].dn
-            attrs = args[0]
-        elif (len(args) == 2):
-            if not isinstance(args[0], basestring):
-                raise TypeError('DN must be string type')
-            if not isinstance(args[1], dict):
-                raise TypeError('attrs must be dict')
-            DN = args[0]
-            attrs = args[1]
-        else:
-            raise TypeError('expected 1 or 2 arguments, got {0}'.format(len(args)))
+        if not isinstance(DN, basestring):
+            raise TypeError('DN must be string type')
+        if not isinstance(attrs, dict):
+            raise TypeError('attrs must be dict')
 
         ar = AddRequest()
         ar.setComponentByName('entry', LDAPDN(DN))
@@ -424,13 +428,15 @@ class LDAP_rw(LDAP):
         logger.debug('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
         return mID
 
-    def add(self, *args):
-        mID = self._sendAdd(*args)
-        return _checkResultCode(self.sock.recvResponse(mID)[0], 'addResponse')
+    # these return a corresponding LDAPObject on success
+    def add(self, DN, attrs):
+        mID = self._sendAdd(DN, attrs)
+        _checkResultCode(self.sock.recvResponse(mID)[0], 'addResponse')
+        return LDAPObject(DN, attrs)
 
-    def addAsync(self, *args):
-        mID = self._sendAdd(*args)
-        return AsyncResultHandle(self.sock, mID, 'addResponse')
+    def addAsync(self, DN, attrs):
+        mID = self._sendAdd(DN, attrs)
+        return AsyncAddHandle(self.sock, mID, LDAPObject(DN, attrs))
 
     # delete an object
     def _sendDelete(self, DN):
@@ -449,15 +455,15 @@ class LDAP_rw(LDAP):
         return AsyncResultHandle(self.sock, mID, 'delResponse')
 
     # exposes all options of the protocol-level ModifyDNRequest
-    def modDN(self, DN, newRDN, cleanAttr=True, newSuperior=None):
+    def modDN(self, DN, newRDN, cleanAttr=True, newParent=None):
         if self.sock.unbound:
             raise ConnectionUnbound()
         mdr = ModifyDNRequest()
         mdr.setComponentByName('entry', LDAPDN(DN))
         mdr.setComponentByName('newrdn', RelativeLDAPDN(newRDN))
         mdr.setComponentByName('deleteoldrdn', cleanAttr)
-        if newSuperior is not None:
-            mdr.setComponentByName('newSuperior', NewSuperior(newSuperior))
+        if newParent is not None:
+            mdr.setComponentByName('newSuperior', NewSuperior(newParent))
         mID = self.sock.sendMessage('modDNRequest', mdr)
         return _checkResultCode(self.sock.recvResponse(mID)[0], 'modDNResponse')
 
@@ -467,8 +473,8 @@ class LDAP_rw(LDAP):
 
     # move object, possibly changing RDN as well
     def move(self, DN, newDN, cleanAttr=True):
-        rdn, superior = newDN.split(',', 1)
-        return self.modDN(DN, rdn, cleanAttr, superior)
+        rdn, parent = newDN.split(',', 1)
+        return self.modDN(DN, rdn, cleanAttr, parent)
 
     # change attributes on an object
     def _sendModify(self, DN, modlist):
@@ -481,7 +487,20 @@ class LDAP_rw(LDAP):
         logger.debug('Modifying DN {0}'.format(DN))
         for mod in modlist:
             logger.debug('> {0}'.format(str(mod)))
-            cl.setComponentByPosition(i, mod.toChange())
+
+            c = Change()
+            c.setComponentByName('operation', mod.op)
+            pa = PartialAttribute()
+            pa.setComponentByName('type', AttributeDescription(mod.attr))
+            vals = Vals()
+            i = 0
+            for v in mod.vals:
+                vals.setComponentByPosition(i, AttributeValue(v))
+                i += 1
+            pa.setComponentByName('vals', vals)
+            c.setComponentByName('modification', pa)
+
+            cl.setComponentByPosition(i, c)
             i += 1
         mr.setComponentByName('changes', cl)
         mID = self.sock.sendMessage('modifyRequest', mr)
@@ -523,7 +542,9 @@ class LDAP_rw(LDAP):
         return self.deleteAttrValuesAsync(DN, dict.fromkeys(attrs, []))
 
     # replace all values on given attributes with the passed values
+    # attributes not mentioned in attrsDict are not touched
     # attributes will be created if they do not exist
+    # specifying a 0-length entry will delete that attribute
     def replaceAttrs(self, DN, attrsDict):
         return self.modify(DN, Modlist(Mod.REPLACE, attrsDict))
 
@@ -574,6 +595,15 @@ class AsyncResultHandle(AsyncHandle):
     def wait(self):
         msg = AsyncHandle.wait(self)[0]
         return _checkResultCode(msg, self.operation)
+
+class AsyncAddHandle(AsyncResultHandle)
+    def __init__(self, sock, messageID, ldapObj):
+        AsyncResultHandle.__init__(self, sock, messageID, 'addResponse')
+        self.ldapObj = ldapObj
+
+    def wait(self):
+        AsyncResultHandle.wait(self)
+        return self.ldapObj
 
 ## other classes
 
@@ -631,22 +661,8 @@ class Mod(object):
         return 'Mod({0}, {1}, {2})'.format(Mod.opToString(self.op), self.attr, vals)
 
     def __repr__(self):
-        return 'Mod(Mod.{0}, {1}, {2})'.format(Mod.opToString(self.op), repr(self.attr), repr(self.vals))
-
-    # convert to protocol object
-    def toChange(self):
-        c = Change()
-        c.setComponentByName('operation', self.op)
-        pa = PartialAttribute()
-        pa.setComponentByName('type', AttributeDescription(self.attr))
-        vals = Vals()
-        i = 0
-        for v in self.vals:
-            vals.setComponentByPosition(i, AttributeValue(v))
-            i += 1
-        pa.setComponentByName('vals', vals)
-        c.setComponentByName('modification', pa)
-        return c
+        return 'Mod(Mod.{0}, {1}, {2})'.format(Mod.opToString(self.op), repr(self.attr),
+            repr(self.vals))
 
 # generate a modlist from a dictionary
 def Modlist(op, attrsDict):
