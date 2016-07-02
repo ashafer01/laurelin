@@ -13,7 +13,8 @@ from rfc4511 import SearchRequest, AttributeSelection, BindRequest, Authenticati
 from rfc4511 import LDAPMessage, MessageID, ProtocolOp, Version, UnbindRequest, CompareRequest
 from rfc4511 import Simple as SimpleCreds, TypesOnly, AttributeValueAssertion, AddRequest
 from rfc4511 import AttributeDescription, AssertionValue, AbandonRequest, AttributeList, Attribute
-from rfc4511 import AttributeValue, Vals, DelRequest
+from rfc4511 import AttributeValue, Vals, DelRequest, ModifyDNRequest, RelativeLDAPDN, NewSuperior
+from rfc4511 import ModifyRequest, Changes, Change, Operation, PartialAttribute
 from filter import parse as parseFilter
 from base import Scope, DerefAliases, LDAPError
 from net import LDAPSocket, LDAPConnectionError
@@ -115,12 +116,105 @@ def searchByURI(uri):
 _sockets = {}
 
 class LDAPObject(dict):
-    def __init__(self, dn, attrs):
+    def __init__(self, dn, attrs, ldapObj=None):
         self.dn = dn
+        self.ldapObj = ldapObj
         dict.__init__(self, attrs)
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, dict.__repr__(self))
+
+    def formatLDIF(self):
+        lines = ['dn: {0}'.format(self.dn)]
+        for attr, vals in self.iteritems():
+            for val in vals:
+                lines.append('{0}: {1}'.format(attr, val))
+        lines.append('')
+        return '\n'.join(lines)
+
+    def refresh(self, attrs=None):
+        if isinstance(self.ldapObj, LDAP):
+            self.update(self.ldapObj.get(self.dn, attrs))
+        else:
+            raise RuntimeError('No LDAP object')
+
+    def addAttrs(self, attrsDict):
+        if isinstance(self.ldapObj, LDAP_rw):
+            self.ldapObj.addAttrs(self.dn, attrsDict)
+            for attr, vals in attrsDict.iteritems():
+                if attr not in self:
+                    self[attr] = vals
+                else:
+                    for val in vals:
+                        if val not in self[attr]:
+                            self[attr].append(val)
+        else:
+            raise RuntimeError('No LDAP_rw object')
+
+    def replaceAttrs(self, attrsDict):
+        if isinstance(self.ldapObj, LDAP_rw):
+            self.ldapObj.replaceAttrs(self.dn, attrsDict)
+            self.update(attrsDict)
+        else:
+            raise RuntimeError('No LDAP_rw object')
+
+    def deleteAttrValues(self, attrsDict):
+        if isinstance(self.ldapObj, LDAP_rw):
+            self.ldapObj.deleteAttrValues(self.dn, attrsDict)
+            for attr, vals in attrsDict.iteritems():
+                if attr in self:
+                    if len(vals) == 0:
+                        self.pop(attr)
+                    else:
+                        for val in vals:
+                            try:
+                                self[attr].remove(val)
+                            except:
+                                pass
+        else:
+            raise RuntimeError('No LDAP_rw object')
+
+    def deleteAttrs(self, attrs):
+        if isinstance(self.ldapObj, LDAP_rw):
+            if not isinstance(attrs, list):
+                attrs = [attrs]
+            self.ldapObj.deleteAttrs(self.dn, attrs)
+            for attr in attrs:
+                try:
+                    self.pop(attr)
+                except:
+                    pass
+        else:
+            raise RuntimeError('No LDAP_rw object')
+
+    def delete(self, attrs):
+        if isinstance(self.ldapObj, LDAP_rw):
+            self.ldapObj.delete(self.dn)
+            self.clear()
+            self.dn = ''
+            self.ldapObj = None
+        else:
+            raise RuntimeError('No LDAP_rw object')
+
+    def rename(self, newRDN, cleanAttr=True):
+        if isinstance(self.ldapObj, LDAP_rw):
+            curDN = self.dn
+            self.ldapObj.rename(curDN, newRDN, cleanAttr)
+            curRDN, curParent = curDN.split(',', 1)
+            if cleanAttr:
+                rdnAttr, rdnVal = curRDN.split('=', 1)
+                try:
+                    self[rdnAttr].remove(rdnVal)
+                except:
+                    pass
+            rdnAttr, rdnVal = newRDN.split('=', 1)
+            if rdnAttr not in self:
+                self[rdnAttr] = [rdnVal]
+            else:
+                self[rdnAttr].append(rdnVal)
+            self.dn = '{0},{1}'.format(newRDN, curParent)
+        else:
+            raise RuntimeError('No LDAP_rw object')
 
 class LDAP(object):
     ## global defaults
@@ -337,6 +431,90 @@ class LDAP_rw(LDAP):
         mID = self._sendDelete(DN)
         return AsyncResultHandle(self.sock, mID, 'delResponse')
 
+    # exposes all options of the protocol-level ModifyDNRequest
+    def modDN(self, DN, newRDN, cleanAttr=True, newSuperior=None):
+        if self.sock.unbound:
+            raise ConnectionUnbound()
+        mdr = ModifyDNRequest()
+        mdr.setComponentByName('entry', LDAPDN(DN))
+        mdr.setComponentByName('newrdn', RelativeLDAPDN(newRDN))
+        mdr.setComponentByName('deleteoldrdn', cleanAttr)
+        if newSuperior is not None:
+            mdr.setComponentByName('newSuperior', NewSuperior(newSuperior))
+        mID = self.sock.sendMessage('modDNRequest', mdr)
+        return _checkResultCode(self.sock.recvResponse(mID)[0], 'modDNResponse')
+
+    # edit the RDN of an object
+    def rename(self, DN, newRDN, cleanAttr=True):
+        return self.modDN(DN, newRDN, cleanAttr)
+
+    # move object, possibly changing RDN as well
+    def move(self, DN, newDN, cleanAttr=True):
+        rdn, superior = newDN.split(',', 1)
+        return self.modDN(DN, rdn, cleanAttr, superior)
+
+    # change attributes on an object
+    def _sendModify(self, DN, modlist):
+        if self.sock.unbound:
+            raise ConnectionUnbound()
+        mr = ModifyRequest()
+        mr.setComponentByName('object', LDAPDN(DN))
+        cl = Changes()
+        i = 0
+        logger.debug('Modifying DN {0}'.format(DN))
+        for mod in modlist:
+            logger.debug('> {0}'.format(str(mod)))
+            cl.setComponentByPosition(i, mod.toChange())
+            i += 1
+        mr.setComponentByName('changes', cl)
+        mID = self.sock.sendMessage('modifyRequest', mr)
+        logger.debug('Sent modify request (ID {0}) for DN {1}'.format(mID, DN))
+        return mID
+
+    def modify(self, DN, modlist):
+        mID = self._sendModify(DN, modlist)
+        return _checkResultCode(self.sock.recvResponse(mID)[0], 'modifyResponse')
+
+    def modifyAsync(self, DN, modlist):
+        mID = self._sendModify(DN, modlist)
+        return AsyncResultHandle(self.sock, mID, 'modifyResponse')
+
+    # add new attributes and values
+    def addAttrs(self, DN, attrsDict):
+        return self.modify(DN, Modlist(Mod.ADD, attrsDict))
+
+    def addAttrsAsync(self, DN, attrsDict):
+        return self.modifyAsync(DN, Modlist(Mod.ADD, attrsDict))
+
+    # delete specific attribute values
+    # specifying a 0-length entry will delete all values
+    def deleteAttrValues(self, DN, attrsDict):
+        return self.modify(DN, Modlist(Mod.DELETE, attrsDict))
+
+    def deleteAttrValuesAsync(self, DN, attrsDict):
+        return self.modifyAsync(DN, Modlist(Mod.DELETE, attrsDict))
+
+    # delete all values for one or more attributes
+    def deleteAttrs(self, DN, attrs):
+        if not isinstance(attrs, list):
+            attrs = [attrs]
+        return self.deleteAttrValues(DN, dict.fromkeys(attrs, []))
+
+    def deleteAttrsAsync(self, DN, attrs):
+        if not isinstance(attrs, list):
+            attrs = [attrs]
+        return self.deleteAttrValuesAsync(DN, dict.fromkeys(attrs, []))
+
+    # replace all values on given attributes with the passed values
+    # attributes will be created if they do not exist
+    def replaceAttrs(self, DN, attrsDict):
+        return self.modify(DN, Modlist(Mod.REPLACE, attrsDict))
+
+    def replaceAttrsAsync(self, DN, attrsDict):
+        return self.modifyAsync(DN, Modlist(Mod.REPLACE, attrsDict))
+
+## async handles
+
 class AsyncHandle(object):
     def __init__(self, sock, messageID, postProcess=lambda x: x):
         self.messageID = messageID
@@ -380,11 +558,14 @@ class AsyncResultHandle(AsyncHandle):
         msg = AsyncHandle.wait(self)[0]
         return _checkResultCode(msg, self.operation)
 
+## other classes
+
+# returned when the server returns a SearchResultReference
 class SearchReferenceHandle(object):
     def __init__(self, URIs):
         self.URIs = URIs
 
-    def get(self):
+    def fetch(self):
         # If multiple URIs are present, the client assumes that any supported URI
         # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
         for uri in self.URIs:
@@ -392,8 +573,74 @@ class SearchReferenceHandle(object):
                 return searchByURI(uri)
             except LDAPConnectionError as e:
                 logger.warning('Error connecting to URI {0} ({1})'.format(uri, e.message))
-        logger.error('No more URIs to try')
         raise LDAPError('Could not complete reference URI search with any supplied URIs')
+
+# describes a single modify operation
+class Mod(object):
+    ADD = Operation('add')
+    REPLACE = Operation('replace')
+    DELETE = Operation('delete')
+
+    @staticmethod
+    def opToString(op):
+        if op == Mod.ADD:
+            return 'ADD'
+        elif op == Mod.REPLACE:
+            return 'REPLACE'
+        elif op == Mod.DELETE:
+            return 'DELETE'
+        else:
+            raise ValueError()
+
+    @staticmethod
+    def stringToOp(opStr):
+        opStr = opStr.lower()
+        return Operation(opStr)
+
+    def __init__(self, op, attr, vals):
+        if (op != Mod.ADD) and (op != Mod.REPLACE) and (op != Mod.DELETE):
+            raise ValueError()
+        if not isinstance(vals, list):
+            raise TypeError()
+        self.op = op
+        self.attr = attr
+        self.vals = vals
+
+    def __str__(self):
+        if len(self.vals) == 0:
+            vals = '<all values>'
+        else:
+            vals = str(self.vals)
+        return 'Mod({0}, {1}, {2})'.format(Mod.opToString(self.op), self.attr, vals)
+
+    def __repr__(self):
+        return 'Mod(Mod.{0}, {1}, {2})'.format(Mod.opToString(self.op), repr(self.attr), repr(self.vals))
+
+    # convert to protocol object
+    def toChange(self):
+        c = Change()
+        c.setComponentByName('operation', self.op)
+        pa = PartialAttribute()
+        pa.setComponentByName('type', AttributeDescription(self.attr))
+        vals = Vals()
+        i = 0
+        for v in self.vals:
+            vals.setComponentByPosition(i, AttributeValue(v))
+            i += 1
+        pa.setComponentByName('vals', vals)
+        c.setComponentByName('modification', pa)
+        return c
+
+# generate a modlist from a dictionary
+def Modlist(op, attrsDict):
+    if not isinstance(attrsDict, dict):
+        raise TypeError()
+    modlist = []
+    for attr, vals in attrsDict.iteritems():
+        modlist.append(Mod(op, attr, vals))
+    return modlist
+
+## Exceptions
 
 class UnexpectedResponseType(LDAPError):
     pass
