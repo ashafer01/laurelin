@@ -116,7 +116,7 @@ def searchByURI(uri):
 _sockets = {}
 
 class LDAPObject(dict):
-    def __init__(self, dn, attrs, ldapObj=None):
+    def __init__(self, dn, attrs={}, ldapObj=None):
         self.dn = dn
         self.ldapObj = ldapObj
         dict.__init__(self, attrs)
@@ -135,6 +135,7 @@ class LDAPObject(dict):
     def refresh(self, attrs=None):
         if isinstance(self.ldapObj, LDAP):
             self.update(self.ldapObj.get(self.dn, attrs))
+            return True
         else:
             raise RuntimeError('No LDAP object')
 
@@ -148,6 +149,7 @@ class LDAPObject(dict):
                     for val in vals:
                         if val not in self[attr]:
                             self[attr].append(val)
+            return True
         else:
             raise RuntimeError('No LDAP_rw object')
 
@@ -155,6 +157,7 @@ class LDAPObject(dict):
         if isinstance(self.ldapObj, LDAP_rw):
             self.ldapObj.replaceAttrs(self.dn, attrsDict)
             self.update(attrsDict)
+            return True
         else:
             raise RuntimeError('No LDAP_rw object')
 
@@ -171,6 +174,7 @@ class LDAPObject(dict):
                                 self[attr].remove(val)
                             except:
                                 pass
+            return True
         else:
             raise RuntimeError('No LDAP_rw object')
 
@@ -184,23 +188,24 @@ class LDAPObject(dict):
                     self.pop(attr)
                 except:
                     pass
+            return True
         else:
             raise RuntimeError('No LDAP_rw object')
 
-    def delete(self, attrs):
+    def delete(self):
         if isinstance(self.ldapObj, LDAP_rw):
             self.ldapObj.delete(self.dn)
             self.clear()
-            self.dn = ''
+            self.dn = None
             self.ldapObj = None
+            return True
         else:
             raise RuntimeError('No LDAP_rw object')
 
-    def rename(self, newRDN, cleanAttr=True):
+    def modDN(self, newRDN, cleanAttr=True, newParent=None):
         if isinstance(self.ldapObj, LDAP_rw):
-            curDN = self.dn
-            self.ldapObj.rename(curDN, newRDN, cleanAttr)
-            curRDN, curParent = curDN.split(',', 1)
+            curRDN, curParent = self.dn.split(',', 1)
+            self.ldapObj.modDN(self.dn, newRDN, cleanAttr, newParent)
             if cleanAttr:
                 rdnAttr, rdnVal = curRDN.split('=', 1)
                 try:
@@ -210,11 +215,23 @@ class LDAPObject(dict):
             rdnAttr, rdnVal = newRDN.split('=', 1)
             if rdnAttr not in self:
                 self[rdnAttr] = [rdnVal]
-            else:
+            elif rdnVal not in self[rdnAttr]:
                 self[rdnAttr].append(rdnVal)
-            self.dn = '{0},{1}'.format(newRDN, curParent)
+            if newParent is None:
+                parent = curParent
+            else:
+                parent = newParent
+            self.dn = '{0},{1}'.format(newRDN, parent)
+            return True
         else:
             raise RuntimeError('No LDAP_rw object')
+
+    def rename(self, newRDN, cleanAttr=True):
+        return self.modDN(newRDN, cleanAttr)
+
+    def move(self, newDN, cleanAttr=True):
+        newRDN, newParent = newDN.split(',', 1)
+        return self.modDN(newRDN, cleanAttr, newParent)
 
 class LDAP(object):
     ## global defaults
