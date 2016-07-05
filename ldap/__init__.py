@@ -328,6 +328,18 @@ class LDAP(object):
         else:
             return results[0]
 
+    # simply check if a DN exisVts
+    def exists(self, DN):
+        if self.sock.unbound:
+            raise ConnectionUnbound()
+        try:
+            self.get(DN)
+            return True
+        except NoSearchResults:
+            return False
+        except MultipleSearchResults:
+            return True
+
     # send a search request
     def _sendSearch(self, baseDN, scope, filterStr=None, attrList=None, searchTimeout=None,
         limit=0, derefAliases=None, attrsOnly=False):
@@ -398,6 +410,8 @@ class LDAP(object):
         return AsyncHandle(self, mID, _processCompareResults)
 
 class LDAP_rw(LDAP):
+    ## simple object add
+
     # send a request to add a new object
     def _sendAdd(self, DN, attrs):
         if self.sock.unbound:
@@ -438,7 +452,32 @@ class LDAP_rw(LDAP):
         mID = self._sendAdd(DN, attrs)
         return AsyncAddHandle(self, mID, LDAPObject(DN, attrs, self))
 
-    # delete an object
+    ## search+add patterns
+
+    def addOrModAddIfExists(self, DN, attrs):
+        try:
+            cur = self.get(DN)
+            cur.addAttrs(attrs)
+            return cur
+        except NoSearchResults:
+            return self.add(DN, attrs)
+
+    def addOrModReplaceIfExists(self, DN, attrs):
+        try:
+            cur = self.get(DN)
+            cur.replaceAttrs(attrs)
+            return cur
+        except NoSearchResults:
+            return self.add(DN, attrs)
+
+    def addIfNotExists(self, DN, attrs):
+        try:
+            return self.get(DN)
+        except NoSearchResults:
+            return self.add(DN, attrs)
+
+    ## delete an object
+
     def _sendDelete(self, DN):
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -453,6 +492,8 @@ class LDAP_rw(LDAP):
     def deleteAsync(self, DN):
         mID = self._sendDelete(DN)
         return AsyncResultHandle(self, mID, 'delResponse')
+
+    ## change object DN
 
     # exposes all options of the protocol-level ModifyDNRequest
     def modDN(self, DN, newRDN, cleanAttr=True, newParent=None):
@@ -476,7 +517,8 @@ class LDAP_rw(LDAP):
         rdn, parent = newDN.split(',', 1)
         return self.modDN(DN, rdn, cleanAttr, parent)
 
-    # change attributes on an object
+    ## change attributes on an object
+
     def _sendModify(self, DN, modlist):
         if self.sock.unbound:
             raise ConnectionUnbound()
