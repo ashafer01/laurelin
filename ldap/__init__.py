@@ -41,11 +41,11 @@ def _checkResultCode(ldapMessage, operation):
 # recv all objects from given LDAPSocket until we get a SearchResultDone; return a list of
 # LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
 # TODO this may block indefinitely if abandoned
-def _recvSearchResults(sock, messageID):
+def _recvSearchResults(ldapConn, messageID):
     ret = []
     logger.debug('Receiving all search results for messageID={0}'.format(messageID))
     while True:
-        for msg in sock.recvResponse(messageID):
+        for msg in ldapConn.sock.recvResponse(messageID):
             try:
                 entry = _unpack('searchResEntry', msg)
                 DN = unicode(entry.getComponentByName('objectName'))
@@ -59,7 +59,7 @@ def _recvSearchResults(sock, messageID):
                     for j in range(0, len(_vals)):
                         vals.append(unicode(_vals.getComponentByPosition(j)))
                     attrs[attrType] = vals
-                ret.append(LDAPObject(DN, attrs))
+                ret.append(LDAPObject(DN, attrs, ldapConn))
                 logger.debug('Got search result object {0}'.format(DN))
             except UnexpectedResponseType:
                 try:
@@ -116,9 +116,9 @@ def searchByURI(uri):
 _sockets = {}
 
 class LDAPObject(dict):
-    def __init__(self, dn, attrs={}, ldapObj=None):
+    def __init__(self, dn, attrs={}, ldapConn=None):
         self.dn = dn
-        self.ldapObj = ldapObj
+        self.ldapConn = ldapConn
         dict.__init__(self, attrs)
 
     def __repr__(self):
@@ -133,8 +133,8 @@ class LDAPObject(dict):
         return '\n'.join(lines)
 
     def refresh(self, attrs=None):
-        if isinstance(self.ldapObj, LDAP):
-            self.update(self.ldapObj.get(self.dn, attrs))
+        if isinstance(self.ldapConn, LDAP):
+            self.update(self.ldapConn.get(self.dn, attrs))
             return True
         else:
             raise RuntimeError('No LDAP object')
@@ -143,8 +143,8 @@ class LDAPObject(dict):
         if attr in self:
             logger.debug('Doing local compare for {0} ({1} = {2})'.format(self.dn, attr, value))
             return (value in self[attr])
-        elif isinstance(self.ldapObj, LDAP):
-            return self.ldapObj.compare(self.dn, attr, value)
+        elif isinstance(self.ldapConn, LDAP):
+            return self.ldapConn.compare(self.dn, attr, value)
         else:
             raise RuntimeError('No LDAP object')
 
@@ -153,8 +153,8 @@ class LDAPObject(dict):
     ## server
 
     def addAttrs(self, attrsDict):
-        if isinstance(self.ldapObj, LDAP_rw):
-            self.ldapObj.addAttrs(self.dn, attrsDict)
+        if isinstance(self.ldapConn, LDAP_rw):
+            self.ldapConn.addAttrs(self.dn, attrsDict)
             for attr, vals in attrsDict.iteritems():
                 if attr not in self:
                     self[attr] = vals
@@ -167,16 +167,16 @@ class LDAPObject(dict):
             raise RuntimeError('No LDAP_rw object')
 
     def replaceAttrs(self, attrsDict):
-        if isinstance(self.ldapObj, LDAP_rw):
-            self.ldapObj.replaceAttrs(self.dn, attrsDict)
+        if isinstance(self.ldapConn, LDAP_rw):
+            self.ldapConn.replaceAttrs(self.dn, attrsDict)
             self.update(attrsDict)
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
 
     def deleteAttrValues(self, attrsDict):
-        if isinstance(self.ldapObj, LDAP_rw):
-            self.ldapObj.deleteAttrValues(self.dn, attrsDict)
+        if isinstance(self.ldapConn, LDAP_rw):
+            self.ldapConn.deleteAttrValues(self.dn, attrsDict)
             for attr, vals in attrsDict.iteritems():
                 if attr in self:
                     if len(vals) == 0:
@@ -192,10 +192,10 @@ class LDAPObject(dict):
             raise RuntimeError('No LDAP_rw object')
 
     def deleteAttrs(self, attrs):
-        if isinstance(self.ldapObj, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP_rw):
             if not isinstance(attrs, list):
                 attrs = [attrs]
-            self.ldapObj.deleteAttrs(self.dn, attrs)
+            self.ldapConn.deleteAttrs(self.dn, attrs)
             for attr in attrs:
                 try:
                     self.pop(attr)
@@ -206,19 +206,19 @@ class LDAPObject(dict):
             raise RuntimeError('No LDAP_rw object')
 
     def delete(self):
-        if isinstance(self.ldapObj, LDAP_rw):
-            self.ldapObj.delete(self.dn)
+        if isinstance(self.ldapConn, LDAP_rw):
+            self.ldapConn.delete(self.dn)
             self.clear()
             self.dn = None
-            self.ldapObj = None
+            self.ldapConn = None
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
 
     def modDN(self, newRDN, cleanAttr=True, newParent=None):
-        if isinstance(self.ldapObj, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP_rw):
             curRDN, curParent = self.dn.split(',', 1)
-            self.ldapObj.modDN(self.dn, newRDN, cleanAttr, newParent)
+            self.ldapConn.modDN(self.dn, newRDN, cleanAttr, newParent)
             if cleanAttr:
                 rdnAttr, rdnVal = curRDN.split('=', 1)
                 try:
@@ -367,11 +367,11 @@ class LDAP(object):
 
     def search(self, *args, **kwds):
         mID = self._sendSearch(*args, **kwds)
-        return _recvSearchResults(self.sock, mID)
+        return _recvSearchResults(self, mID)
 
     def searchAsync(self, *args, **kwds):
         mID = self._sendSearch(*args, **kwds)
-        return AsyncSearchHandle(self.sock, mID)
+        return AsyncSearchHandle(self, mID)
 
     # send a compare request
     def _sendCompare(self, DN, attr, value):
@@ -395,7 +395,7 @@ class LDAP(object):
 
     def compareAsync(self, *args):
         mID = self._sendCompare(*args)
-        return AsyncHandle(self.sock, mID, _processCompareResults)
+        return AsyncHandle(self, mID, _processCompareResults)
 
 class LDAP_rw(LDAP):
     # send a request to add a new object
@@ -432,11 +432,11 @@ class LDAP_rw(LDAP):
     def add(self, DN, attrs):
         mID = self._sendAdd(DN, attrs)
         _checkResultCode(self.sock.recvResponse(mID)[0], 'addResponse')
-        return LDAPObject(DN, attrs)
+        return LDAPObject(DN, attrs, self)
 
     def addAsync(self, DN, attrs):
         mID = self._sendAdd(DN, attrs)
-        return AsyncAddHandle(self.sock, mID, LDAPObject(DN, attrs))
+        return AsyncAddHandle(self, mID, LDAPObject(DN, attrs, self))
 
     # delete an object
     def _sendDelete(self, DN):
@@ -452,7 +452,7 @@ class LDAP_rw(LDAP):
 
     def deleteAsync(self, DN):
         mID = self._sendDelete(DN)
-        return AsyncResultHandle(self.sock, mID, 'delResponse')
+        return AsyncResultHandle(self, mID, 'delResponse')
 
     # exposes all options of the protocol-level ModifyDNRequest
     def modDN(self, DN, newRDN, cleanAttr=True, newParent=None):
@@ -513,7 +513,7 @@ class LDAP_rw(LDAP):
 
     def modifyAsync(self, DN, modlist):
         mID = self._sendModify(DN, modlist)
-        return AsyncResultHandle(self.sock, mID, 'modifyResponse')
+        return AsyncResultHandle(self, mID, 'modifyResponse')
 
     # add new attributes and values
     def addAttrs(self, DN, attrsDict):
@@ -554,9 +554,10 @@ class LDAP_rw(LDAP):
 ## async handles
 
 class AsyncHandle(object):
-    def __init__(self, sock, messageID, postProcess=lambda x: x):
+    def __init__(self, ldapConn, messageID, postProcess=lambda x: x):
         self.messageID = messageID
-        self.sock = sock
+        self.sock = ldapConn.sock
+        self.ldapConn = ldapConn
         self.abandoned = False
         self.postProcess = postProcess
 
@@ -585,20 +586,20 @@ class AsyncSearchHandle(AsyncHandle):
             raise ConnectionUnbound()
         if self.abandoned:
             raise AbandonedAsyncError()
-        return _recvSearchResults(self.sock, self.messageID)
+        return _recvSearchResults(self.ldapConn, self.messageID)
 
 class AsyncResultHandle(AsyncHandle):
-    def __init__(self, sock, messageID, operation):
-        AsyncHandle.__init__(self, sock, messageID)
+    def __init__(self, ldapConn, messageID, operation):
+        AsyncHandle.__init__(self, ldapConn, messageID)
         self.operation = operation
 
     def wait(self):
         msg = AsyncHandle.wait(self)[0]
         return _checkResultCode(msg, self.operation)
 
-class AsyncAddHandle(AsyncResultHandle)
-    def __init__(self, sock, messageID, ldapObj):
-        AsyncResultHandle.__init__(self, sock, messageID, 'addResponse')
+class AsyncAddHandle(AsyncResultHandle):
+    def __init__(self, ldapConn, messageID, ldapObj):
+        AsyncResultHandle.__init__(self, ldapConn, messageID, 'addResponse')
         self.ldapObj = ldapObj
 
     def wait(self):
@@ -648,7 +649,7 @@ class Mod(object):
         if (op != Mod.ADD) and (op != Mod.REPLACE) and (op != Mod.DELETE):
             raise ValueError()
         if not isinstance(vals, list):
-            raise TypeError()
+            vals = [vals]
         self.op = op
         self.attr = attr
         self.vals = vals
