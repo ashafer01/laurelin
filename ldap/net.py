@@ -36,6 +36,7 @@ class LDAPSocket(object):
         self.URI = hostURI
         self.bound = False
         self.unbound = False
+        self.abandonedMIDs = []
 
     def sendMessage(self, op, obj):
         mID = self._nextMessageID
@@ -54,6 +55,8 @@ class LDAPSocket(object):
             if (wantMessageID <= 0) or (obj.getComponentByName('messageID') == wantMessageID):
                 ret.append(obj)
                 self._messageQueue.remove(obj)
+        if wantMessageID in self.abandonedMIDs:
+            return ret
         try:
             raw += self._sock.recv(LDAPSocket.RECV_BUFFER)
             while len(raw) > 0:

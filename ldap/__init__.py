@@ -40,11 +40,12 @@ def _checkResultCode(ldapMessage, operation):
 
 # recv all objects from given LDAPSocket until we get a SearchResultDone; return a list of
 # LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
-# TODO this may block indefinitely if abandoned
 def _recvSearchResults(ldapConn, messageID):
     ret = []
     logger.debug('Receiving all search results for messageID={0}'.format(messageID))
     while True:
+        if messageID in ldapConn.sock.abandonedMIDs:
+            return ret
         for msg in ldapConn.sock.recvResponse(messageID):
             try:
                 entry = _unpack('searchResEntry', msg)
@@ -170,6 +171,9 @@ class LDAPObject(dict):
         if isinstance(self.ldapConn, LDAP_rw):
             self.ldapConn.replaceAttrs(self.dn, attrsDict)
             self.update(attrsDict)
+            for k in self.keys():
+                if len(self[k]) == 0:
+                    self.pop(k)
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
@@ -185,6 +189,8 @@ class LDAPObject(dict):
                         for val in vals:
                             try:
                                 self[attr].remove(val)
+                                if len(self[attr]) == 0:
+                                    self.pop(attr)
                             except:
                                 pass
             return True
@@ -218,11 +224,17 @@ class LDAPObject(dict):
     def modDN(self, newRDN, cleanAttr=True, newParent=None):
         if isinstance(self.ldapConn, LDAP_rw):
             curRDN, curParent = self.dn.split(',', 1)
-            self.ldapConn.modDN(self.dn, newRDN, cleanAttr, newParent)
+            if newParent is None:
+                parent = curParent
+            else:
+                parent = newParent
+            self.ldapConn.modDN(self.dn, newRDN, cleanAttr, parent)
             if cleanAttr:
                 rdnAttr, rdnVal = curRDN.split('=', 1)
                 try:
                     self[rdnAttr].remove(rdnVal)
+                    if len(self[rdnAttr]) == 0:
+                        self.pop(rdnAttr)
                 except:
                     pass
             rdnAttr, rdnVal = newRDN.split('=', 1)
@@ -230,10 +242,6 @@ class LDAPObject(dict):
                 self[rdnAttr] = [rdnVal]
             elif rdnVal not in self[rdnAttr]:
                 self[rdnAttr].append(rdnVal)
-            if newParent is None:
-                parent = curParent
-            else:
-                parent = newParent
             self.dn = '{0},{1}'.format(newRDN, parent)
             return True
         else:
@@ -611,6 +619,9 @@ class AsyncHandle(object):
         logger.debug('Waiting for at least 1 object for messageID={0}'.format(self.messageID))
         ret = []
         while len(ret) < 1:
+            if self.abandoned:
+                logger.debug('Abandoned; stopping wait')
+                break
             ret += self.sock.recvResponse(self.messageID)
         logger.debug('Done waiting for messageID={0}'.format(self.messageID))
         return self.postProcess(ret)
@@ -620,6 +631,7 @@ class AsyncHandle(object):
             raise ConnectionUnbound()
         logger.debug('Abandoning messageID={0}'.format(self.messageID))
         self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
+        self.sock.abandonedMID.append(self.messageID)
         self.abandoned = True
 
 class AsyncSearchHandle(AsyncHandle):
