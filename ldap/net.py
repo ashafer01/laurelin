@@ -5,7 +5,7 @@ from pyasn1.codec.ber.decoder import decode as berDecode
 from pyasn1.error import SubstrateUnderrunError
 
 from rfc4511 import LDAPMessage, MessageID, ProtocolOp
-from base import LDAPError
+from errors import LDAPError
 
 _nextSockID = 0
 
@@ -29,7 +29,6 @@ class LDAPSocket(object):
             raise LDAPConnectionError('{0} ({1})'.format(e.strerror, e.errno))
         self._messageQueue = []
         self._nextMessageID = 1
-        self._rawBuffer = ''
 
         global _nextSockID
         self.ID = _nextSockID
@@ -50,16 +49,12 @@ class LDAPSocket(object):
         self._sock.sendall(berEncode(lm))
         return mID
 
-    def recvResponse(self, wantMessageID=0, limit=0, raw=''):
+    def recvResponse(self, wantMessageID=0, raw=''):
         ret = []
-        raw = self._rawBuffer + raw
-        self._rawBuffer = ''
         for obj in self._messageQueue:
             if (wantMessageID <= 0) or (obj.getComponentByName('messageID') == wantMessageID):
                 ret.append(obj)
                 self._messageQueue.remove(obj)
-                if (limit > 0) and (len(ret) == limit):
-                    return ret
         if wantMessageID in self.abandonedMIDs:
             return ret
         try:
@@ -73,14 +68,8 @@ class LDAPSocket(object):
                         self._messageQueue.append(response)
                 else:
                     ret.append(response)
-                if (limit > 0) and (len(ret) == limit):
-                    self._rawBuffer = raw
-                    break
             return ret
         except SubstrateUnderrunError:
-            if (limit > 0) and (len(ret) == limit):
-                self._rawBuffer = raw
-                return ret
             ret += self.recvResponse(wantMessageID, limit, raw)
             return ret
 
