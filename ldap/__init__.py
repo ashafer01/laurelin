@@ -16,114 +16,56 @@ from rfc4511 import AttributeDescription, AssertionValue, AbandonRequest, Attrib
 from rfc4511 import AttributeValue, Vals, DelRequest, ModifyDNRequest, RelativeLDAPDN, NewSuperior
 from rfc4511 import ModifyRequest, Changes, Change, Operation, PartialAttribute
 from filter import parse as parseFilter
-from base import Scope, DerefAliases, LDAPError
+from base import Scope, DerefAliases, LDAPError, Extensible
 from net import LDAPSocket, LDAPConnectionError
 
-# unpack an object from an LDAPMessage envelope
-def _unpack(op, ldapMessage):
-    po = ldapMessage.getComponentByName('protocolOp')
-    ret = po.getComponentByName(op)
-    if ret is not None:
-        return ret
-    else:
-        raise UnexpectedResponseType()
+class LDAPObject(dict, Extensible):
+    def __init__(self, dn,
+        attrs={},
+        ldapConn=None,
+        searchScope=Scope.SUBTREE,
+        rdnAttr=None
+        ):
 
-# check for success result
-def _checkResultCode(ldapMessage, operation):
-    mID = ldapMessage.getComponentByName('messageID')
-    res = _unpack(operation, ldapMessage).getComponentByName('resultCode')
-    if res == ResultCode('success'):
-        logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
-        return True
-    else:
-        raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
-
-# recv all objects from given LDAPSocket until we get a SearchResultDone; return a list of
-# LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
-def _recvSearchResults(ldapConn, messageID):
-    ret = []
-    logger.debug('Receiving all search results for messageID={0}'.format(messageID))
-    while True:
-        if messageID in ldapConn.sock.abandonedMIDs:
-            return ret
-        for msg in ldapConn.sock.recvResponse(messageID):
-            try:
-                entry = _unpack('searchResEntry', msg)
-                DN = unicode(entry.getComponentByName('objectName'))
-                attrs = {}
-                _attrs = entry.getComponentByName('attributes')
-                for i in range(0, len(_attrs)):
-                    _attr = _attrs.getComponentByPosition(i)
-                    attrType = unicode(_attr.getComponentByName('type'))
-                    _vals = _attr.getComponentByName('vals')
-                    vals = []
-                    for j in range(0, len(_vals)):
-                        vals.append(unicode(_vals.getComponentByPosition(j)))
-                    attrs[attrType] = vals
-                ret.append(LDAPObject(DN, attrs, ldapConn))
-                logger.debug('Got search result object {0}'.format(DN))
-            except UnexpectedResponseType:
-                try:
-                    _checkResultCode(msg, 'searchResDone')
-                    return ret
-                except UnexpectedResponseType:
-                    resref = _unpack('searchResRef', msg)
-                    URIs = []
-                    for i in range(0, len(resref)):
-                        URIs.append(unicode(resref.getComponentByPosition(i)))
-                    logger.debug('Got search reference to: {0}'.format(' | '.join(URIs)))
-                    ret.append(SearchReferenceHandle(URIs))
-
-# convert compare result codes to boolean
-def _processCompareResults(ldapMessages):
-    mID = ldapMessages[0].getComponentByName('messageID')
-    res = _unpack('compareResponse', ldapMessages[0]).getComponentByName('resultCode')
-    if res == ResultCode('compareTrue'):
-        logger.debug('Compared True (ID {0})'.format(mID))
-        return True
-    elif res == ResultCode('compareFalse'):
-        logger.debug('Compared False (ID {0})'.format(mID))
-        return False
-    else:
-        raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
-
-# perform a search based on an RFC4516 URI
-def searchByURI(uri):
-    parsedURI = urlparse(uri)
-    hostURI = '{0}://{1}'.format(parsedURI.scheme, parsedURL.netloc)
-    ldap = LDAP(hostURI, reuseConnection=False)
-    DN = parsedURI.path
-    params = parsedURI.query.split('?')
-    nparams = len(params)
-    if (nparams > 0) and (len(params[0]) > 0):
-        attrList = params[0].split(',')
-    else:
-        attrList = [LDAP.ALL_USER_ATTRS]
-    if (nparams > 1) and (len(params[1]) > 0):
-        scope = Scope.string(params[1])
-    else:
-        scope = Scope.BASE
-    if (nparams > 2) and (len(params[2]) > 0):
-        filter = params[2]
-    else:
-        filter = LDAP.DEFAULT_FILTER
-    if (nparams > 3) and (len(params[3]) > 0):
-        raise LDAPError('Extensions for searchByURI not yet implemented')
-    ret = ldap.search(DN, scope, filterStr=filter, attrList=attrList)
-    ldap.unbind()
-    return ret
-
-# for storing reusable sockets
-_sockets = {}
-
-class LDAPObject(dict):
-    def __init__(self, dn, attrs={}, ldapConn=None):
         self.dn = dn
         self.ldapConn = ldapConn
+        self.searchScope = searchScope
+        self.rdnAttr = rdnAttr
         dict.__init__(self, attrs)
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, dict.__repr__(self))
+
+    ## relative methods
+
+    def RDN(self, rdn):
+        if self.rdnAttr is not None:
+            if not rdn.startswith(self.rdnAttr + '=')):
+                rdn = '{0}={1}'.format(self.rdnAttr, rdn)
+        elif '=' not in rdn:
+            raise ValueError('No rdnAttr specified, must supply full RDN attr=val'):
+        return '{0},{1}'.format(rdn, self.dn)
+
+    def obj(self, rdn, tag=None, searchScope=None, rdnAttr=None):
+        if searchScope is None:
+            searchScope = self.searchScope
+        if rdnAttr is None:
+            rdnAttr = self.rdnAttr
+        return self.ldapConn.obj(self.RDN(rdn), tag, searchScope, rdnAttr)
+
+    def get(self, rdn, attrs=None):
+        if isinstance(self.ldapConn, LDAP):
+            return self.ldapConn.get(self.RDN(rdn), attrs)
+        else:
+            raise RuntimeError('No LDAP object')
+
+    def search(self, filter, attrs=None, *args, **kwds):
+        if isinstance(self.ldapConn, LDAP):
+            return self.ldapConn.search(self.dn, self.searchScope, filter, attrs, *args, **kwds)
+        else:
+            raise RuntimeError('No LDAP object')
+
+    ## object-specific methods
 
     def formatLDIF(self):
         lines = ['dn: {0}'.format(self.dn)]
@@ -149,50 +91,79 @@ class LDAPObject(dict):
         else:
             raise RuntimeError('No LDAP object')
 
+    def hasObjectClass(self, objectClass):
+        if 'objectClass' not in self:
+            self.refresh(['objectClass'])
+        return (objectClass in self['objectClass'])
+
     ## these call the LDAP_rw methods of the same name, passing the object's DN as the first
     ## argument, then update the local attributes dictionary after a successful request to the
     ## server
+
+    def _local_addAttr(self, attr, vals):
+        if attr not in self:
+            self[attr] = vals
+        else:
+            for val in vals:
+                if val not in self[attr]:
+                    self[attr].append(val)
+
+    def modify(self, modlist):
+        if isinstance(self.ldapConn, LDAP_rw):
+            self.ldapConn.modify(self.dn, modlist)
+            for mod in modlist:
+                if mod.op == Mod.ADD:
+                    self._local_addAttr(mod.attr, mod.vals)
+                elif mod.op == Mod.REPLACE:
+                    self._local_replaceAttrs({mod.attr: mod.vals})
+                elif mod.op == Mod.DELETE:
+                    self._local_deleteAttrValues(mod.attr, mod.vals)
+                else:
+                    raise ValueError('Invalid mod op')
+        else:
+            raise RuntimeError('No LDAP_rw object')
 
     def addAttrs(self, attrsDict):
         if isinstance(self.ldapConn, LDAP_rw):
             self.ldapConn.addAttrs(self.dn, attrsDict)
             for attr, vals in attrsDict.iteritems():
-                if attr not in self:
-                    self[attr] = vals
-                else:
-                    for val in vals:
-                        if val not in self[attr]:
-                            self[attr].append(val)
+                self._local_addAttr(attr, vals)
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
 
+    def _local_replaceAttrs(self, attrsDict):
+        self.update(attrsDict)
+        for k in self.keys():
+            if len(self[k]) == 0:
+                self.pop(k)
+
     def replaceAttrs(self, attrsDict):
         if isinstance(self.ldapConn, LDAP_rw):
             self.ldapConn.replaceAttrs(self.dn, attrsDict)
-            self.update(attrsDict)
-            for k in self.keys():
-                if len(self[k]) == 0:
-                    self.pop(k)
+            self._local_replaceAttrs(attrsDict)
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
+
+    def _local_deleteAttrValues(self, attr, vals):
+        if attr in self:
+            if len(vals) == 0:
+                self.pop(attr)
+            else:
+                for val in vals:
+                    try:
+                        self[attr].remove(val)
+                        if len(self[attr]) == 0:
+                            self.pop(attr)
+                    except:
+                        pass
 
     def deleteAttrValues(self, attrsDict):
         if isinstance(self.ldapConn, LDAP_rw):
             self.ldapConn.deleteAttrValues(self.dn, attrsDict)
             for attr, vals in attrsDict.iteritems():
-                if attr in self:
-                    if len(vals) == 0:
-                        self.pop(attr)
-                    else:
-                        for val in vals:
-                            try:
-                                self[attr].remove(val)
-                                if len(self[attr]) == 0:
-                                    self.pop(attr)
-                            except:
-                                pass
+                self._local_deleteAttrValues(attr, vals)
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
@@ -254,29 +225,35 @@ class LDAPObject(dict):
         newRDN, newParent = newDN.split(',', 1)
         return self.modDN(newRDN, cleanAttr, newParent)
 
-class LDAP(object):
-    ## global defaults
+# for storing reusable sockets
+_sockets = {}
+
+class LDAP(Extensible):
+    # global defaults
     DEFAULT_FILTER = '(objectClass=*)'
     DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
     DEFAULT_SEARCH_TIMEOUT = 0
     DEFAULT_CONNECT_TIMEOUT = 5
 
-    ## other constants
+    # other constants
     NO_ATTRS = '1.1'
     ALL_USER_ATTRS = '*'
 
     def __init__(self, connectTo,
         reuseConnection=True,
+        baseDC=None,
         connectTimeout=DEFAULT_CONNECT_TIMEOUT,
         searchTimeout=DEFAULT_SEARCH_TIMEOUT,
         derefAliases=DEFAULT_DEREF_ALIASES,
         ):
 
-        ## setup
+        # setup
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
 
-        ## connect
+        self._taggedObjects = {}
+
+        # connect
         if isinstance(connectTo, basestring):
             self.hostURI = connectTo
             if reuseConnection:
@@ -285,11 +262,21 @@ class LDAP(object):
                 self.sock = _sockets[self.hostURI]
             else:
                 self.sock = LDAPSocket(self.hostURI, connectTimeout)
+            if baseDC is not None:
+                for dcpart in baseDC.split(','):
+                    if not dcpart.startswith('dc='):
+                        raise ValueError('Invalid base domain component')
+                self.baseDC = baseDC
+            else:
+                raise ValueError('baseDC is required')
         elif isinstance(connectTo, LDAP):
             self.hostURI = connectTo.hostURI
             self.sock = connectTo.sock
+            self.baseDC = baseDC
         else:
             raise TypeError('Must supply URI string or LDAP instance for connectTo')
+
+        self.base = self.obj(self.baseDC, searchScope=Scope.SUBTREE)
         logger.debug('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
 
     def simpleBind(self, user, pw):
@@ -308,7 +295,9 @@ class LDAP(object):
         mID = self.sock.sendMessage('bindRequest', br)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
             self.sock.ID, user))
-        return _checkResultCode(self.sock.recvResponse()[0], 'bindResponse')
+        ret = _checkResultCode(self.sock.recvResponse()[0], 'bindResponse')
+        self.sock.bound = ret
+        return ret
 
     def unbind(self):
         if self.sock.unbound:
@@ -323,6 +312,25 @@ class LDAP(object):
         except KeyError:
             pass
 
+    close = unbind
+
+    # get a tagged object
+    def tag(self, tag):
+        try:
+            return self._taggedObjects[tag]
+        except KeyError:
+            raise TagError('tag {0} does not exist'.format(tag))
+
+    # create an empty LDAPObject without querying the server
+    def obj(self, DN, tag=None, searchScope=None, rdnAttr=None):
+        obj = LDAPObject(DN, ldapConn=self, searchScope=searchScope, rdnAttr=rdnAttr)
+        if tag is not None:
+            if tag in self._taggedObjects:
+                return TagError('tag {0} already exists'.format(tag))
+            else:
+                self._taggedObjects[tag] = obj
+        return obj
+
     # get a specific object by DN
     def get(self, DN, attrList=None):
         if self.sock.unbound:
@@ -336,12 +344,12 @@ class LDAP(object):
         else:
             return results[0]
 
-    # simply check if a DN exisVts
+    # simply check if a DN exists
     def exists(self, DN):
         if self.sock.unbound:
             raise ConnectionUnbound()
         try:
-            self.get(DN)
+            self.get(DN, [])
             return True
         except NoSearchResults:
             return False
@@ -601,6 +609,51 @@ class LDAP_rw(LDAP):
     def replaceAttrsAsync(self, DN, attrsDict):
         return self.modifyAsync(DN, Modlist(Mod.REPLACE, attrsDict))
 
+    # process a basic LDIF
+    # TODO: full RFC 2849 implementation
+    def processLDIF(self, ldifStr):
+        ldifLines = ldifStr.splitlines()
+        if not ldifLines[0].startswith('dn:'):
+            raise ValueError('Missing dn')
+        DN = ldifLines[0][3:].strip()
+        if not ldifLines[1].startswith('changetype:'):
+            raise ValueError('Missing changetype')
+        changetype = ldifLines[1][11:].strip()
+
+        if changetype == 'add':
+            attrs = {}
+            for line in ldifLines[2:]:
+                attr, val = line.split(':', 1)
+                if attr not in attrs:
+                    attrs[attr] = []
+                attrs[attr].append(val)
+            return self.add(DN, attrs)
+        elif changetype == 'delete':
+            return self.delete(DN)
+        elif changetype == 'modify':
+            modOp = None
+            modAttr = None
+            vals = []
+            modlist = []
+            for line in ldifLines[2:]:
+                if modOp is None:
+                    _modOp, _modAttr = line.split(':')
+                    modOp = Mod.string(_modOp)
+                    modAttr = _modAttr.strip()
+                    vals = []
+                elif line == '-':
+                    if modOp == 'add' and len(vals) == 0:
+                        raise ValueError('no attribute values to add')
+                    modlist += Modlist(modOp, {modAttr: vals})
+                else:
+                    if line.startswith(modAttr):
+                        vals.append(line[len(modAttr)+1:].strip())
+                    else:
+                        raise ValueError('Unexpected attribute')
+            return self.modify(DN, modlist)
+        else:
+            raise ValueError('changetype {0} unknown/not yet implemented'.format(changetype))
+
 ## async handles
 
 class AsyncHandle(object):
@@ -630,17 +683,17 @@ class AsyncHandle(object):
         if self.sock.unbound:
             raise ConnectionUnbound()
         logger.debug('Abandoning messageID={0}'.format(self.messageID))
+        self.abandoned = True
         self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
         self.sock.abandonedMID.append(self.messageID)
-        self.abandoned = True
 
 class AsyncSearchHandle(AsyncHandle):
-    def wait(self):
+    def wait(self, limit=0):
         if self.sock.unbound:
             raise ConnectionUnbound()
         if self.abandoned:
             raise AbandonedAsyncError()
-        return _recvSearchResults(self.ldapConn, self.messageID)
+        return _recvSearchResults(self.ldapConn, self.messageID, limit)
 
 class AsyncResultHandle(AsyncHandle):
     def __init__(self, ldapConn, messageID, operation):
@@ -694,16 +747,25 @@ class Mod(object):
         else:
             raise ValueError()
 
+    # translate ldif modify operation strings to constant
     @staticmethod
-    def stringToOp(opStr):
-        opStr = opStr.lower()
-        return Operation(opStr)
+    def string(op):
+        if op == 'add':
+            return Mod.ADD
+        elif op == 'replace':
+            return Mod.REPLACE
+        elif op == 'delete':
+            return Mod.DELETE
+        else:
+            raise ValueError()
 
     def __init__(self, op, attr, vals):
         if (op != Mod.ADD) and (op != Mod.REPLACE) and (op != Mod.DELETE):
             raise ValueError()
         if not isinstance(vals, list):
             vals = [vals]
+        if (op == Mod.ADD) and (len(vals) == 0):
+            raise ValueError('No values to add')
         self.op = op
         self.attr = attr
         self.vals = vals
@@ -719,6 +781,34 @@ class Mod(object):
         return 'Mod(Mod.{0}, {1}, {2})'.format(Mod.opToString(self.op), repr(self.attr),
             repr(self.vals))
 
+## public functions
+
+# perform a search based on an RFC4516 URI
+def searchByURI(uri):
+    parsedURI = urlparse(uri)
+    hostURI = '{0}://{1}'.format(parsedURI.scheme, parsedURL.netloc)
+    ldap = LDAP(hostURI, reuseConnection=False)
+    DN = parsedURI.path
+    params = parsedURI.query.split('?')
+    nparams = len(params)
+    if (nparams > 0) and (len(params[0]) > 0):
+        attrList = params[0].split(',')
+    else:
+        attrList = [LDAP.ALL_USER_ATTRS]
+    if (nparams > 1) and (len(params[1]) > 0):
+        scope = Scope.string(params[1])
+    else:
+        scope = Scope.BASE
+    if (nparams > 2) and (len(params[2]) > 0):
+        filter = params[2]
+    else:
+        filter = LDAP.DEFAULT_FILTER
+    if (nparams > 3) and (len(params[3]) > 0):
+        raise LDAPError('Extensions for searchByURI not yet implemented')
+    ret = ldap.search(DN, scope, filterStr=filter, attrList=attrList)
+    ldap.unbind()
+    return ret
+
 # generate a modlist from a dictionary
 def Modlist(op, attrsDict):
     if not isinstance(attrsDict, dict):
@@ -728,7 +818,81 @@ def Modlist(op, attrsDict):
         modlist.append(Mod(op, attr, vals))
     return modlist
 
+## private functions
+
+# unpack an object from an LDAPMessage envelope
+def _unpack(op, ldapMessage):
+    po = ldapMessage.getComponentByName('protocolOp')
+    ret = po.getComponentByName(op)
+    if ret is not None:
+        return ret
+    else:
+        raise UnexpectedResponseType()
+
+# check for success result
+def _checkResultCode(ldapMessage, operation):
+    mID = ldapMessage.getComponentByName('messageID')
+    res = _unpack(operation, ldapMessage).getComponentByName('resultCode')
+    if res == ResultCode('success'):
+        logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
+        return True
+    else:
+        raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
+
+# recv all objects from given LDAPSocket until we get a SearchResultDone; return a list of
+# LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
+def _recvSearchResults(ldapConn, messageID, limit=0):
+    ret = []
+    logger.debug('Receiving all search results for messageID={0}'.format(messageID))
+    while True:
+        if messageID in ldapConn.sock.abandonedMIDs:
+            logger.debug('ID={0} abandoned while receiving search results'.format(messageID))
+            return ret
+        for msg in ldapConn.sock.recvResponse(messageID, limit):
+            try:
+                entry = _unpack('searchResEntry', msg)
+                DN = unicode(entry.getComponentByName('objectName'))
+                attrs = {}
+                _attrs = entry.getComponentByName('attributes')
+                for i in range(0, len(_attrs)):
+                    _attr = _attrs.getComponentByPosition(i)
+                    attrType = unicode(_attr.getComponentByName('type'))
+                    _vals = _attr.getComponentByName('vals')
+                    vals = []
+                    for j in range(0, len(_vals)):
+                        vals.append(unicode(_vals.getComponentByPosition(j)))
+                    attrs[attrType] = vals
+                ret.append(LDAPObject(DN, attrs, ldapConn))
+                logger.debug('Got search result object {0}'.format(DN))
+            except UnexpectedResponseType:
+                try:
+                    _checkResultCode(msg, 'searchResDone')
+                    return ret
+                except UnexpectedResponseType:
+                    resref = _unpack('searchResRef', msg)
+                    URIs = []
+                    for i in range(0, len(resref)):
+                        URIs.append(unicode(resref.getComponentByPosition(i)))
+                    logger.debug('Got search reference to: {0}'.format(' | '.join(URIs)))
+                    ret.append(SearchReferenceHandle(URIs))
+
+# convert compare result codes to boolean
+def _processCompareResults(ldapMessages):
+    mID = ldapMessages[0].getComponentByName('messageID')
+    res = _unpack('compareResponse', ldapMessages[0]).getComponentByName('resultCode')
+    if res == ResultCode('compareTrue'):
+        logger.debug('Compared True (ID {0})'.format(mID))
+        return True
+    elif res == ResultCode('compareFalse'):
+        logger.debug('Compared False (ID {0})'.format(mID))
+        return False
+    else:
+        raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
+
 ## Exceptions
+
+class TagError(LDAPError):
+    pass
 
 class UnexpectedResponseType(LDAPError):
     pass

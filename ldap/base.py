@@ -26,3 +26,13 @@ class DerefAliases:
 
 class LDAPError(Exception):
     pass
+
+class Extensible(object):
+    @classmethod
+    def EXTEND(cls, methods):
+        for method in methods:
+            if isinstance(method, tuple):
+                name, method = method
+            else:
+                name = method.__name__
+            setattr(cls, name, method)
