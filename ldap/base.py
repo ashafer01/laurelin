@@ -150,7 +150,7 @@ class LDAP(Extensible):
         mID = self.sock.sendMessage('bindRequest', br)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
             self.sock.ID, user))
-        ret = _checkResultCode(self.sock.recvResponse()[0], 'bindResponse')
+        ret = _checkSuccessResult(self.sock.recvResponse()[0], 'bindResponse')
         self.sock.bound = ret
         return ret
 
@@ -272,11 +272,19 @@ class LDAP(Extensible):
                             vals.append(unicode(_vals.getComponentByPosition(j)))
                         attrs[attrType] = vals
                     ret.append(LDAPObject(DN, attrs, self))
-                    logger.debug('Got search result object {0}'.format(DN))
+                    logger.debug('Got search result entry {0}'.format(DN))
                 except UnexpectedResponseType:
                     try:
-                        _checkResultCode(msg, 'searchResDone')
-                        return ret
+                        res = _unpack('searchResDone', msg).getComponentByName('resultCode')
+                        if res == ResultCode('success') or res == ResultCode('noSuchObject'):
+                            logger.debug('Got all search results for ID {0}, result is {1}'.format(
+                                messageID, repr(res)
+                            ))
+                            return ret
+                        else:
+                            raise LDAPError('Got {0} for search results (ID {1})'.format(
+                                repr(res), messageID
+                            ))
                     except UnexpectedResponseType:
                         resref = _unpack('searchResRef', msg)
                         URIs = []
@@ -345,7 +353,7 @@ class LDAP_rw(LDAP):
     # these return a corresponding LDAPObject on success
     def add(self, DN, attrs):
         mID = self._sendAdd(DN, attrs)
-        _checkResultCode(self.sock.recvResponse(mID)[0], 'addResponse')
+        _checkSuccessResult(self.sock.recvResponse(mID)[0], 'addResponse')
         return LDAPObject(DN, attrs, self)
 
     ## search+add patterns
@@ -368,8 +376,11 @@ class LDAP_rw(LDAP):
 
     def addIfNotExists(self, DN, attrs):
         try:
-            return self.get(DN)
+            cur = self.get(DN)
+            logger.debug('Object {0} already exists on addIfNotExists'.format(DN))
+            return cur
         except NoSearchResults:
+            logger.debug('Object {0} does not exist on addIfNotExists, adding'.format(DN))
             return self.add(DN, attrs)
 
     ## delete an object
@@ -383,7 +394,7 @@ class LDAP_rw(LDAP):
 
     def delete(self, DN):
         mID = self._sendDelete(DN)
-        return _checkResultCode(self.sock.recvResponse(mID)[0], 'delResponse')
+        return _checkSuccessResult(self.sock.recvResponse(mID)[0], 'delResponse')
 
     ## change object DN
 
@@ -398,7 +409,7 @@ class LDAP_rw(LDAP):
         if newParent is not None:
             mdr.setComponentByName('newSuperior', NewSuperior(newParent))
         mID = self.sock.sendMessage('modDNRequest', mdr)
-        return _checkResultCode(self.sock.recvResponse(mID)[0], 'modDNResponse')
+        return _checkSuccessResult(self.sock.recvResponse(mID)[0], 'modDNResponse')
 
     # edit the RDN of an object
     def rename(self, DN, newRDN, cleanAttr=True):
@@ -427,10 +438,10 @@ class LDAP_rw(LDAP):
             pa = PartialAttribute()
             pa.setComponentByName('type', AttributeDescription(mod.attr))
             vals = Vals()
-            i = 0
+            j = 0
             for v in mod.vals:
-                vals.setComponentByPosition(i, AttributeValue(v))
-                i += 1
+                vals.setComponentByPosition(j, AttributeValue(v))
+                j += 1
             pa.setComponentByName('vals', vals)
             c.setComponentByName('modification', pa)
 
@@ -443,7 +454,7 @@ class LDAP_rw(LDAP):
 
     def modify(self, DN, modlist):
         mID = self._sendModify(DN, modlist)
-        return _checkResultCode(self.sock.recvResponse(mID)[0], 'modifyResponse')
+        return _checkSuccessResult(self.sock.recvResponse(mID)[0], 'modifyResponse')
 
     # add new attributes and values
     def addAttrs(self, DN, attrsDict):
@@ -754,7 +765,7 @@ def _unpack(op, ldapMessage):
         raise UnexpectedResponseType()
 
 # check for success result
-def _checkResultCode(ldapMessage, operation):
+def _checkSuccessResult(ldapMessage, operation):
     mID = ldapMessage.getComponentByName('messageID')
     res = _unpack(operation, ldapMessage).getComponentByName('resultCode')
     if res == ResultCode('success'):

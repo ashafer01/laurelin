@@ -1,4 +1,4 @@
-from ldap.base import LDAP, LDAP_rw, LDAPObject, _unpack, _checkResultCode, _processCompareResults
+from ldap.base import LDAP, LDAP_rw, LDAPObject, _unpack, _checkSuccessResult, _processCompareResults
 from ldap.modify import Mod, Modlist
 
 ## LDAP extension methods
@@ -102,7 +102,7 @@ class AsyncResultHandle(AsyncHandle):
 
     def wait(self):
         msg = AsyncHandle.wait(self)[0]
-        return _checkResultCode(msg, self.operation)
+        return _checkSuccessResult(msg, self.operation)
 
 class AsyncAddHandle(AsyncResultHandle):
     def __init__(self, ldapConn, messageID, ldapObj):
