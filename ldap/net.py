@@ -55,6 +55,8 @@ class LDAPSocket(object):
             if (wantMessageID <= 0) or (obj.getComponentByName('messageID') == wantMessageID):
                 ret.append(obj)
                 self._messageQueue.remove(obj)
+        if len(ret) > 0:
+            return ret
         if wantMessageID in self.abandonedMIDs:
             return ret
         try:

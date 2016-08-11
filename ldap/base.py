@@ -78,7 +78,11 @@ class Extensible(object):
                 name, method = method
             else:
                 name = method.__name__
-            setattr(cls, name, method)
+            if not hasattr(cls, name):
+                setattr(cls, name, method)
+            else:
+                raise LDAPExtensionError('Cannot add extension attribute {0} - class {1} already '
+                    'has an attribute by that name'.format(name, cls.__name__))
 
 # for storing reusable sockets
 _sockets = {}

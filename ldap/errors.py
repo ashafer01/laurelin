@@ -1,6 +1,9 @@
 class LDAPError(Exception):
     pass
 
+class LDAPExtensionError(LDAPError):
+    pass
+
 class TagError(LDAPError):
     pass
 
