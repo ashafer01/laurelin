@@ -27,7 +27,7 @@ LDAP.EXTEND([
 
 def addAsync(self, DN, attrs):
     mID = self._sendAdd(DN, attrs)
-    return AsyncAddHandle(self, mID, LDAPObject(DN, attrs, self))
+    return AsyncAddHandle(self, mID, self.obj(DN, attrs))
 
 def deleteAsync(self, DN):
     mID = self._sendDelete(DN)

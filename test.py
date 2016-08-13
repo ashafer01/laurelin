@@ -1,7 +1,7 @@
 from getpass import getpass
 from laurelin.ldap import LDAP_rw, Scope
 
-l = LDAP_rw('ldap://127.0.0.1:389', baseDC='dc=example,dc=org')
+l = LDAP_rw('ldap://127.0.0.1:389')
 l.simpleBind('cn=admin,dc=example,dc=org', getpass())
 
 o = l.addIfNotExists('ou=test,dc=example,dc=org', {
