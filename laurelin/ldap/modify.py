@@ -59,3 +59,51 @@ def Modlist(op, attrsDict):
     for attr, vals in attrsDict.iteritems():
         modlist.append(Mod(op, attr, vals))
     return modlist
+
+## Smart modlist functions which will prevent errors
+
+# generate a modlist to add only new attribute values that are not known to exist
+def AddModlist(curAttrs, newAttrs):
+    if not isinstance(curAttrs, dict):
+        raise TypeError('curAttrs must be dict')
+    if not isinstance(newAttrs, dict):
+        raise TypeError('newAttrs must be dict')
+    addAttrs = {}
+    for attr, vals in newAttrs.iteritems():
+        if attr in curAttrs:
+            for val in vals:
+                if val not in curAttrs[attr]:
+                    if attr not in addAttrs:
+                        addAttrs[attr] = []
+                    addAttrs[attr].append(val)
+        else:
+            addAttrs[attr] = vals
+    return Modlist(Mod.ADD, addAttrs)
+
+# generate a modlist to delete only attribute values that are known to exist
+def DeleteModlist(curAttrs, delAttrs):
+    if not isinstance(delAttrs, dict):
+        raise TypeError('curAttrs must be dict')
+    if not isinstance(delAttrs, dict):
+        raise TypeError('newAttrs must be dict')
+    _delAttrs = {}
+    for attr, vals in delAttrs.iteritems():
+        if attr in curAttrs:
+            if len(vals) == 0:
+                _delAttrs[attr] = vals
+            else:
+                for val in vals:
+                    if val in curAttrs[attr]:
+                        if attr not in _delAttrs:
+                            _delAttrs[attr] = []
+                        _delAttrs[attr].append(val)
+    return Modlist(Mod.DELETE, _delAttrs)
+
+# for completeness - a replace operation should never return an error:
+# # all attribute values will be replaced with those given if the attribute exists
+# # attributes will be created if they do not exist
+# # specifying a 0-length entry will delete that attribute
+# # attributes not mentioned are not touched
+def ReplaceModlist(*args):
+    attrsDict = args[-1]
+    return Modlist(Mod.REPLACE, attrsDict)

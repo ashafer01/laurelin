@@ -1,5 +1,5 @@
 import re
-from ldap import LDAP, LDAP_rw, LDAPObject
+from laurelin.ldap import LDAP, LDAP_rw, LDAPObject
 
 TAG = 'netgroup_base'
 OBJECT_CLASS = 'nisNetgroup'

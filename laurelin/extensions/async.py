@@ -1,5 +1,12 @@
-from ldap.base import LDAP, LDAP_rw, LDAPObject, _unpack, _checkSuccessResult, _processCompareResults
-from ldap.modify import Mod, Modlist
+from laurelin.ldap.base import (
+    LDAP,
+    LDAP_rw,
+    LDAPObject,
+    _unpack,
+    _checkSuccessResult,
+    _processCompareResults
+)
+from laurelin.ldap.modify import Mod, Modlist
 
 ## LDAP extension methods
 
