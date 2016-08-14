@@ -337,9 +337,8 @@ class LDAP(Extensible):
         return _processCompareResults(self.sock.recvResponse(mID))
 
 class LDAP_rw(LDAP):
-    ## simple object add
+    ## add a new object
 
-    # send a request to add a new object
     def _sendAdd(self, DN, attrs):
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -369,7 +368,7 @@ class LDAP_rw(LDAP):
         logger.debug('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
         return mID
 
-    # these return a corresponding LDAPObject on success
+    # returns a corresponding LDAPObject on success
     def add(self, DN, attrs):
         mID = self._sendAdd(DN, attrs)
         _checkSuccessResult(self.sock.recvResponse(mID)[0], 'addResponse')
@@ -765,7 +764,7 @@ class LDAPObject(dict, Extensible):
             if not self.ldapConn.strictModify:
                 self.refreshMissing(attrs)
             self.ldapConn.deleteAttrs(self.dn, attrs, current=self)
-            self.localDeleteAttrs(attrs, writtenToServer=True)
+            self.localDeleteAttrs(attrs)
             self.removeEmptyAttrs()
             return True
         else:

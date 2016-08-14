@@ -3,10 +3,27 @@
 ## 
 ## Filter parser
 
-from rfc4511 import Filter, And, Or, Not, EqualityMatch, SubstringFilter, GreaterOrEqual
-from rfc4511 import LessOrEqual, Present, ApproxMatch, ExtensibleMatch
-from rfc4511 import AttributeValue, AttributeDescription, Substrings, Substring, AssertionValue
-from rfc4511 import Initial, Any, Final
+from rfc4511 import (
+    Filter,
+    And,
+    Or,
+    Not,
+    EqualityMatch,
+    SubstringFilter,
+    GreaterOrEqual,
+    LessOrEqual,
+    Present,
+    ApproxMatch,
+    ExtensibleMatch,
+    AttributeValue,
+    AttributeDescription,
+    Substrings,
+    Substring,
+    AssertionValue,
+    Initial,
+    Any,
+    Final,
+)
 
 def findClosingParen(text):
     if text[0] != '(':
@@ -14,7 +31,7 @@ def findClosingParen(text):
     parens = 1
     i = 0
     while parens > 0:
-        i+= 1
+        i += 1
         if text[i] == '(':
             parens += 1
         elif text[i] == ')':
