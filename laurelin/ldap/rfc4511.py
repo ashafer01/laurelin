@@ -645,7 +645,7 @@ class Filter(Choice):
                                NamedType('or', Or()),
                                NamedType('not', Not()),
                                NamedType('equalityMatch', EqualityMatch()),
-                               NamedType('substringFilter', SubstringFilter()),
+                               NamedType('substrings', SubstringFilter()),
                                NamedType('greaterOrEqual', GreaterOrEqual()),
                                NamedType('lessOrEqual', LessOrEqual()),
                                NamedType('present', Present()),
