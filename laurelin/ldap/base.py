@@ -95,6 +95,9 @@ class LDAP(Extensible):
     DEFAULT_CONNECT_TIMEOUT = 5
     DEFAULT_STRICT_MODIFY = False
     DEFAULT_REUSE_CONNECTION = True
+    DEFAULT_SSL_CAFILE = None
+    DEFAULT_SSL_CAPATH = None
+    DEFAULT_SSL_CADATA = None
 
     # other constants
     NO_ATTRS = '1.1'
@@ -107,6 +110,9 @@ class LDAP(Extensible):
         searchTimeout=DEFAULT_SEARCH_TIMEOUT,
         derefAliases=DEFAULT_DEREF_ALIASES,
         strictModify=DEFAULT_STRICT_MODIFY,
+        sslCAFile=DEFAULT_SSL_CAFILE,
+        sslCAPath=DEFAULT_SSL_CAPATH,
+        sslCAData=DEFAULT_SSL_CADATA,
         ):
 
         # setup

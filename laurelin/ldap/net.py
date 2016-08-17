@@ -1,4 +1,5 @@
-from socket import create_connection, error as SocketError
+import ssl
+from socket import socket, error as SocketError
 from urlparse import urlparse
 from pyasn1.codec.ber.encoder import encode as berEncode
 from pyasn1.codec.ber.decoder import decode as berDecode
@@ -12,21 +13,38 @@ _nextSockID = 0
 class LDAPSocket(object):
     RECV_BUFFER = 4096
 
-    def __init__(self, hostURI, connectTimeout=5):
+    def __init__(self, hostURI,
+        connectTimeout=5,
+        sslCAFile=None,
+        sslCAPath=None,
+        sslCAData=None,
+        ):
+
         parsedURI = urlparse(hostURI)
+        self._sock = socket()
         if parsedURI.scheme == 'ldap':
-            ap = parsedURI.netloc.split(':', 1)
-            address = ap[0]
-            if len(ap) == 1:
-                port = 389
-            else:
-                port = int(ap[1])
+            defaultPort = 389
+        elif parsedURI.scheme == 'ldaps':
+            defaultPort = 636
+            ctx = ssl.create_default_context(cafile=sslCAFile, capath=sslCAPath, cadata=sslCAData)
+            self._sock = ctx.wrap_socket(self._sock, server_hostname=address)
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
+
+        ap = parsedURI.netloc.split(':', 1)
+        address = ap[0]
+        if len(ap) == 1:
+            port = defaultPort
+        else:
+            port = int(ap[1])
+
         try:
-            self._sock = create_connection((address, port), connectTimeout)
+            self._sock.settimeout(connectTimeout)
+            self._sock.connect((address, port))
+            self._sock.settimeout(None)
         except SocketError as e:
             raise LDAPConnectionError('{0} ({1})'.format(e.strerror, e.errno))
+
         self._messageQueue = []
         self._nextMessageID = 1
 
