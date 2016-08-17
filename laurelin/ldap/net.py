@@ -21,6 +21,9 @@ class LDAPSocket(object):
         ):
 
         parsedURI = urlparse(hostURI)
+        ap = parsedURI.netloc.split(':', 1)
+        address = ap[0]
+
         self._sock = socket()
         if parsedURI.scheme == 'ldap':
             defaultPort = 389
@@ -31,8 +34,6 @@ class LDAPSocket(object):
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
 
-        ap = parsedURI.netloc.split(':', 1)
-        address = ap[0]
         if len(ap) == 1:
             port = defaultPort
         else:

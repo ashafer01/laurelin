@@ -127,10 +127,12 @@ class LDAP(Extensible):
             self.hostURI = connectTo
             if reuseConnection:
                 if self.hostURI not in _sockets:
-                    _sockets[self.hostURI] = LDAPSocket(self.hostURI, connectTimeout)
+                    _sockets[self.hostURI] = LDAPSocket(self.hostURI, connectTimeout, sslCAFile,
+                        sslCAPath, sslCAData)
                 self.sock = _sockets[self.hostURI]
             else:
-                self.sock = LDAPSocket(self.hostURI, connectTimeout)
+                self.sock = LDAPSocket(self.hostURI, connectTimeout, sslCAFile, sslCAPath,
+                    sslCAData)
             logger.debug('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
             if baseDC is not None:
                 for dcpart in baseDC.split(','):
