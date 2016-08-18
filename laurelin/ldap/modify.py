@@ -85,7 +85,7 @@ def DeleteModlist(curAttrs, delAttrs):
     if not isinstance(delAttrs, dict):
         raise TypeError('curAttrs must be dict')
     if not isinstance(delAttrs, dict):
-        raise TypeError('newAttrs must be dict')
+        raise TypeError('delAttrs must be dict')
     _delAttrs = {}
     for attr, vals in delAttrs.iteritems():
         if attr in curAttrs:

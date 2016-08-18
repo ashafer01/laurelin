@@ -745,9 +745,7 @@ class LDAPObject(dict, Extensible):
 
     def replaceAttrs(self, attrsDict):
         if isinstance(self.ldapConn, LDAP_rw):
-            if not self.ldapConn.strictModify:
-                self.refreshMissing(attrsDict.keys())
-            self.ldapConn.replaceAttrs(self.dn, attrsDict, current=self)
+            self.ldapConn.replaceAttrs(self.dn, attrsDict)
             self.localReplaceAttrs(attrsDict)
             self.removeEmptyAttrs()
             return True
