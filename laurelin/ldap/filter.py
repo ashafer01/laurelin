@@ -14,7 +14,6 @@ from rfc4511 import (
     LessOrEqual,
     Present,
     ApproxMatch,
-    ExtensibleMatch,
     AttributeValue,
     AttributeDescription,
     Substrings,
@@ -24,6 +23,7 @@ from rfc4511 import (
     Any,
     Final,
 )
+from errors import LDAPError
 
 def findClosingParen(text):
     if text[0] != '(':
@@ -81,45 +81,57 @@ def parse(filterStr):
         attr, val = chunk.split('=', 1)
         if attr[-1] == '>':
             ava = GreaterOrEqual()
-            ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1]))
+            ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1].strip()))
             ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('greaterOrEqual', ava)
         elif attr[-1] == '<':
             ava = LessOrEqual()
-            ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1]))
+            ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1].strip()))
             ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('lessOrEqual', ava)
         elif attr[-1] == '~':
             ava = ApproxMatch()
-            ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1]))
+            ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1].strip()))
             ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('approxMatch', ava)
-        elif val == '*':
+        elif attr[-1] == ':':
+            raise LDAPError('extensible filters not yet implemented')
+        elif val.strip() == '*':
             fil.setComponentByName('present', Present(attr))
         elif '*' in val:
             subf = SubstringFilter()
-            subf.setComponentByName('type', AttributeDescription(attr))
+            subf.setComponentByName('type', AttributeDescription(attr.strip()))
             subs = Substrings()
             sublist = val.split('*')
+            p = 0
+            i = 0
             if sublist[0] != '':
+                # do initial substring
                 c = Substring()
                 c.setComponentByName('initial', Initial(sublist[0]))
-                subs.setComponentByPosition(0, c)
-            if sublist[-1] != '':
-                c = Substring()
-                c.setComponentByName('final', Final(sublist[-1]))
-                subs.setComponentByPosition(len(sublist)-1, c)
-            i = 1
-            while i < len(sublist)-1:
-                c = Substring()
-                c.setComponentByName('any', Any(sublist[i]))
-                subs.setComponentByPosition(i, c)
+                subs.setComponentByPosition(p, c)
                 i += 1
+                p += 1
+            else:
+                i += 1
+            # do middle substrings
+            while i < len(sublist)-1:
+                if sublist[i] != '':
+                    c = Substring()
+                    c.setComponentByName('any', Any(sublist[i]))
+                    subs.setComponentByPosition(p, c)
+                    p += 1
+                i += 1
+            if sublist[i] != '':
+                # do final substring
+                c = Substring()
+                c.setComponentByName('final', Final(sublist[i]))
+                subs.setComponentByPosition(p, c)
             subf.setComponentByName('substrings', subs)
             fil.setComponentByName('substrings', subf)
         else:
             ava = EqualityMatch()
-            ava.setComponentByName('attributeDesc', AttributeDescription(attr))
+            ava.setComponentByName('attributeDesc', AttributeDescription(attr.strip()))
             ava.setComponentByName('assertionValue', AttributeValue(val))
             fil.setComponentByName('equalityMatch', ava)
     return fil

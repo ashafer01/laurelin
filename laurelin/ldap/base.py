@@ -272,7 +272,7 @@ class LDAP(Extensible):
 
         mID = self.sock.sendMessage('searchRequest', req)
         logger.debug('Sent search request (ID {0}): baseDN={1}, scope={2}, filterStr={3}, '
-            ' attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrList)))
+            'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrList)))
         return mID
 
     # recv all objects from given LDAPSocket until we get a SearchResultDone; return a list of
@@ -406,7 +406,6 @@ class LDAP_rw(LDAP):
             logger.debug('Object {0} already exists on addIfNotExists'.format(DN))
             return cur
         except NoSearchResults:
-            logger.debug('Object {0} does not exist on addIfNotExists, adding'.format(DN))
             return self.add(DN, attrs)
 
     ## delete an object
@@ -479,8 +478,12 @@ class LDAP_rw(LDAP):
         return mID
 
     def modify(self, DN, modlist):
-        mID = self._sendModify(DN, modlist)
-        return _checkSuccessResult(self.sock.recvResponse(mID)[0], 'modifyResponse')
+        if len(modlist) > 0:
+            mID = self._sendModify(DN, modlist)
+            return _checkSuccessResult(self.sock.recvResponse(mID)[0], 'modifyResponse')
+        else:
+            logger.debug('Not sending 0-length modlist for DN {0}'.format(DN))
+            return True
 
     # add new attributes and values
     def addAttrs(self, DN, attrsDict, current=None):
