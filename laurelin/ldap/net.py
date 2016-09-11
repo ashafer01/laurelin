@@ -1,6 +1,7 @@
 import ssl
 from socket import socket, error as SocketError
 from urlparse import urlparse
+from collections import deque
 from pyasn1.codec.ber.encoder import encode as berEncode
 from pyasn1.codec.ber.decoder import decode as berDecode
 from pyasn1.error import SubstrateUnderrunError
@@ -46,7 +47,7 @@ class LDAPSocket(object):
         except SocketError as e:
             raise LDAPConnectionError('{0} ({1})'.format(e.strerror, e.errno))
 
-        self._messageQueue = []
+        self._messageQueues = {}
         self._nextMessageID = 1
 
         global _nextSockID
@@ -68,31 +69,51 @@ class LDAPSocket(object):
         self._sock.sendall(berEncode(lm))
         return mID
 
-    def recvResponse(self, wantMessageID=0, raw=''):
+    def recvOne(self, wantMessageID):
+        return next(self.recvIter(wantMessageID))
+
+    def recvAll(self, wantMessageID):
         ret = []
-        for obj in self._messageQueue:
-            if (wantMessageID <= 0) or (obj.getComponentByName('messageID') == wantMessageID):
-                ret.append(obj)
-                self._messageQueue.remove(obj)
-        if len(ret) > 0:
-            return ret
-        if wantMessageID in self.abandonedMIDs:
-            return ret
         try:
-            raw += self._sock.recv(LDAPSocket.RECV_BUFFER)
-            while len(raw) > 0:
-                response, raw = berDecode(raw, asn1Spec=LDAPMessage())
-                if wantMessageID > 0:
-                    if wantMessageID == response.getComponentByName('messageID'):
-                        ret.append(response)
+            self._sock.setblocking(0)
+            for obj in self.recvIter(wantMessageID):
+                ret.append(obj)
+        except SocketError as e:
+            pass
+        finally:
+            self._sock.setblocking(1)
+            return ret
+
+    def recvIter(self, wantMessageID):
+        flushQueue = True
+        raw = ''
+        while True:
+            if flushQueue:
+                if wantMessageID in self._messageQueues:
+                    q = self._messageQueues[wantMessageID]
+                    while True:
+                        if len(q) == 0:
+                            break
+                        obj = q.popleft()
+                        if len(q) == 0:
+                            del self._messageQueues[wantMessageID]
+                        yield obj
+            else:
+                flushQueue = True
+            try:
+                raw += self._sock.recv(LDAPSocket.RECV_BUFFER)
+                while len(raw) > 0:
+                    response, raw = berDecode(raw, asn1Spec=LDAPMessage())
+                    haveMessageID = response.getComponentByName('messageID')
+                    if wantMessageID == haveMessageID:
+                        yield response
                     else:
-                        self._messageQueue.append(response)
-                else:
-                    ret.append(response)
-            return ret
-        except SubstrateUnderrunError:
-            ret += self.recvResponse(wantMessageID, limit, raw)
-            return ret
+                        if haveMessageID not in self._messageQueues:
+                            self._messageQueues[haveMessageID] = deque()
+                        self._messageQueues[haveMessageID].append(response)
+            except SubstrateUnderrunError:
+                flushQueue = False
+                continue
 
     def close(self):
         return self._sock.close()

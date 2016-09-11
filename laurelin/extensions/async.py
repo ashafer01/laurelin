@@ -2,11 +2,11 @@ from laurelin.ldap.base import (
     LDAP,
     LDAP_rw,
     LDAPObject,
-    _unpack,
     _checkSuccessResult,
-    _processCompareResults
 )
 from laurelin.ldap.modify import Mod, Modlist
+from laurelin.ldap.errors import UnexpectedResponseType
+from laurelin.ldap.rfc4511 import AbandonRequest
 
 ## LDAP extension methods
 
@@ -16,7 +16,7 @@ def searchAsync(self, *args, **kwds):
 
 def compareAsync(self, *args):
     mID = self._sendCompare(*args)
-    return AsyncHandle(self, mID, _processCompareResults)
+    return AsyncCompareHandle(self, mID)
 
 LDAP.EXTEND([
     searchAsync,
@@ -64,31 +64,24 @@ LDAP_rw.EXTEND([
 ## async handles
 
 class AsyncHandle(object):
-    def __init__(self, ldapConn, messageID, postProcess=lambda x: x):
+    def __init__(self, ldapConn, messageID):
         self.messageID = messageID
         self.sock = ldapConn.sock
         self.ldapConn = ldapConn
         self.abandoned = False
-        self.postProcess = postProcess
 
-    def wait(self):
+    def _check(self):
         if self.sock.unbound:
             raise ConnectionUnbound()
         if self.abandoned:
             raise AbandonedAsyncError()
-        logger.debug('Waiting for at least 1 object for messageID={0}'.format(self.messageID))
-        ret = []
-        while len(ret) < 1:
-            if self.abandoned:
-                logger.debug('Abandoned; stopping wait')
-                break
-            ret += self.sock.recvResponse(self.messageID)
-        logger.debug('Done waiting for messageID={0}'.format(self.messageID))
-        return self.postProcess(ret)
+
+    def wait(self):
+        self._check()
+        return self.sock.recvAll(self.messageID)
 
     def abandon(self):
-        if self.sock.unbound:
-            raise ConnectionUnbound()
+        self._check()
         logger.debug('Abandoning messageID={0}'.format(self.messageID))
         self.abandoned = True
         self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
@@ -96,11 +89,17 @@ class AsyncHandle(object):
 
 class AsyncSearchHandle(AsyncHandle):
     def wait(self):
-        if self.sock.unbound:
-            raise ConnectionUnbound()
-        if self.abandoned:
-            raise AbandonedAsyncError()
-        return self.ldapConn._recvSearchResults(self.messageID)
+        self._check()
+        return self.ldapConn._searchResultsAll(self.messageID)
+
+    def iter(self):
+        self._check()
+        return self.ldapConn._searchResultsIter(self.messageID)
+
+class AsyncCompareHandle(AsyncHandle):
+    def wait(self):
+        self._check()
+        return self.ldapConn._compareResult(self.messageID)
 
 class AsyncResultHandle(AsyncHandle):
     def __init__(self, ldapConn, messageID, operation):

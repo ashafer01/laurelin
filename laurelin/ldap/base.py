@@ -104,8 +104,8 @@ class LDAP(Extensible):
     ALL_USER_ATTRS = '*'
 
     def __init__(self, connectTo,
-        reuseConnection=DEFAULT_REUSE_CONNECTION,
         baseDC=None,
+        reuseConnection=DEFAULT_REUSE_CONNECTION,
         connectTimeout=DEFAULT_CONNECT_TIMEOUT,
         searchTimeout=DEFAULT_SEARCH_TIMEOUT,
         derefAliases=DEFAULT_DEREF_ALIASES,
@@ -141,12 +141,18 @@ class LDAP(Extensible):
                 self.baseDC = baseDC
             else:
                 logger.debug('Querying server to find baseDC')
-                o = self.get('', ['namingContexts'])
+                o = self.get('', ['namingContexts', 'defaultNamingContext'])
                 self.baseDC = None
-                for nc in o.get('namingContexts', []):
-                    if nc.startswith('dc='):
-                        self.baseDC = nc
-                        break
+                if 'defaultNamingContext' in o:
+                    self.baseDC = o['defaultNamingContext'][0]
+                else:
+                    for nc in o.get('namingContexts', []):
+                        if nc.startswith('dc='):
+                            if self.baseDC is None:
+                                self.baseDC = nc
+                            else:
+                                raise RuntimeError('Server supplied multiple dc namingContexts, '
+                                    'baseDC must be provided')
                 if self.baseDC is None:
                     raise RuntimeError('No baseDC supplied and none found from server')
         elif isinstance(connectTo, LDAP):
@@ -177,7 +183,7 @@ class LDAP(Extensible):
         mID = self.sock.sendMessage('bindRequest', br)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
             self.sock.ID, user))
-        ret = _checkSuccessResult(self.sock.recvResponse()[0], 'bindResponse')
+        ret = _checkSuccessResult(self.sock.recvOne(mID), 'bindResponse')
         self.sock.bound = ret
         return ret
 
@@ -275,54 +281,64 @@ class LDAP(Extensible):
             'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrList)))
         return mID
 
-    # recv all objects from given LDAPSocket until we get a SearchResultDone; return a list of
-    # LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
-    def _recvSearchResults(self, messageID):
+    def _searchResultsAll(self, messageID):
         ret = []
         logger.debug('Receiving all search results for messageID={0}'.format(messageID))
-        while True:
+        for obj in self._searchResultsIter(messageID):
+            ret.append(obj)
+        return ret
+
+    def _searchResultsIter(self, messageID):
+        for msg in self.sock.recvIter(messageID):
             if messageID in self.sock.abandonedMIDs:
                 logger.debug('ID={0} abandoned while receiving search results'.format(messageID))
-                return ret
-            for msg in self.sock.recvResponse(messageID):
+                raise StopIteration()
+            try:
+                mID, entry = _unpack('searchResEntry', msg)
+                DN = unicode(entry.getComponentByName('objectName'))
+                attrs = {}
+                _attrs = entry.getComponentByName('attributes')
+                for i in range(0, len(_attrs)):
+                    _attr = _attrs.getComponentByPosition(i)
+                    attrType = unicode(_attr.getComponentByName('type'))
+                    _vals = _attr.getComponentByName('vals')
+                    vals = []
+                    for j in range(0, len(_vals)):
+                        vals.append(unicode(_vals.getComponentByPosition(j)))
+                    attrs[attrType] = vals
+                logger.debug('Got search result entry (ID {0}) {1}'.format(mID, DN))
+                yield self.obj(DN, attrs)
+            except UnexpectedResponseType:
                 try:
-                    entry = _unpack('searchResEntry', msg)
-                    DN = unicode(entry.getComponentByName('objectName'))
-                    attrs = {}
-                    _attrs = entry.getComponentByName('attributes')
-                    for i in range(0, len(_attrs)):
-                        _attr = _attrs.getComponentByPosition(i)
-                        attrType = unicode(_attr.getComponentByName('type'))
-                        _vals = _attr.getComponentByName('vals')
-                        vals = []
-                        for j in range(0, len(_vals)):
-                            vals.append(unicode(_vals.getComponentByPosition(j)))
-                        attrs[attrType] = vals
-                    ret.append(LDAPObject(DN, attrs, self))
-                    logger.debug('Got search result entry {0}'.format(DN))
+                    mID, resobj = _unpack('searchResDone', msg)
+                    res = resobj.getComponentByName('resultCode')
+                    if res == ResultCode('success') or res == ResultCode('noSuchObject'):
+                        logger.debug('Got all search results for ID {0}, result is {1}'.format(
+                            mID, repr(res)
+                        ))
+                        raise StopIteration()
+                    else:
+                        raise LDAPError('Got {0} for search results (ID {1})'.format(
+                            repr(res), messageID
+                        ))
                 except UnexpectedResponseType:
-                    try:
-                        res = _unpack('searchResDone', msg).getComponentByName('resultCode')
-                        if res == ResultCode('success') or res == ResultCode('noSuchObject'):
-                            logger.debug('Got all search results for ID {0}, result is {1}'.format(
-                                messageID, repr(res)
-                            ))
-                            return ret
-                        else:
-                            raise LDAPError('Got {0} for search results (ID {1})'.format(
-                                repr(res), messageID
-                            ))
-                    except UnexpectedResponseType:
-                        resref = _unpack('searchResRef', msg)
-                        URIs = []
-                        for i in range(0, len(resref)):
-                            URIs.append(unicode(resref.getComponentByPosition(i)))
-                        logger.debug('Got search reference to: {0}'.format(' | '.join(URIs)))
-                        ret.append(SearchReferenceHandle(URIs))
+                    mID, resref = _unpack('searchResRef', ldapMessage)
+                    URIs = []
+                    for i in range(0, len(resref)):
+                        URIs.append(unicode(resref.getComponentByPosition(i)))
+                    logger.debug('Got search reference (ID {0}) to: {1}'.format(mID,
+                        ' | '.join(URIs)))
+                    yield SearchReferenceHandle(URIs)
 
     def search(self, *args, **kwds):
         mID = self._sendSearch(*args, **kwds)
-        return self._recvSearchResults(mID)
+        return self._searchResultsAll(mID)
+
+    # iterate objects from given LDAPSocket until we get a SearchResultDone; yielding instances of
+    # LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
+    def searchIter(self, *args, **kwds):
+        mID = self._sendSearch(*args, **kwds)
+        return self._searchResultsIter(mID)
 
     # send a compare request
     def _sendCompare(self, DN, attr, value):
@@ -340,9 +356,21 @@ class LDAP(Extensible):
         logger.debug('Sent compare request (ID {0}): {1} ({2} = {3})'.format(mID, DN, attr, value))
         return mID
 
+    def _compareResult(self, messageID):
+        msg = self.sock.recvOne(messageID)
+        mID, res = _unpack('compareResponse', msg).getComponentByName('resultCode')
+        if res == ResultCode('compareTrue'):
+            logger.debug('Compared True (ID {0})'.format(mID))
+            return True
+        elif res == ResultCode('compareFalse'):
+            logger.debug('Compared False (ID {0})'.format(mID))
+            return False
+        else:
+            raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
+
     def compare(self, *args):
         mID = self._sendCompare(*args)
-        return _processCompareResults(self.sock.recvResponse(mID))
+        return self._compareResult(mID)
 
 class LDAP_rw(LDAP):
     ## add a new object
@@ -379,7 +407,7 @@ class LDAP_rw(LDAP):
     # returns a corresponding LDAPObject on success
     def add(self, DN, attrs):
         mID = self._sendAdd(DN, attrs)
-        _checkSuccessResult(self.sock.recvResponse(mID)[0], 'addResponse')
+        _checkSuccessResult(self.sock.recvOne(mID), 'addResponse')
         return self.obj(DN, attrs)
 
     ## search+add patterns
@@ -419,7 +447,7 @@ class LDAP_rw(LDAP):
 
     def delete(self, DN):
         mID = self._sendDelete(DN)
-        return _checkSuccessResult(self.sock.recvResponse(mID)[0], 'delResponse')
+        return _checkSuccessResult(self.sock.recvOne(mID), 'delResponse')
 
     ## change object DN
 
@@ -434,7 +462,7 @@ class LDAP_rw(LDAP):
         if newParent is not None:
             mdr.setComponentByName('newSuperior', NewSuperior(newParent))
         mID = self.sock.sendMessage('modDNRequest', mdr)
-        return _checkSuccessResult(self.sock.recvResponse(mID)[0], 'modDNResponse')
+        return _checkSuccessResult(self.sock.recvOne(mID), 'modDNResponse')
 
     # edit the RDN of an object
     def rename(self, DN, newRDN, cleanAttr=True):
@@ -480,7 +508,7 @@ class LDAP_rw(LDAP):
     def modify(self, DN, modlist):
         if len(modlist) > 0:
             mID = self._sendModify(DN, modlist)
-            return _checkSuccessResult(self.sock.recvResponse(mID)[0], 'modifyResponse')
+            return _checkSuccessResult(self.sock.recvOne(mID), 'modifyResponse')
         else:
             logger.debug('Not sending 0-length modlist for DN {0}'.format(DN))
             return True
@@ -823,37 +851,51 @@ class LDAPObject(dict, Extensible):
         newRDN, newParent = newDN.split(',', 1)
         return self.modDN(newRDN, cleanAttr, newParent)
 
+# perform a search based on an RFC4516 URI
+def searchByURI(uri):
+    parsedURI = urlparse(uri)
+    hostURI = '{0}://{1}'.format(parsedURI.scheme, parsedURL.netloc)
+    ldap = LDAP(hostURI, reuseConnection=False)
+    DN = parsedURI.path
+    params = parsedURI.query.split('?')
+    nparams = len(params)
+    if (nparams > 0) and (len(params[0]) > 0):
+        attrList = params[0].split(',')
+    else:
+        attrList = [LDAP.ALL_USER_ATTRS]
+    if (nparams > 1) and (len(params[1]) > 0):
+        scope = Scope.string(params[1])
+    else:
+        scope = Scope.BASE
+    if (nparams > 2) and (len(params[2]) > 0):
+        filter = params[2]
+    else:
+        filter = LDAP.DEFAULT_FILTER
+    if (nparams > 3) and (len(params[3]) > 0):
+        raise LDAPError('Extensions for searchByURI not yet implemented')
+    ret = ldap.search(DN, scope, filterStr=filter, attrList=attrList)
+    ldap.unbind()
+    return ret
+
 # unpack an object from an LDAPMessage envelope
 def _unpack(op, ldapMessage):
+    mID = ldapMessage.getComponentByName('messageID')
     po = ldapMessage.getComponentByName('protocolOp')
     ret = po.getComponentByName(op)
     if ret is not None:
-        return ret
+        return mID, ret
     else:
         raise UnexpectedResponseType()
 
 # check for success result
 def _checkSuccessResult(ldapMessage, operation):
-    mID = ldapMessage.getComponentByName('messageID')
-    res = _unpack(operation, ldapMessage).getComponentByName('resultCode')
+    mID, obj = _unpack(operation, ldapMessage)
+    res = obj.getComponentByName('resultCode')
     if res == ResultCode('success'):
         logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
         return True
     else:
         raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
-
-# convert compare result codes to boolean
-def _processCompareResults(ldapMessages):
-    mID = ldapMessages[0].getComponentByName('messageID')
-    res = _unpack('compareResponse', ldapMessages[0]).getComponentByName('resultCode')
-    if res == ResultCode('compareTrue'):
-        logger.debug('Compared True (ID {0})'.format(mID))
-        return True
-    elif res == ResultCode('compareFalse'):
-        logger.debug('Compared False (ID {0})'.format(mID))
-        return False
-    else:
-        raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
 
 # returned when the server returns a SearchResultReference
 class SearchReferenceHandle(object):
