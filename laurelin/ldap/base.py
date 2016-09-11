@@ -49,7 +49,9 @@ logger.setLevel(logging.DEBUG)
 class Scope:
     BASE = _Scope('baseObject')
     ONELEVEL = _Scope('singleLevel')
+    ONE = ONELEVEL
     SUBTREE = _Scope('wholeSubtree')
+    SUB = SUBTREE
 
     # translate RFC4516 URL scope strings to constant
     @staticmethod
@@ -196,7 +198,7 @@ class LDAP(Extensible):
         self.sock.unbound = True
         logger.debug('Unbound on {0} (#{1})'.format(self.sock.URI, self.sock.ID))
         try:
-            _sockets.pop(self.sock.URI)
+            del _sockets[self.sock.URI]
         except KeyError:
             pass
 
