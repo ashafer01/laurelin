@@ -611,6 +611,12 @@ class LDAPObject(dict, Extensible):
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, dict.__repr__(self))
 
+    def __contains__(self, attr):
+        if dict.__contains__(self, attr):
+            return (len(self[attr]) > 0)
+        else:
+            return False
+
     ## relative methods
 
     def RDN(self, rdn):
@@ -699,32 +705,32 @@ class LDAPObject(dict, Extensible):
     def commit(self):
         if isinstance(self.ldapConn, LDAP_rw):
             self.ldapConn.replaceAttrs(self.dn, self)
-            self.removeEmptyAttrs()
+            self._removeEmptyAttrs()
         else:
             raise RuntimeError('No LDAP_rw object')
 
-    # remove any 0-length attributes from the local dictionary so as to match the server
+    # clean any 0-length attributes from the local dictionary so as to match the server
     # called automatically after writing to the server
-    def removeEmptyAttrs(self):
+    def _removeEmptyAttrs(self):
         for attr in self.keys():
             if len(self[attr]) == 0:
-                self.pop(attr)
+                del self[attr]
 
     ## local modify methods
     ## accept same input as online versions, but only update the local attributes dictionary
 
-    def localModify(self, modlist):
+    def modify_local(self, modlist):
         for mod in modlist:
             if mod.op == Mod.ADD:
-                self.localAddAttrs({mod.attr: mod.vals})
+                self.addAttrs_local({mod.attr: mod.vals})
             elif mod.op == Mod.REPLACE:
-                self.localReplaceAttrs({mod.attr: mod.vals})
+                self.replaceAttrs_local({mod.attr: mod.vals})
             elif mod.op == Mod.DELETE:
-                self.localDeleteAttrValues({mod.attr: mod.vals})
+                self.deleteAttrValues_local({mod.attr: mod.vals})
             else:
                 raise ValueError('Invalid mod op')
 
-    def localAddAttrs(self, attrsDict):
+    def addAttrs_local(self, attrsDict):
         for attr, vals in attrsDict.iteritems():
             if attr not in self:
                 self[attr] = vals
@@ -733,10 +739,10 @@ class LDAPObject(dict, Extensible):
                     if val not in self[attr]:
                         self[attr].append(val)
 
-    def localReplaceAttrs(self, attrsDict):
+    def replaceAttrs_local(self, attrsDict):
         self.update(attrsDict)
 
-    def localDeleteAttrValues(self, attrsDict):
+    def deleteAttrValues_local(self, attrsDict):
         for attr, vals in attrsDict.iteritems():
             if attr in self:
                 if len(vals) > 0:
@@ -748,8 +754,8 @@ class LDAPObject(dict, Extensible):
                 else:
                     self[attr] = []
 
-    def localDeleteAttrs(self, attrsList):
-        self.localDeleteAttrValues(dict.fromkeys(attrsList, []))
+    def deleteAttrs_local(self, attrsList):
+        self.deleteAttrValues_local(dict.fromkeys(attrsList, []))
 
     ## online modify methods
     ## these call the LDAP_rw methods of the same name, passing the object's DN as the first
@@ -759,8 +765,8 @@ class LDAPObject(dict, Extensible):
     def modify(self, modlist):
         if isinstance(self.ldapConn, LDAP_rw):
             self.ldapConn.modify(self.dn, modlist)
-            self.localModify(modlist)
-            self.removeEmptyAttrs()
+            self.modify_local(modlist)
+            self._removeEmptyAttrs()
         else:
             raise RuntimeError('No LDAP_rw object')
 
@@ -769,7 +775,7 @@ class LDAPObject(dict, Extensible):
             if not self.ldapConn.strictModify:
                 self.refreshMissing(attrsDict.keys())
             self.ldapConn.addAttrs(self.dn, attrsDict, current=self)
-            self.localAddAttrs(attrsDict)
+            self.addAttrs_local(attrsDict)
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
@@ -777,8 +783,8 @@ class LDAPObject(dict, Extensible):
     def replaceAttrs(self, attrsDict):
         if isinstance(self.ldapConn, LDAP_rw):
             self.ldapConn.replaceAttrs(self.dn, attrsDict)
-            self.localReplaceAttrs(attrsDict)
-            self.removeEmptyAttrs()
+            self.replaceAttrs_local(attrsDict)
+            self._removeEmptyAttrs()
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
@@ -788,8 +794,8 @@ class LDAPObject(dict, Extensible):
             if not self.ldapConn.strictModify:
                 self.refreshMissing(attrsDict.keys())
             self.ldapConn.deleteAttrValues(self.dn, attrsDict, current=self)
-            self.localDeleteAttrValues(attrsDict)
-            self.removeEmptyAttrs()
+            self.deleteAttrValues_local(attrsDict)
+            self._removeEmptyAttrs()
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
@@ -801,8 +807,8 @@ class LDAPObject(dict, Extensible):
             if not self.ldapConn.strictModify:
                 self.refreshMissing(attrs)
             self.ldapConn.deleteAttrs(self.dn, attrs, current=self)
-            self.localDeleteAttrs(attrs)
-            self.removeEmptyAttrs()
+            self.deleteAttrs_local(attrs)
+            self._removeEmptyAttrs()
             return True
         else:
             raise RuntimeError('No LDAP_rw object')
@@ -831,7 +837,7 @@ class LDAPObject(dict, Extensible):
                 rdnAttr, rdnVal = curRDN.split('=', 1)
                 try:
                     self[rdnAttr].remove(rdnVal)
-                    self.removeEmptyAttrs()
+                    self._removeEmptyAttrs()
                 except:
                     pass
             rdnAttr, rdnVal = newRDN.split('=', 1)
