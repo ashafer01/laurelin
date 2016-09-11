@@ -183,7 +183,7 @@ class LDAP(Extensible):
         mID = self.sock.sendMessage('bindRequest', br)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
             self.sock.ID, user))
-        ret = _checkSuccessResult(self.sock.recvOne(mID), 'bindResponse')
+        ret = self._successResult(mID, 'bindResponse')
         self.sock.bound = ret
         return ret
 
@@ -373,6 +373,16 @@ class LDAP(Extensible):
         return self._compareResult(mID)
 
 class LDAP_rw(LDAP):
+    # check for success result
+    def _successResult(self, messageID, operation):
+        mID, obj = _unpack(operation, self.sock.recvOne(messageID))
+        res = obj.getComponentByName('resultCode')
+        if res == ResultCode('success'):
+            logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
+            return True
+        else:
+            raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
+
     ## add a new object
 
     def _sendAdd(self, DN, attrs):
@@ -407,7 +417,7 @@ class LDAP_rw(LDAP):
     # returns a corresponding LDAPObject on success
     def add(self, DN, attrs):
         mID = self._sendAdd(DN, attrs)
-        _checkSuccessResult(self.sock.recvOne(mID), 'addResponse')
+        self._successResult(mID, 'addResponse')
         return self.obj(DN, attrs)
 
     ## search+add patterns
@@ -447,7 +457,7 @@ class LDAP_rw(LDAP):
 
     def delete(self, DN):
         mID = self._sendDelete(DN)
-        return _checkSuccessResult(self.sock.recvOne(mID), 'delResponse')
+        return self._successResult(mID, 'delResponse')
 
     ## change object DN
 
@@ -462,7 +472,7 @@ class LDAP_rw(LDAP):
         if newParent is not None:
             mdr.setComponentByName('newSuperior', NewSuperior(newParent))
         mID = self.sock.sendMessage('modDNRequest', mdr)
-        return _checkSuccessResult(self.sock.recvOne(mID), 'modDNResponse')
+        return self._successResult(mID, 'modDNResponse')
 
     # edit the RDN of an object
     def rename(self, DN, newRDN, cleanAttr=True):
@@ -508,7 +518,7 @@ class LDAP_rw(LDAP):
     def modify(self, DN, modlist):
         if len(modlist) > 0:
             mID = self._sendModify(DN, modlist)
-            return _checkSuccessResult(self.sock.recvOne(mID), 'modifyResponse')
+            return self._successResult(mID, 'modifyResponse')
         else:
             logger.debug('Not sending 0-length modlist for DN {0}'.format(DN))
             return True
@@ -892,16 +902,6 @@ def _unpack(op, ldapMessage):
         return mID, ret
     else:
         raise UnexpectedResponseType()
-
-# check for success result
-def _checkSuccessResult(ldapMessage, operation):
-    mID, obj = _unpack(operation, ldapMessage)
-    res = obj.getComponentByName('resultCode')
-    if res == ResultCode('success'):
-        logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
-        return True
-    else:
-        raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
 
 # returned when the server returns a SearchResultReference
 class SearchReferenceHandle(object):

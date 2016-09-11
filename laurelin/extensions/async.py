@@ -1,64 +1,59 @@
-from laurelin.ldap.base import (
-    LDAP,
-    LDAP_rw,
-    LDAPObject,
-    _checkSuccessResult,
-)
+from laurelin.ldap.base import LDAP, LDAP_rw, LDAPObject
 from laurelin.ldap.modify import Mod, Modlist
 from laurelin.ldap.errors import UnexpectedResponseType
 from laurelin.ldap.rfc4511 import AbandonRequest
 
 ## LDAP extension methods
 
-def searchAsync(self, *args, **kwds):
+def search_async(self, *args, **kwds):
     mID = self._sendSearch(*args, **kwds)
     return AsyncSearchHandle(self, mID)
 
-def compareAsync(self, *args):
+def compare_async(self, *args):
     mID = self._sendCompare(*args)
     return AsyncCompareHandle(self, mID)
 
 LDAP.EXTEND([
-    searchAsync,
-    compareAsync,
+    search_async,
+    compare_async,
 ])
 
 ## LDAP_rw extension methods
 
-def addAsync(self, DN, attrs):
+def add_async(self, DN, attrs):
     mID = self._sendAdd(DN, attrs)
     return AsyncAddHandle(self, mID, self.obj(DN, attrs))
 
-def deleteAsync(self, DN):
+def delete_async(self, DN):
     mID = self._sendDelete(DN)
     return AsyncResultHandle(self, mID, 'delResponse')
 
-def modifyAsync(self, DN, modlist):
+def modify_async(self, DN, modlist):
     mID = self._sendModify(DN, modlist)
     return AsyncResultHandle(self, mID, 'modifyResponse')
 
-def addAttrsAsync(self, DN, attrsDict):
-    return self.modifyAsync(DN, Modlist(Mod.ADD, attrsDict))
+def addAttrs_async(self, DN, attrsDict):
+    return self.modify_async(DN, Modlist(Mod.ADD, attrsDict))
 
-def deleteAttrValuesAsync(self, DN, attrsDict):
-    return self.modifyAsync(DN, Modlist(Mod.DELETE, attrsDict))
+def deleteAttrValues_async(self, DN, attrsDict):
+    return self.modify_async(DN, Modlist(Mod.DELETE, attrsDict))
 
-def deleteAttrsAsync(self, DN, attrs):
+def deleteAttrs_async(self, DN, attrs):
     if not isinstance(attrs, list):
         attrs = [attrs]
-    return self.deleteAttrValuesAsync(DN, dict.fromkeys(attrs, []))
+    return self.deleteAttrValues_async(DN, dict.fromkeys(attrs, []))
 
-def replaceAttrsAsync(self, DN, attrsDict):
-    return self.modifyAsync(DN, Modlist(Mod.REPLACE, attrsDict))
+def replaceAttrs_async(self, DN, attrsDict):
+    return self.modify_async(DN, Modlist(Mod.REPLACE, attrsDict))
 
 LDAP_rw.EXTEND([
-    addAsync,
-    deleteAsync,
-    modifyAsync,
-    addAttrsAsync,
-    deleteAttrValuesAsync,
-    deleteAttrsAsync,
-    replaceAttrsAsync,
+    add_async,
+    delete_async,
+    modify_async,
+    addAttrs_async,
+    deleteAttrValues_async,
+    deleteAttrs_async,
+    replaceAttrs_async,
 ])
 
 ## async handles
@@ -77,8 +72,7 @@ class AsyncHandle(object):
             raise AbandonedAsyncError()
 
     def wait(self):
-        self._check()
-        return self.sock.recvAll(self.messageID)
+        raise NotImplementedError()
 
     def abandon(self):
         self._check()
@@ -107,8 +101,8 @@ class AsyncResultHandle(AsyncHandle):
         self.operation = operation
 
     def wait(self):
-        msg = AsyncHandle.wait(self)[0]
-        return _checkSuccessResult(msg, self.operation)
+        self._check()
+        return self.ldapConn._successResult(self.messageID, self.operation)
 
 class AsyncAddHandle(AsyncResultHandle):
     def __init__(self, ldapConn, messageID, ldapObj):
