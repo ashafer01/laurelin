@@ -100,6 +100,7 @@ class LDAP(Extensible):
     DEFAULT_SSL_CAFILE = None
     DEFAULT_SSL_CAPATH = None
     DEFAULT_SSL_CADATA = None
+    DEFAULT_FETCH_RESULT_REFS = True
 
     # other constants
     NO_ATTRS = '1.1'
@@ -115,11 +116,13 @@ class LDAP(Extensible):
         sslCAFile=DEFAULT_SSL_CAFILE,
         sslCAPath=DEFAULT_SSL_CAPATH,
         sslCAData=DEFAULT_SSL_CADATA,
+        fetchResultRefs=DEFAULT_FETCH_RESULT_REFS,
         ):
 
         # setup
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
+        self.defaultFetchResultRefs = fetchResultRefs
         self.strictModify = strictModify
 
         self._taggedObjects = {}
@@ -283,15 +286,17 @@ class LDAP(Extensible):
             'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrList)))
         return mID
 
-    def _searchResultsAll(self, messageID):
+    def _searchResultsAll(self, messageID, fetchResultRefs=None):
         ret = []
         logger.debug('Receiving all search results for messageID={0}'.format(messageID))
-        for obj in self._searchResultsIter(messageID):
+        for obj in self._searchResults_iter(messageID, fetchResultRefs):
             ret.append(obj)
         return ret
 
-    def _searchResultsIter(self, messageID):
-        for msg in self.sock.recvIter(messageID):
+    def _searchResults_iter(self, messageID, fetchResultRefs=None):
+        if fetchResultRefs is None:
+            fetchResultRefs = self.defaultFetchResultRefs
+        for msg in self.sock.recv_iter(messageID):
             if messageID in self.sock.abandonedMIDs:
                 logger.debug('ID={0} abandoned while receiving search results'.format(messageID))
                 raise StopIteration()
@@ -330,17 +335,23 @@ class LDAP(Extensible):
                         URIs.append(unicode(resref.getComponentByPosition(i)))
                     logger.debug('Got search reference (ID {0}) to: {1}'.format(mID,
                         ' | '.join(URIs)))
-                    yield SearchReferenceHandle(URIs)
+                    if fetchResultRefs:
+                        for obj in SearchReferenceHandle(URIs).fetch_iter():
+                            yield obj
+                    else:
+                        yield SearchReferenceHandle(URIs)
 
     def search(self, *args, **kwds):
+        fetchResultRefs = kwds.pop('fetchResutlRefs', self.defaultFetchResultRefs)
         mID = self._sendSearch(*args, **kwds)
-        return self._searchResultsAll(mID)
+        return self._searchResultsAll(mID, fetchResultRefs)
 
     # iterate objects from given LDAPSocket until we get a SearchResultDone; yielding instances of
     # LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
-    def searchIter(self, *args, **kwds):
+    def search_iter(self, *args, **kwds):
+        fetchResultRefs = kwds.pop('fetchResutlRefs', self.defaultFetchResultRefs)
         mID = self._sendSearch(*args, **kwds)
-        return self._searchResultsIter(mID)
+        return self._searchResults_iter(mID, fetchResultRefs)
 
     # send a compare request
     def _sendCompare(self, DN, attr, value):
@@ -666,7 +677,6 @@ class LDAPObject(dict, Extensible):
         for attr, vals in self.iteritems():
             for val in vals:
                 yield (attr, val)
-        raise StopIteration()
 
     def deepcopy(self):
         ret = {}
@@ -871,29 +881,44 @@ class LDAPObject(dict, Extensible):
 
 # perform a search based on an RFC4516 URI
 def searchByURI(uri):
-    parsedURI = urlparse(uri)
-    hostURI = '{0}://{1}'.format(parsedURI.scheme, parsedURL.netloc)
-    ldap = LDAP(hostURI, reuseConnection=False)
-    DN = parsedURI.path
-    params = parsedURI.query.split('?')
-    nparams = len(params)
-    if (nparams > 0) and (len(params[0]) > 0):
-        attrList = params[0].split(',')
-    else:
-        attrList = [LDAP.ALL_USER_ATTRS]
-    if (nparams > 1) and (len(params[1]) > 0):
-        scope = Scope.string(params[1])
-    else:
-        scope = Scope.BASE
-    if (nparams > 2) and (len(params[2]) > 0):
-        filter = params[2]
-    else:
-        filter = LDAP.DEFAULT_FILTER
-    if (nparams > 3) and (len(params[3]) > 0):
-        raise LDAPError('Extensions for searchByURI not yet implemented')
-    ret = ldap.search(DN, scope, filterStr=filter, attrList=attrList)
+    parsedURI = LDAPURI(uri)
+    ldap = LDAP(parsedURI.hostURI, reuseConnection=False)
+    ret = ldap.search(parsedURI.DN, parsedURI.scope, filterStr=parsedURI.filter,
+        attrList=parsedURI.attrList)
     ldap.unbind()
     return ret
+
+def searchByURI_iter(uri):
+    parsedURI = LDAPURI(uri)
+    ldap = LDAP(parsedURI.hostURI, reuseConnection=False)
+    for obj in ldap.search_iter(parsedURI.DN, parsedURI.scope, filterStr=parsedURI.filter,
+        attrList=parsedURI.attrList):
+        yield obj
+    ldap.unbind()
+
+class LDAPURI(object):
+    def __init__(self, uri):
+        parsedURI = urlparse(uri)
+        self.scheme = parsedURI.scheme
+        self.netloc = parsedURI.netloc
+        self.hostURI = '{0}://{1}'.format(self.scheme, self.netloc)
+        self.DN = parsedURI.path
+        params = parsedURI.query.split('?')
+        nparams = len(params)
+        if (nparams > 0) and (len(params[0]) > 0):
+            self.attrList = params[0].split(',')
+        else:
+            self.attrList = [LDAP.ALL_USER_ATTRS]
+        if (nparams > 1) and (len(params[1]) > 0):
+            self.scope = Scope.string(params[1])
+        else:
+            self.scope = Scope.BASE
+        if (nparams > 2) and (len(params[2]) > 0):
+            self.filter = params[2]
+        else:
+            self.filter = LDAP.DEFAULT_FILTER
+        if (nparams > 3) and (len(params[3]) > 0):
+            raise LDAPError('Extensions for searchByURI not yet implemented')
 
 # unpack an object from an LDAPMessage envelope
 def _unpack(op, ldapMessage):
@@ -916,6 +941,14 @@ class SearchReferenceHandle(object):
         for uri in self.URIs:
             try:
                 return searchByURI(uri)
+            except LDAPConnectionError as e:
+                logger.warning('Error connecting to URI {0} ({1})'.format(uri, e.message))
+        raise LDAPError('Could not complete reference URI search with any supplied URIs')
+
+    def fetch_iter(self):
+        for uri in self.URIs:
+            try:
+                return searchByURI_iter(uri)
             except LDAPConnectionError as e:
                 logger.warning('Error connecting to URI {0} ({1})'.format(uri, e.message))
         raise LDAPError('Could not complete reference URI search with any supplied URIs')

@@ -70,13 +70,13 @@ class LDAPSocket(object):
         return mID
 
     def recvOne(self, wantMessageID):
-        return next(self.recvIter(wantMessageID))
+        return next(self.recv_iter(wantMessageID))
 
     def recvAll(self, wantMessageID):
         ret = []
         try:
             self._sock.setblocking(0)
-            for obj in self.recvIter(wantMessageID):
+            for obj in self.recv_iter(wantMessageID):
                 ret.append(obj)
         except SocketError as e:
             pass
@@ -84,7 +84,7 @@ class LDAPSocket(object):
             self._sock.setblocking(1)
             return ret
 
-    def recvIter(self, wantMessageID):
+    def recv_iter(self, wantMessageID):
         flushQueue = True
         raw = ''
         while True:

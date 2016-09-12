@@ -6,8 +6,9 @@ from laurelin.ldap.rfc4511 import AbandonRequest
 ## LDAP extension methods
 
 def search_async(self, *args, **kwds):
+    fetchResultRefs = kwds.pop('fetchResutlRefs', self.defaultFetchResultRefs)
     mID = self._sendSearch(*args, **kwds)
-    return AsyncSearchHandle(self, mID)
+    return AsyncSearchHandle(self, mID, fetchResultRefs)
 
 def compare_async(self, *args):
     mID = self._sendCompare(*args)
@@ -82,13 +83,17 @@ class AsyncHandle(object):
         self.sock.abandonedMID.append(self.messageID)
 
 class AsyncSearchHandle(AsyncHandle):
+    def __init__(self, ldapConn, messageID, fetchResultRefs=None):
+        AsyncHandle.__init__(self, ldapConn, messageID)
+        self.fetchResultRefs = fetchResultRefs
+
     def wait(self):
         self._check()
-        return self.ldapConn._searchResultsAll(self.messageID)
+        return self.ldapConn._searchResultsAll(self.messageID, self.fetchResultRefs)
 
     def iter(self):
         self._check()
-        return self.ldapConn._searchResultsIter(self.messageID)
+        return self.ldapConn._searchResults_iter(self.messageID, self.fetchResultRefs)
 
 class AsyncCompareHandle(AsyncHandle):
     def wait(self):
