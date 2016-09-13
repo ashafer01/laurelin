@@ -7,5 +7,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         'pyasn1',
+        'pure-sasl',
     ],
 )

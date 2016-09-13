@@ -18,6 +18,7 @@ from rfc4511 import (
     Version,
     AuthenticationChoice,
     Simple as SimpleCreds,
+    SaslCredentials,
     AttributeSelection,
     AttributeDescription,
     TypesOnly,
@@ -101,8 +102,9 @@ class LDAP(Extensible):
     DEFAULT_SSL_CAPATH = None
     DEFAULT_SSL_CADATA = None
     DEFAULT_FETCH_RESULT_REFS = True
+    DEFAULT_SASL_MECHANISM = None
 
-    # other constants
+    # spec constants
     NO_ATTRS = '1.1'
     ALL_USER_ATTRS = '*'
 
@@ -117,15 +119,18 @@ class LDAP(Extensible):
         sslCAPath=DEFAULT_SSL_CAPATH,
         sslCAData=DEFAULT_SSL_CADATA,
         fetchResultRefs=DEFAULT_FETCH_RESULT_REFS,
+        defaultSaslMechanism=DEFAULT_SASL_MECHANISM,
         ):
 
         # setup
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
         self.defaultFetchResultRefs = fetchResultRefs
+        self.defaultSaslMechanism = defaultSaslMechanism
         self.strictModify = strictModify
 
         self._taggedObjects = {}
+        self._saslMechs = None
 
         # connect
         if isinstance(connectTo, basestring):
@@ -191,6 +196,73 @@ class LDAP(Extensible):
         ret = self._successResult(mID, 'bindResponse')
         self.sock.bound = ret
         return ret
+
+    def getSASLMechanisms(self):
+        if self._saslMechs is None:
+            logger.debug('Querying server to find supported SASL mechanisms')
+            o = self.get('', ['supportedSASLMechanisms'])
+            self._saslMechs = o.get('supportedSASLMechanisms', [])
+            logger.debug('Supported SASL mechanisms = {0}'.format(','.join(self._saslMechs)))
+        return self._saslMechs
+
+    def recheckSASLMechanisms(self):
+        if self._saslMechs is None:
+            raise LDAPError('SASL mechanisms have not yet been queried')
+        else:
+            origMechs = set(self._saslMechs)
+            self._saslMechs = None
+            self.getSASLMechanisms()
+            if origMechs != set(self._saslMechs):
+                raise LDAPError('Supported SASL mechanisms differ on recheck, possible downgrade'
+                    ' attack')
+            else:
+                return self._saslMechs
+
+    def saslBind(self, mech=None, **props):
+        mechs = self.getSASLMechanisms()
+        if mech is None:
+            mech = self.defaultSaslMechanism
+        if mech is not None:
+            if mech not in mechs:
+                raise LDAPError('SASL mechanism "{0}" is not supported by the server'.format(mech))
+            else:
+                mechs = [mech]
+        self.sock.saslInit(mechs, **props)
+
+        challengeResponse = None
+        while True:
+            br = BindRequest()
+            br.setComponentByName('version', Version(3))
+            br.setComponentByName('name', LDAPDN(unicode('')))
+            ac = AuthenticationChoice()
+            sasl = SaslCredentials()
+            sasl.setComponentByName('mechanism', unicode(self.sock.saslMech()))
+            if challengeResponse is not None:
+                sasl.setComponentByName('credentials', unicode(challengeResponse))
+                challengeReponse = None
+            ac.setComponentByName('sasl', sasl)
+            br.setComponentByName('authentication', ac)
+
+            mID = self.sock.sendMessage('bindRequest', br)
+            logger.debug('Sent SASL bind request (ID {0}) on connection #{1}'.format(mID,
+                self.sock.ID))
+
+            mID, res = _unpack('bindResponse', self.sock.recvOne(mID))
+            status = res.getComponentByName('resultCode')
+            if status == ResultCode('saslBindInProgress'):
+                challengeResponse = self.sock.saslProcessAuthChallenge(
+                    res.getComponentByName('serverSaslCreds')
+                )
+                continue
+            elif status == ResultCode('success'):
+                if self.sock.saslOK():
+                    logger.debug('SASL bind completed successfully')
+                    self.recheckSASLMechanisms()
+                    return True
+                else:
+                    raise LDAPError('Server reported bind success but SASL auth is incomplete')
+            else:
+                raise LDAPError('Got {0} during SASL bind'.format(repr(status)))
 
     def unbind(self):
         if self.sock.unbound:
@@ -385,8 +457,7 @@ class LDAP(Extensible):
         mID = self._sendCompare(*args)
         return self._compareResult(mID)
 
-class LDAP_rw(LDAP):
-    # check for success result
+    # general purpose check for success result
     def _successResult(self, messageID, operation):
         mID, obj = _unpack(operation, self.sock.recvOne(messageID))
         res = obj.getComponentByName('resultCode')
@@ -396,6 +467,8 @@ class LDAP_rw(LDAP):
         else:
             raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
 
+
+class LDAP_rw(LDAP):
     ## add a new object
 
     def _sendAdd(self, DN, attrs):

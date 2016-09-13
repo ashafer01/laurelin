@@ -5,9 +5,10 @@ from collections import deque
 from pyasn1.codec.ber.encoder import encode as berEncode
 from pyasn1.codec.ber.decoder import decode as berDecode
 from pyasn1.error import SubstrateUnderrunError
+from puresasl.client import SASLClient
 
 from rfc4511 import LDAPMessage, MessageID, ProtocolOp
-from errors import LDAPError
+from errors import LDAPError, LDAPSASLError
 
 _nextSockID = 0
 
@@ -23,7 +24,7 @@ class LDAPSocket(object):
 
         parsedURI = urlparse(hostURI)
         ap = parsedURI.netloc.split(':', 1)
-        address = ap[0]
+        self.host = ap[0]
 
         self._sock = socket()
         if parsedURI.scheme == 'ldap':
@@ -31,7 +32,7 @@ class LDAPSocket(object):
         elif parsedURI.scheme == 'ldaps':
             defaultPort = 636
             ctx = ssl.create_default_context(cafile=sslCAFile, capath=sslCAPath, cadata=sslCAData)
-            self._sock = ctx.wrap_socket(self._sock, server_hostname=address)
+            self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
 
@@ -42,13 +43,14 @@ class LDAPSocket(object):
 
         try:
             self._sock.settimeout(connectTimeout)
-            self._sock.connect((address, port))
+            self._sock.connect((self.host, port))
             self._sock.settimeout(None)
         except SocketError as e:
             raise LDAPConnectionError('{0} ({1})'.format(e.strerror, e.errno))
 
         self._messageQueues = {}
         self._nextMessageID = 1
+        self._saslClient = None
 
         global _nextSockID
         self.ID = _nextSockID
@@ -58,6 +60,32 @@ class LDAPSocket(object):
         self.unbound = False
         self.abandonedMIDs = []
 
+    def saslInit(self, mechs, **props):
+        self._saslClient = SASLClient(self.host, 'ldap', **props)
+        self._saslClient.choose_mechanism(mechs)
+
+    def saslOK(self):
+        if self._saslClient is not None:
+            return self._saslClient.complete()
+        else:
+            return False
+
+    def saslMech(self):
+        if self._saslClient is not None:
+            mech = self._saslClient.mechanism
+            if mech is None:
+                raise LDAPSASLError('SASL init not complete - no mech chosen')
+            else:
+                return mech
+        else:
+            raise LDAPSASLError('SASL init not complete')
+
+    def saslProcessAuthChallenge(self, challenge):
+        if self._saslClient is not None:
+            return self._saslClient.process(challenge)
+        else:
+            raise LDAPSASLError('SASL init not complete')
+
     def sendMessage(self, op, obj):
         mID = self._nextMessageID
         lm = LDAPMessage()
@@ -66,7 +94,10 @@ class LDAPSocket(object):
         po.setComponentByName(op, obj)
         lm.setComponentByName('protocolOp', po)
         self._nextMessageID += 1
-        self._sock.sendall(berEncode(lm))
+        raw = berEncode(lm)
+        if self.saslOK():
+            raw = self._saslClient.wrap(raw)
+        self._sock.sendall(raw)
         return mID
 
     def recvOne(self, wantMessageID):
@@ -101,7 +132,10 @@ class LDAPSocket(object):
             else:
                 flushQueue = True
             try:
-                raw += self._sock.recv(LDAPSocket.RECV_BUFFER)
+                newraw = self._sock.recv(LDAPSocket.RECV_BUFFER)
+                if self.saslOK():
+                    newraw = self._saslClient.unwrap(newraw)
+                raw += newraw
                 while len(raw) > 0:
                     response, raw = berDecode(raw, asn1Spec=LDAPMessage())
                     haveMessageID = response.getComponentByName('messageID')
