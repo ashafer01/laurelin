@@ -218,7 +218,7 @@ class LDAP(Extensible):
             self._saslMechs = None
             self.getSASLMechanisms()
             if origMechs != set(self._saslMechs):
-                msg = 'Supported SASL mechanisms differ on recheck, possible downgrade attack')
+                msg = 'Supported SASL mechanisms differ on recheck, possible downgrade attack'
                 if self.saslFatalDowngradeCheck:
                     raise LDAPError(msg)
                 else:
