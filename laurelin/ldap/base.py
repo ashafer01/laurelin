@@ -1,5 +1,6 @@
 import logging
 from urlparse import urlparse
+from warnings import warn
 
 from rfc4511 import (
     LDAPDN,
@@ -103,6 +104,7 @@ class LDAP(Extensible):
     DEFAULT_SSL_CADATA = None
     DEFAULT_FETCH_RESULT_REFS = True
     DEFAULT_SASL_MECHANISM = None
+    DEFAULT_SASL_FATAL_DOWNGRADE_CHECK = True
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -119,15 +121,17 @@ class LDAP(Extensible):
         sslCAPath=DEFAULT_SSL_CAPATH,
         sslCAData=DEFAULT_SSL_CADATA,
         fetchResultRefs=DEFAULT_FETCH_RESULT_REFS,
-        defaultSaslMechanism=DEFAULT_SASL_MECHANISM,
+        saslMechanism=DEFAULT_SASL_MECHANISM,
+        saslFatalDowngradeCheck=DEFAULT_SASL_FATAL_DOWNGRADE_CHECK,
         ):
 
         # setup
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
         self.defaultFetchResultRefs = fetchResultRefs
-        self.defaultSaslMechanism = defaultSaslMechanism
+        self.defaultSaslMechanism = saslMechanism
         self.strictModify = strictModify
+        self.saslfatalDowngradeCheck = saslFatalDowngradeCheck
 
         self._taggedObjects = {}
         self._saslMechs = None
@@ -143,7 +147,7 @@ class LDAP(Extensible):
             else:
                 self.sock = LDAPSocket(self.hostURI, connectTimeout, sslCAFile, sslCAPath,
                     sslCAData)
-            logger.debug('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
+            logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
             if baseDC is not None:
                 for dcpart in baseDC.split(','):
                     if not dcpart.startswith('dc='):
@@ -169,7 +173,7 @@ class LDAP(Extensible):
             self.hostURI = connectTo.hostURI
             self.sock = connectTo.sock
             self.baseDC = connectTo.baseDC
-            logger.debug('Connected to {0} (#{1}) from existing object'.format(
+            logger.info('Connected to {0} (#{1}) from existing object'.format(
                 self.hostURI, self.sock.ID))
         else:
             raise TypeError('Must supply URI string or LDAP instance for connectTo')
@@ -195,6 +199,7 @@ class LDAP(Extensible):
             self.sock.ID, user))
         ret = self._successResult(mID, 'bindResponse')
         self.sock.bound = ret
+        logger.info('Simple bind successful')
         return ret
 
     def getSASLMechanisms(self):
@@ -213,8 +218,11 @@ class LDAP(Extensible):
             self._saslMechs = None
             self.getSASLMechanisms()
             if origMechs != set(self._saslMechs):
-                raise LDAPError('Supported SASL mechanisms differ on recheck, possible downgrade'
-                    ' attack')
+                msg = 'Supported SASL mechanisms differ on recheck, possible downgrade attack')
+                if self.saslFatalDowngradeCheck:
+                    raise LDAPError(msg)
+                else:
+                    warn(msg)
             else:
                 return self._saslMechs
 
@@ -256,7 +264,7 @@ class LDAP(Extensible):
                 continue
             elif status == ResultCode('success'):
                 if self.sock.saslOK():
-                    logger.debug('SASL bind completed successfully')
+                    logger.info('SASL bind successful')
                     self.recheckSASLMechanisms()
                     return True
                 else:
@@ -271,7 +279,7 @@ class LDAP(Extensible):
         self.sock.sendMessage('unbindRequest', UnbindRequest())
         self.sock.close()
         self.sock.unbound = True
-        logger.debug('Unbound on {0} (#{1})'.format(self.sock.URI, self.sock.ID))
+        logger.info('Unbound on {0} (#{1})'.format(self.sock.URI, self.sock.ID))
         try:
             del _sockets[self.sock.URI]
         except KeyError:
@@ -405,7 +413,7 @@ class LDAP(Extensible):
                     URIs = []
                     for i in range(0, len(resref)):
                         URIs.append(unicode(resref.getComponentByPosition(i)))
-                    logger.debug('Got search reference (ID {0}) to: {1}'.format(mID,
+                    logger.debug('Got search result reference (ID {0}) to: {1}'.format(mID,
                         ' | '.join(URIs)))
                     if fetchResultRefs:
                         for obj in SearchReferenceHandle(URIs).fetch_iter():
@@ -1015,7 +1023,7 @@ class SearchReferenceHandle(object):
             try:
                 return searchByURI(uri)
             except LDAPConnectionError as e:
-                logger.warning('Error connecting to URI {0} ({1})'.format(uri, e.message))
+                warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
         raise LDAPError('Could not complete reference URI search with any supplied URIs')
 
     def fetch_iter(self):
@@ -1023,5 +1031,5 @@ class SearchReferenceHandle(object):
             try:
                 return searchByURI_iter(uri)
             except LDAPConnectionError as e:
-                logger.warning('Error connecting to URI {0} ({1})'.format(uri, e.message))
+                warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
         raise LDAPError('Could not complete reference URI search with any supplied URIs')
