@@ -90,10 +90,10 @@ class LDAPSocket(object):
         mID = self._nextMessageID
         lm = LDAPMessage()
         lm.setComponentByName('messageID', MessageID(mID))
+        self._nextMessageID += 1
         po = ProtocolOp()
         po.setComponentByName(op, obj)
         lm.setComponentByName('protocolOp', po)
-        self._nextMessageID += 1
         raw = berEncode(lm)
         if self.saslOK():
             raw = self._saslClient.wrap(raw)
@@ -131,6 +131,8 @@ class LDAPSocket(object):
                         yield obj
             else:
                 flushQueue = True
+            if wantMessageID in self.abandonedMIDs:
+                raise StopIteration()
             try:
                 newraw = self._sock.recv(LDAPSocket.RECV_BUFFER)
                 if self.saslOK():
