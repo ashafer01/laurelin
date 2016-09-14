@@ -1,8 +1,8 @@
 # System
 
-Digital Ocean VPS with Debian 7.9
-OpenLDAP 2.4.31
-Cyrus SASL 2.1.25
+* Digital Ocean VPS with Debian 7.9
+* OpenLDAP 2.4.31
+* Cyrus SASL 2.1.25
 
 ## SASL config ldif
 
