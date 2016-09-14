@@ -181,7 +181,7 @@ class LDAP(Extensible):
         logger.debug('Creating base object for {0}'.format(self.baseDC))
         self.base = self.obj(self.baseDC, relativeSearchScope=Scope.SUBTREE)
 
-    def simpleBind(self, user, pw):
+    def simpleBind(self, username='', password=''):
         if self.sock.unbound:
             raise ConnectionUnbound()
         if self.sock.bound:
@@ -189,14 +189,14 @@ class LDAP(Extensible):
 
         br = BindRequest()
         br.setComponentByName('version', Version(3))
-        br.setComponentByName('name', LDAPDN(unicode(user)))
+        br.setComponentByName('name', LDAPDN(unicode(username)))
         ac = AuthenticationChoice()
-        ac.setComponentByName('simple', SimpleCreds(unicode(pw)))
+        ac.setComponentByName('simple', SimpleCreds(unicode(password)))
         br.setComponentByName('authentication', ac)
 
         mID = self.sock.sendMessage('bindRequest', br)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
-            self.sock.ID, user))
+            self.sock.ID, username))
         ret = self._successResult(mID, 'bindResponse')
         self.sock.bound = ret
         logger.info('Simple bind successful')
