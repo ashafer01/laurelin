@@ -4,6 +4,8 @@
 * OpenLDAP 2.4.31
 * Cyrus SASL 2.1.25
 
+# SASL
+
 ## SASL config ldif
 
     dn: cn=config
