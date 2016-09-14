@@ -51,6 +51,7 @@ class LDAPSocket(object):
         self._messageQueues = {}
         self._nextMessageID = 1
         self._saslClient = None
+        self._saslBindComplete = False
 
         global _nextSockID
         self.ID = _nextSockID
@@ -66,10 +67,18 @@ class LDAPSocket(object):
 
     def saslOK(self):
         if self._saslClient is not None:
-            return self._saslClient.complete()
+            return self._saslBindComplete
         else:
             return False
 
+    @property
+    def saslQoP(self):
+        if self._saslClient is not None:
+            return self._saslClient.qop
+        else:
+            raise LDAPSASLError('SASL init not complete')
+
+    @property
     def saslMech(self):
         if self._saslClient is not None:
             mech = self._saslClient.mechanism

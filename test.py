@@ -3,7 +3,8 @@ from laurelin.ldap import LDAP_rw, Scope
 import laurelin.extensions.async
 
 l = LDAP_rw('ldap://127.0.0.1')
-l.simpleBind('cn=admin,dc=example,dc=org', getpass())
+#l.simpleBind('cn=admin,dc=example,dc=org', getpass())
+l.saslBind(mech='DIGEST-MD5', username='admin', password=getpass())
 
 #for o in l.base.search('(objectClass=*)'):
 #    print o.formatLDIF()

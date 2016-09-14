@@ -207,7 +207,7 @@ class LDAP(Extensible):
             logger.debug('Querying server to find supported SASL mechanisms')
             o = self.get('', ['supportedSASLMechanisms'])
             self._saslMechs = o.get('supportedSASLMechanisms', [])
-            logger.debug('Supported SASL mechanisms = {0}'.format(','.join(self._saslMechs)))
+            logger.debug('Server supported SASL mechs = {0}'.format(','.join(self._saslMechs)))
         return self._saslMechs
 
     def recheckSASLMechanisms(self):
@@ -236,6 +236,7 @@ class LDAP(Extensible):
             else:
                 mechs = [mech]
         self.sock.saslInit(mechs, **props)
+        logger.debug('Selected SASL mech = {0}'.format(self.sock.saslMech))
 
         challengeResponse = None
         while True:
@@ -244,7 +245,7 @@ class LDAP(Extensible):
             br.setComponentByName('name', LDAPDN(unicode('')))
             ac = AuthenticationChoice()
             sasl = SaslCredentials()
-            sasl.setComponentByName('mechanism', unicode(self.sock.saslMech()))
+            sasl.setComponentByName('mechanism', unicode(self.sock.saslMech))
             if challengeResponse is not None:
                 sasl.setComponentByName('credentials', unicode(challengeResponse))
                 challengeReponse = None
@@ -263,14 +264,15 @@ class LDAP(Extensible):
                 )
                 continue
             elif status == ResultCode('success'):
-                if self.sock.saslOK():
-                    logger.info('SASL bind successful')
-                    self.recheckSASLMechanisms()
-                    return True
-                else:
-                    raise LDAPError('Server reported bind success but SASL auth is incomplete')
+                logger.info('SASL bind successful')
+                logger.debug('Negotiated SASL QoP = {0}'.format(self.sock.saslQoP))
+                self.sock._saslBindComplete = True
+                self.recheckSASLMechanisms()
+                return True
             else:
                 raise LDAPError('Got {0} during SASL bind'.format(repr(status)))
+        if not self.sock.saslOK():
+            raise LDAPError('SASL auth incomplete')
 
     def unbind(self):
         if self.sock.unbound:
