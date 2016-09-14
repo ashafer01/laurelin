@@ -24,3 +24,13 @@
 ## Adding sasl user password with
 
     saslpasswd2 -u example.org -c $USER
+
+## SASL auth control test case
+
+    % ldapwhoami -Y DIGEST-MD5 -U admin -H ldap://127.0.0.1
+    SASL/DIGEST-MD5 authentication started
+    Please enter your password: 
+    SASL username: admin
+    SASL SSF: 128
+    SASL data security layer installed.
+    dn:cn=admin,dc=example,dc=org
