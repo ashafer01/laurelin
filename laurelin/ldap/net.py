@@ -51,7 +51,6 @@ class LDAPSocket(object):
         self._messageQueues = {}
         self._nextMessageID = 1
         self._saslClient = None
-        self._saslBindComplete = False
 
         global _nextSockID
         self.ID = _nextSockID
@@ -65,9 +64,10 @@ class LDAPSocket(object):
         self._saslClient = SASLClient(self.host, 'ldap', **props)
         self._saslClient.choose_mechanism(mechs)
 
+    @property
     def saslOK(self):
         if self._saslClient is not None:
-            return self._saslBindComplete
+            return self.bound
         else:
             return False
 
@@ -104,7 +104,7 @@ class LDAPSocket(object):
         po.setComponentByName(op, obj)
         lm.setComponentByName('protocolOp', po)
         raw = berEncode(lm)
-        if self.saslOK():
+        if self.saslOK:
             raw = self._saslClient.wrap(raw)
         self._sock.sendall(raw)
         return mID
@@ -144,7 +144,7 @@ class LDAPSocket(object):
                 raise StopIteration()
             try:
                 newraw = self._sock.recv(LDAPSocket.RECV_BUFFER)
-                if self.saslOK():
+                if self.saslOK:
                     newraw = self._saslClient.unwrap(newraw)
                 raw += newraw
                 while len(raw) > 0:

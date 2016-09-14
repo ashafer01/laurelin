@@ -227,6 +227,11 @@ class LDAP(Extensible):
                 return self._saslMechs
 
     def saslBind(self, mech=None, **props):
+        if self.sock.unbound:
+            raise ConnectionUnbound()
+        if self.sock.bound:
+            raise ConnectionAlreadyBound()
+
         mechs = self.getSASLMechanisms()
         if mech is None:
             mech = self.defaultSaslMechanism
@@ -266,13 +271,12 @@ class LDAP(Extensible):
             elif status == ResultCode('success'):
                 logger.info('SASL bind successful')
                 logger.debug('Negotiated SASL QoP = {0}'.format(self.sock.saslQoP))
-                self.sock._saslBindComplete = True
+                self.sock.bound = True
                 self.recheckSASLMechanisms()
                 return True
             else:
                 raise LDAPError('Got {0} during SASL bind'.format(repr(status)))
-        if not self.sock.saslOK():
-            raise LDAPError('SASL auth incomplete')
+        raise LDAPError('Programming error - reached end of saslBind')
 
     def unbind(self):
         if self.sock.unbound:
