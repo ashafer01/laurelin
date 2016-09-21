@@ -83,7 +83,7 @@ LDAPObject.EXTEND([
 
 ## private functions
 
-TRIPLE_RE = re.compile('^\(([^,]*),([^,]*),([^)]*)\)$'
+TRIPLE_RE = re.compile('^\(([^,]*),([^,]*),([^)]*)\)$')
 
 def _netgroupFilter(filter):
     return '(&(objectClass={0}){1})'.format(OBJECT_CLASS, filter)
