@@ -1,6 +1,6 @@
 from laurelin.ldap.base import LDAP, LDAP_rw, LDAPObject
 from laurelin.ldap.modify import Mod, Modlist
-from laurelin.ldap.errors import UnexpectedResponseType
+from laurelin.ldap.errors import LDAPError, ConnectionUnbound
 from laurelin.ldap.rfc4511 import AbandonRequest
 
 ## LDAP extension methods
@@ -58,6 +58,9 @@ LDAP_rw.EXTEND([
 ])
 
 ## async handles
+
+class AbandonedAsyncError(LDAPError):
+    pass
 
 class AsyncHandle(object):
     def __init__(self, ldapConn, messageID):

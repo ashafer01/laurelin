@@ -8,7 +8,7 @@ from pyasn1.error import SubstrateUnderrunError
 from puresasl.client import SASLClient
 
 from rfc4511 import LDAPMessage, MessageID, ProtocolOp
-from errors import LDAPError, LDAPSASLError
+from errors import LDAPError, LDAPSASLError, LDAPConnectionError
 
 _nextSockID = 0
 
@@ -152,6 +152,8 @@ class LDAPSocket(object):
                     haveMessageID = response.getComponentByName('messageID')
                     if wantMessageID == haveMessageID:
                         yield response
+                    elif haveMessageID == 0:
+                        raise LDAPError('Got message ID 0')
                     else:
                         if haveMessageID not in self._messageQueues:
                             self._messageQueues[haveMessageID] = deque()
@@ -162,6 +164,3 @@ class LDAPSocket(object):
 
     def close(self):
         return self._sock.close()
-
-class LDAPConnectionError(LDAPError):
-    pass

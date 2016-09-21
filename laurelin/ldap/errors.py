@@ -7,6 +7,9 @@ class LDAPExtensionError(LDAPError):
 class LDAPSASLError(LDAPError):
     pass
 
+class LDAPConnectionError(LDAPError):
+    pass
+
 class TagError(LDAPError):
     pass
 
@@ -32,6 +35,3 @@ class ConnectionAlreadyBound(InvalidBindState):
 class ConnectionUnbound(InvalidBindState):
     def __init__(self):
         LDAPError.__init__(self, 'The connection has been unbound')
-
-class AbandonedAsyncError(LDAPError):
-    pass

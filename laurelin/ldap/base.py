@@ -103,7 +103,7 @@ class LDAP(Extensible):
     DEFAULT_SSL_CAPATH = None
     DEFAULT_SSL_CADATA = None
     DEFAULT_FETCH_RESULT_REFS = True
-    DEFAULT_SASL_MECHANISM = None
+    DEFAULT_SASL_MECH = None
     DEFAULT_SASL_FATAL_DOWNGRADE_CHECK = True
 
     # spec constants
@@ -121,7 +121,7 @@ class LDAP(Extensible):
         sslCAPath=DEFAULT_SSL_CAPATH,
         sslCAData=DEFAULT_SSL_CADATA,
         fetchResultRefs=DEFAULT_FETCH_RESULT_REFS,
-        saslMechanism=DEFAULT_SASL_MECHANISM,
+        saslMech=DEFAULT_SASL_MECH,
         saslFatalDowngradeCheck=DEFAULT_SASL_FATAL_DOWNGRADE_CHECK,
         ):
 
@@ -129,7 +129,7 @@ class LDAP(Extensible):
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
         self.defaultFetchResultRefs = fetchResultRefs
-        self.defaultSaslMechanism = saslMechanism
+        self.defaultSaslMech = saslMech
         self.strictModify = strictModify
         self.saslfatalDowngradeCheck = saslFatalDowngradeCheck
 
@@ -202,28 +202,29 @@ class LDAP(Extensible):
         logger.info('Simple bind successful')
         return ret
 
-    def getSASLMechanisms(self):
+    def getSASLMechs(self):
         if self._saslMechs is None:
-            logger.debug('Querying server to find supported SASL mechanisms')
+            logger.debug('Querying server to find supported SASL mechs')
             o = self.get('', ['supportedSASLMechanisms'])
             self._saslMechs = o.get('supportedSASLMechanisms', [])
             logger.debug('Server supported SASL mechs = {0}'.format(','.join(self._saslMechs)))
         return self._saslMechs
 
-    def recheckSASLMechanisms(self):
+    def recheckSASLMechs(self):
         if self._saslMechs is None:
-            raise LDAPError('SASL mechanisms have not yet been queried')
+            raise LDAPError('SASL mechs have not yet been queried')
         else:
             origMechs = set(self._saslMechs)
             self._saslMechs = None
-            self.getSASLMechanisms()
+            self.getSASLMechs()
             if origMechs != set(self._saslMechs):
-                msg = 'Supported SASL mechanisms differ on recheck, possible downgrade attack'
+                msg = 'Supported SASL mechs differ on recheck, possible downgrade attack'
                 if self.saslFatalDowngradeCheck:
                     raise LDAPError(msg)
                 else:
                     warn(msg)
             else:
+                logger.debug('No evidence of downgrade attack')
                 return self._saslMechs
 
     def saslBind(self, mech=None, **props):
@@ -232,12 +233,12 @@ class LDAP(Extensible):
         if self.sock.bound:
             raise ConnectionAlreadyBound()
 
-        mechs = self.getSASLMechanisms()
+        mechs = self.getSASLMechs()
         if mech is None:
-            mech = self.defaultSaslMechanism
+            mech = self.defaultSaslMech
         if mech is not None:
             if mech not in mechs:
-                raise LDAPError('SASL mechanism "{0}" is not supported by the server'.format(mech))
+                raise LDAPError('SASL mech "{0}" is not supported by the server'.format(mech))
             else:
                 mechs = [mech]
         self.sock.saslInit(mechs, **props)
@@ -272,7 +273,7 @@ class LDAP(Extensible):
                 logger.info('SASL bind successful')
                 logger.debug('Negotiated SASL QoP = {0}'.format(self.sock.saslQoP))
                 self.sock.bound = True
-                self.recheckSASLMechanisms()
+                self.recheckSASLMechs()
                 return True
             else:
                 raise LDAPError('Got {0} during SASL bind'.format(repr(status)))
