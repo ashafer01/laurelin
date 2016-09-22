@@ -3,7 +3,8 @@
 ## 
 ## Filter parser
 
-from rfc4511 import (
+from __future__ import absolute_import
+from .rfc4511 import (
     Filter,
     And,
     Or,
@@ -23,7 +24,7 @@ from rfc4511 import (
     Any,
     Final,
 )
-from errors import LDAPError
+from .errors import LDAPError
 
 def findClosingParen(text):
     if text[0] != '(':

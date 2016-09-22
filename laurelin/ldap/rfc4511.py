@@ -46,6 +46,7 @@
 # IMPLICIT TAGS
 # EXTENSIBILITY IMPLIED
 
+from __future__ import absolute_import
 from pyasn1.type.univ import OctetString, Integer, Sequence, Choice, SequenceOf, Boolean, Null, Enumerated, SetOf
 from pyasn1.type.namedtype import NamedTypes, NamedType, OptionalNamedType, DefaultedNamedType
 from pyasn1.type.constraint import ValueRangeConstraint, SingleValueConstraint, ValueSizeConstraint

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from setuptools import setup, find_packages
 
 setup(
@@ -8,5 +9,6 @@ setup(
     install_requires=[
         'pyasn1',
         'pure-sasl',
+        'six',
     ],
 )

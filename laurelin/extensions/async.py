@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from laurelin.ldap.base import LDAP, LDAP_rw, LDAPObject
 from laurelin.ldap.modify import Mod, Modlist
 from laurelin.ldap.errors import LDAPError, ConnectionUnbound

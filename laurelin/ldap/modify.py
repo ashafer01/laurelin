@@ -1,4 +1,6 @@
-from rfc4511 import Operation
+from __future__ import absolute_import
+from .rfc4511 import Operation
+import six
 
 # describes a single modify operation
 class Mod(object):
@@ -56,7 +58,7 @@ def Modlist(op, attrsDict):
     if not isinstance(attrsDict, dict):
         raise TypeError()
     modlist = []
-    for attr, vals in attrsDict.iteritems():
+    for attr, vals in six.iteritems(attrsDict):
         modlist.append(Mod(op, attr, vals))
     return modlist
 
@@ -69,7 +71,7 @@ def AddModlist(curAttrs, newAttrs):
     if not isinstance(newAttrs, dict):
         raise TypeError('newAttrs must be dict')
     addAttrs = {}
-    for attr, vals in newAttrs.iteritems():
+    for attr, vals in six.iteritems(newAttrs):
         if attr in curAttrs:
             for val in vals:
                 if val not in curAttrs[attr]:
@@ -87,7 +89,7 @@ def DeleteModlist(curAttrs, delAttrs):
     if not isinstance(delAttrs, dict):
         raise TypeError('delAttrs must be dict')
     _delAttrs = {}
-    for attr, vals in delAttrs.iteritems():
+    for attr, vals in six.iteritems(delAttrs):
         if attr in curAttrs:
             if len(vals) == 0:
                 _delAttrs[attr] = vals

@@ -1,8 +1,8 @@
+from __future__ import absolute_import
 import logging
-from urlparse import urlparse
 from warnings import warn
 
-from rfc4511 import (
+from .rfc4511 import (
     LDAPDN,
     LDAPString,
     Integer0ToMax as NonNegativeInteger,
@@ -37,10 +37,13 @@ from rfc4511 import (
     Scope as _Scope,
     DerefAliases as _DerefAliases,
 )
-from filter import parse as parseFilter
-from net import LDAPSocket, LDAPConnectionError
-from errors import *
-from modify import Mod, Modlist, AddModlist, DeleteModlist
+from .filter import parse as parseFilter
+from .net import LDAPSocket, LDAPConnectionError
+from .errors import *
+from .modify import Mod, Modlist, AddModlist, DeleteModlist
+import six
+from six.moves import range
+from six.moves.urllib.parse import urlparse
 
 logger = logging.getLogger('laurelin.ldap')
 stderrHandler = logging.StreamHandler()
@@ -137,7 +140,7 @@ class LDAP(Extensible):
         self._saslMechs = None
 
         # connect
-        if isinstance(connectTo, basestring):
+        if isinstance(connectTo, six.string_types):
             self.hostURI = connectTo
             if reuseConnection:
                 if self.hostURI not in _sockets:
@@ -189,9 +192,9 @@ class LDAP(Extensible):
 
         br = BindRequest()
         br.setComponentByName('version', Version(3))
-        br.setComponentByName('name', LDAPDN(unicode(username)))
+        br.setComponentByName('name', LDAPDN(six.text_type(username)))
         ac = AuthenticationChoice()
-        ac.setComponentByName('simple', SimpleCreds(unicode(password)))
+        ac.setComponentByName('simple', SimpleCreds(six.text_type(password)))
         br.setComponentByName('authentication', ac)
 
         mID = self.sock.sendMessage('bindRequest', br)
@@ -248,12 +251,12 @@ class LDAP(Extensible):
         while True:
             br = BindRequest()
             br.setComponentByName('version', Version(3))
-            br.setComponentByName('name', LDAPDN(unicode('')))
+            br.setComponentByName('name', LDAPDN(six.text_type('')))
             ac = AuthenticationChoice()
             sasl = SaslCredentials()
-            sasl.setComponentByName('mechanism', unicode(self.sock.saslMech))
+            sasl.setComponentByName('mechanism', six.text_type(self.sock.saslMech))
             if challengeResponse is not None:
-                sasl.setComponentByName('credentials', unicode(challengeResponse))
+                sasl.setComponentByName('credentials', six.text_type(challengeResponse))
                 challengeReponse = None
             ac.setComponentByName('sasl', sasl)
             br.setComponentByName('authentication', ac)
@@ -266,7 +269,7 @@ class LDAP(Extensible):
             status = res.getComponentByName('resultCode')
             if status == ResultCode('saslBindInProgress'):
                 challengeResponse = self.sock.saslProcessAuthChallenge(
-                    res.getComponentByName('serverSaslCreds')
+                    six.text_type(res.getComponentByName('serverSaslCreds'))
                 )
                 continue
             elif status == ResultCode('success'):
@@ -389,16 +392,16 @@ class LDAP(Extensible):
                 raise StopIteration()
             try:
                 mID, entry = _unpack('searchResEntry', msg)
-                DN = unicode(entry.getComponentByName('objectName'))
+                DN = six.text_type(entry.getComponentByName('objectName'))
                 attrs = {}
                 _attrs = entry.getComponentByName('attributes')
                 for i in range(0, len(_attrs)):
                     _attr = _attrs.getComponentByPosition(i)
-                    attrType = unicode(_attr.getComponentByName('type'))
+                    attrType = six.text_type(_attr.getComponentByName('type'))
                     _vals = _attr.getComponentByName('vals')
                     vals = []
                     for j in range(0, len(_vals)):
-                        vals.append(unicode(_vals.getComponentByPosition(j)))
+                        vals.append(six.text_type(_vals.getComponentByPosition(j)))
                     attrs[attrType] = vals
                 logger.debug('Got search result entry (ID {0}) {1}'.format(mID, DN))
                 yield self.obj(DN, attrs)
@@ -419,7 +422,7 @@ class LDAP(Extensible):
                     mID, resref = _unpack('searchResRef', ldapMessage)
                     URIs = []
                     for i in range(0, len(resref)):
-                        URIs.append(unicode(resref.getComponentByPosition(i)))
+                        URIs.append(six.text_type(resref.getComponentByPosition(i)))
                     logger.debug('Got search result reference (ID {0}) to: {1}'.format(mID,
                         ' | '.join(URIs)))
                     if fetchResultRefs:
@@ -446,10 +449,10 @@ class LDAP(Extensible):
             raise ConnectionUnbound()
 
         cr = CompareRequest()
-        cr.setComponentByName('entry', LDAPDN(unicode(DN)))
+        cr.setComponentByName('entry', LDAPDN(six.text_type(DN)))
         ava = AttributeValueAssertion()
-        ava.setComponentByName('attributeDesc', AttributeDescription(unicode(attr)))
-        ava.setComponentByName('assertionValue', AssertionValue(unicode(value)))
+        ava.setComponentByName('attributeDesc', AttributeDescription(six.text_type(attr)))
+        ava.setComponentByName('assertionValue', AssertionValue(six.text_type(value)))
         cr.setComponentByName('ava', ava)
 
         mID = self.sock.sendMessage('compareRequest', cr)
@@ -490,7 +493,7 @@ class LDAP_rw(LDAP):
         if self.sock.unbound:
             raise ConnectionUnbound()
 
-        if not isinstance(DN, basestring):
+        if not isinstance(DN, six.string_types):
             raise TypeError('DN must be string type')
         if not isinstance(attrs, dict):
             raise TypeError('attrs must be dict')
@@ -499,7 +502,7 @@ class LDAP_rw(LDAP):
         ar.setComponentByName('entry', LDAPDN(DN))
         al = AttributeList()
         i = 0
-        for attrType, attrVals in attrs.iteritems():
+        for attrType, attrVals in six.iteritems(attrs):
             attr = Attribute()
             attr.setComponentByName('type', AttributeDescription(attrType))
             vals = Vals()
@@ -629,7 +632,7 @@ class LDAP_rw(LDAP):
         if current is not None:
             modlist = AddModlist(current, attrsDict)
         elif not self.strictModify:
-            current = self.get(DN, attrsDict.keys())
+            current = self.get(DN, list(attrsDict.keys()))
             modlist = AddModlist(current, attrsDict)
         else:
             modlist = Modlist(Mod.ADD, attrsDict)
@@ -641,7 +644,7 @@ class LDAP_rw(LDAP):
         if current is not None:
             modlist = DeleteModlist(current, attrsDict)
         elif not self.strictModify:
-            current = self.get(DN, attrsDict.keys())
+            current = self.get(DN, list(attrsDict.keys()))
             modlist = DeleteModlist(current, attrsDict)
         else:
             modlist = Modlist(Mod.DELETE, attrsDict)
@@ -762,7 +765,7 @@ class LDAPObject(dict, Extensible):
     ## object-specific methods
 
     def iterattrs(self):
-        for attr, vals in self.iteritems():
+        for attr, vals in six.iteritems(self):
             for val in vals:
                 yield (attr, val)
 
@@ -841,7 +844,7 @@ class LDAPObject(dict, Extensible):
                 raise ValueError('Invalid mod op')
 
     def addAttrs_local(self, attrsDict):
-        for attr, vals in attrsDict.iteritems():
+        for attr, vals in six.iteritems(attrsDict):
             if attr not in self:
                 self[attr] = vals
             else:
@@ -853,7 +856,7 @@ class LDAPObject(dict, Extensible):
         self.update(attrsDict)
 
     def deleteAttrValues_local(self, attrsDict):
-        for attr, vals in attrsDict.iteritems():
+        for attr, vals in six.iteritems(attrsDict):
             if attr in self:
                 if len(vals) > 0:
                     for val in vals:
@@ -883,7 +886,7 @@ class LDAPObject(dict, Extensible):
     def addAttrs(self, attrsDict):
         if isinstance(self.ldapConn, LDAP_rw):
             if not self.ldapConn.strictModify:
-                self.refreshMissing(attrsDict.keys())
+                self.refreshMissing(list(attrsDict.keys()))
             self.ldapConn.addAttrs(self.dn, attrsDict, current=self)
             self.addAttrs_local(attrsDict)
             return True
@@ -902,7 +905,7 @@ class LDAPObject(dict, Extensible):
     def deleteAttrValues(self, attrsDict):
         if isinstance(self.ldapConn, LDAP_rw):
             if not self.ldapConn.strictModify:
-                self.refreshMissing(attrsDict.keys())
+                self.refreshMissing(list(attrsDict.keys()))
             self.ldapConn.deleteAttrValues(self.dn, attrsDict, current=self)
             self.deleteAttrValues_local(attrsDict)
             self._removeEmptyAttrs()

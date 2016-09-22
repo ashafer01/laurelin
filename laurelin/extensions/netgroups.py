@@ -1,5 +1,7 @@
+from __future__ import absolute_import
 import re
 from laurelin.ldap import LDAP, LDAP_rw, LDAPObject, LDAPError
+import six
 
 TAG = 'netgroup_base'
 OBJECT_CLASS = 'nisNetgroup'
@@ -108,7 +110,7 @@ def _memberUserListToAttrs(memberList, domain=''):
     attrs = {}
     for member in memberList:
         attr = 'nisNetgroupTriple'
-        if isinstance(member, basestring):
+        if isinstance(member, six.string_types):
             if member[0] == '+':
                 attr = 'memberNisNetgroup'
                 member = member[1:]
@@ -136,7 +138,7 @@ def _memberHostListToAttrs(memberList, domain=''):
     attrs = {}
     for member in memberList:
         attr = 'nisNetgroupTriple'
-        if isinstance(member, basestring):
+        if isinstance(member, six.string_types):
             if member[0] == '+':
                 attr = 'memberNisNetgroup'
                 member = member[1:]

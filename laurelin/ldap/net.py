@@ -1,14 +1,15 @@
+from __future__ import absolute_import
 import ssl
 from socket import socket, error as SocketError
-from urlparse import urlparse
+from six.moves.urllib.parse import urlparse
 from collections import deque
 from pyasn1.codec.ber.encoder import encode as berEncode
 from pyasn1.codec.ber.decoder import decode as berDecode
 from pyasn1.error import SubstrateUnderrunError
 from puresasl.client import SASLClient
 
-from rfc4511 import LDAPMessage, MessageID, ProtocolOp
-from errors import LDAPError, LDAPSASLError, LDAPConnectionError
+from .rfc4511 import LDAPMessage, MessageID, ProtocolOp
+from .errors import LDAPError, LDAPSASLError, LDAPConnectionError
 
 _nextSockID = 0
 
@@ -126,7 +127,7 @@ class LDAPSocket(object):
 
     def recv_iter(self, wantMessageID):
         flushQueue = True
-        raw = ''
+        raw = b''
         while True:
             if flushQueue:
                 if wantMessageID in self._messageQueues:
