@@ -309,7 +309,7 @@ class LDAP(Extensible):
         obj = LDAPObject(DN, attrs=attrs, ldapConn=self, *args, **kwds)
         if tag is not None:
             if tag in self._taggedObjects:
-                return TagError('tag {0} already exists'.format(tag))
+                raise TagError('tag {0} already exists'.format(tag))
             else:
                 self._taggedObjects[tag] = obj
         return obj
