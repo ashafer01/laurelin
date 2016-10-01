@@ -473,19 +473,23 @@ class LDAP(Extensible):
                         yield SearchReferenceHandle(URIs)
 
     def search(self, *args, **kwds):
-        fetchResultRefs = kwds.pop('fetchResutlRefs', self.defaultFetchResultRefs)
+        fetchResultRefs = kwds.pop('fetchResultRefs', self.defaultFetchResultRefs)
         mID = self._sendSearch(*args, **kwds)
         return self._searchResultsAll(mID, fetchResultRefs)
 
-    # iterate objects from given LDAPSocket until we get a SearchResultDone; yielding instances of
-    # LDAPObject (and SearchReferenceHandle if any result references are returned from the server)
     def search_iter(self, *args, **kwds):
-        fetchResultRefs = kwds.pop('fetchResutlRefs', self.defaultFetchResultRefs)
+        """Send search and iterate results until we get a SearchResultDone
+
+         Yields instances of LDAPObject and possibly SearchReferenceHandle, if any result
+         references are returned from the server, and the fetchResultRefs keyword arg is False.
+        """
+        fetchResultRefs = kwds.pop('fetchResultRefs', self.defaultFetchResultRefs)
         mID = self._sendSearch(*args, **kwds)
         return self._searchResults_iter(mID, fetchResultRefs)
 
     # send a compare request
     def _sendCompare(self, DN, attr, value):
+        """Send a compare request and return internal message ID"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
@@ -501,6 +505,7 @@ class LDAP(Extensible):
         return mID
 
     def _compareResult(self, messageID):
+        """Receive compare result and convert to boolean"""
         msg = self.sock.recvOne(messageID)
         mID, res = _unpack('compareResponse', msg).getComponentByName('resultCode')
         if res == ResultCode('compareTrue'):
@@ -513,11 +518,12 @@ class LDAP(Extensible):
             raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
 
     def compare(self, *args):
+        """Perform a compare operation, returning boolean"""
         mID = self._sendCompare(*args)
         return self._compareResult(mID)
 
-    # general purpose check for success result
     def _successResult(self, messageID, operation):
+        """Receive an object from the socket and raise an LDAPError if its not a success result"""
         mID, obj = _unpack(operation, self.sock.recvOne(messageID))
         res = obj.getComponentByName('resultCode')
         if res == ResultCode('success'):

@@ -1,3 +1,5 @@
+"""Provides protocol-level interface for low-level sockets"""
+
 from __future__ import absolute_import
 import ssl
 from socket import socket, error as SocketError
@@ -14,6 +16,8 @@ from .errors import LDAPError, LDAPSASLError, LDAPConnectionError
 _nextSockID = 0
 
 class LDAPSocket(object):
+    """Holds a connection to an LDAP server"""
+
     RECV_BUFFER = 4096
 
     def __init__(self, hostURI,
@@ -32,6 +36,7 @@ class LDAPSocket(object):
             defaultPort = 389
         elif parsedURI.scheme == 'ldaps':
             defaultPort = 636
+            # N.B. this is presently the only thing breaking 2.6 support
             ctx = ssl.create_default_context(cafile=sslCAFile, capath=sslCAPath, cadata=sslCAData)
             self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
         else:
@@ -62,11 +67,13 @@ class LDAPSocket(object):
         self.abandonedMIDs = []
 
     def saslInit(self, mechs, **props):
+        """Initialize a puresasl.client.SASLClient"""
         self._saslClient = SASLClient(self.host, 'ldap', **props)
         self._saslClient.choose_mechanism(mechs)
 
     @property
     def saslOK(self):
+        """Check if SASL has been initialized and bind marked complete"""
         if self._saslClient is not None:
             return self.bound
         else:
@@ -74,6 +81,7 @@ class LDAPSocket(object):
 
     @property
     def saslQoP(self):
+        """Obtain the chosen quality of protection"""
         if self._saslClient is not None:
             return self._saslClient.qop
         else:
@@ -81,6 +89,7 @@ class LDAPSocket(object):
 
     @property
     def saslMech(self):
+        """Obtain the chosen mechanism"""
         if self._saslClient is not None:
             mech = self._saslClient.mechanism
             if mech is None:
@@ -91,12 +100,18 @@ class LDAPSocket(object):
             raise LDAPSASLError('SASL init not complete')
 
     def saslProcessAuthChallenge(self, challenge):
+        """Process an auth challenge and return the correct response"""
         if self._saslClient is not None:
             return self._saslClient.process(challenge)
         else:
             raise LDAPSASLError('SASL init not complete')
 
     def sendMessage(self, op, obj):
+        """Create and sned an LDAPMessage given an operation name and a corresponding object
+
+         Operation names must be defined as component names in laurelin.ldap.rfc4511.ProtocolOp and
+         the object must be of the corresponding type
+        """
         mID = self._nextMessageID
         lm = LDAPMessage()
         lm.setComponentByName('messageID', MessageID(mID))
@@ -164,4 +179,5 @@ class LDAPSocket(object):
                 continue
 
     def close(self):
+        """Close the low-level socket connection"""
         return self._sock.close()

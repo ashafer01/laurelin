@@ -1,9 +1,11 @@
+"""Contains utilities for performing object modification"""
+
 from __future__ import absolute_import
 from .rfc4511 import Operation
 import six
 
-# describes a single modify operation
 class Mod(object):
+    """Describes a single modify operation"""
     ADD = Operation('add')
     REPLACE = Operation('replace')
     DELETE = Operation('delete')
@@ -19,9 +21,9 @@ class Mod(object):
         else:
             raise ValueError()
 
-    # translate ldif modify operation strings to constant
     @staticmethod
     def string(op):
+        """Translte LDIF changetype strings to constant"""
         if op == 'add':
             return Mod.ADD
         elif op == 'replace':
@@ -53,8 +55,9 @@ class Mod(object):
         return 'Mod(Mod.{0}, {1}, {2})'.format(Mod.opToString(self.op), repr(self.attr),
             repr(self.vals))
 
-# generate a modlist from a dictionary
 def Modlist(op, attrsDict):
+    """Generate a modlist from a dictionary"""
+
     if not isinstance(attrsDict, dict):
         raise TypeError()
     modlist = []
@@ -64,8 +67,9 @@ def Modlist(op, attrsDict):
 
 ## Smart modlist functions which will prevent errors
 
-# generate a modlist to add only new attribute values that are not known to exist
 def AddModlist(curAttrs, newAttrs):
+    """Generate a modlist to add only new attribute values that are not known to exist"""
+
     if not isinstance(curAttrs, dict):
         raise TypeError('curAttrs must be dict')
     if not isinstance(newAttrs, dict):
@@ -82,8 +86,9 @@ def AddModlist(curAttrs, newAttrs):
             addAttrs[attr] = vals
     return Modlist(Mod.ADD, addAttrs)
 
-# generate a modlist to delete only attribute values that are known to exist
 def DeleteModlist(curAttrs, delAttrs):
+    """Generate a modlist to delete only attribute values that are known to exist"""
+
     if not isinstance(delAttrs, dict):
         raise TypeError('curAttrs must be dict')
     if not isinstance(delAttrs, dict):
@@ -101,11 +106,13 @@ def DeleteModlist(curAttrs, delAttrs):
                         _delAttrs[attr].append(val)
     return Modlist(Mod.DELETE, _delAttrs)
 
-# for completeness - a replace operation should never return an error:
-# # all attribute values will be replaced with those given if the attribute exists
-# # attributes will be created if they do not exist
-# # specifying a 0-length entry will delete that attribute
-# # attributes not mentioned are not touched
 def ReplaceModlist(*args):
+    """For completeness - a replace operation should never return an error:
+
+     * All attribute values will be replaced with those given if the attribute exists
+     * Attributes will be created if they do not exist
+     * Specifying a 0-length entry will delete that attribute
+     * Attributes not mentioned are not touched
+    """
     attrsDict = args[-1]
     return Modlist(Mod.REPLACE, attrsDict)

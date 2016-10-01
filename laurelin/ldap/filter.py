@@ -1,7 +1,4 @@
-##
-## ldap.filter
-## 
-## Filter parser
+"""Contains utilities for handling filters"""
 
 from __future__ import absolute_import
 from .rfc4511 import (
@@ -26,19 +23,6 @@ from .rfc4511 import (
 )
 from .errors import LDAPError
 
-def findClosingParen(text):
-    if text[0] != '(':
-        raise ValueError()
-    parens = 1
-    i = 0
-    while parens > 0:
-        i += 1
-        if text[i] == '(':
-            parens += 1
-        elif text[i] == ')':
-            parens -= 1
-    return i
-
 escapeMap = [
     ('(', '\\28'),
     (')', '\\29'),
@@ -53,27 +37,20 @@ escapeMap = [
     ('/', '\\2f')
 ]
 def escape(text):
+    """Escape special characters"""
     for rep in escapeMap:
         text = text.replace(*rep)
     return text
 
-def parseSet(filterStr, cls):
-    fset = cls()
-    i = 0
-    while len(filterStr) > 0:
-        end = findClosingParen(filterStr)+1
-        fset.setComponentByPosition(i, parse(filterStr[0:end]))
-        filterStr = filterStr[end:]
-        i += 1
-    return fset
-
 def parse(filterStr):
+    """Parse a filter string to a protocol-level object"""
+
     fil = Filter()
-    chunk = filterStr[1:findClosingParen(filterStr)]
+    chunk = filterStr[1:_findClosingParen(filterStr)]
     if chunk[0] == '&':
-        fil.setComponentByName('and', parseSet(chunk[1:], And))
+        fil.setComponentByName('and', _parseSet(chunk[1:], And))
     elif chunk[0] == '|':
-        fil.setComponentByName('or', parseSet(chunk[1:], Or))
+        fil.setComponentByName('or', _parseSet(chunk[1:], Or))
     elif chunk[0] == '!':
         notFilter = Not()
         notFilter.setComponentByName('innerNotFilter', parse(chunk[1:]))
@@ -136,3 +113,26 @@ def parse(filterStr):
             ava.setComponentByName('assertionValue', AttributeValue(val))
             fil.setComponentByName('equalityMatch', ava)
     return fil
+
+def _parseSet(filterStr, cls):
+    fset = cls()
+    i = 0
+    while len(filterStr) > 0:
+        end = _findClosingParen(filterStr)+1
+        fset.setComponentByPosition(i, parse(filterStr[0:end]))
+        filterStr = filterStr[end:]
+        i += 1
+    return fset
+
+def _findClosingParen(text):
+    if text[0] != '(':
+        raise ValueError()
+    parens = 1
+    i = 0
+    while parens > 0:
+        i += 1
+        if text[i] == '(':
+            parens += 1
+        elif text[i] == ')':
+            parens -= 1
+    return i

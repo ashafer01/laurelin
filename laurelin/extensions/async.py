@@ -7,7 +7,7 @@ from laurelin.ldap.rfc4511 import AbandonRequest
 ## LDAP extension methods
 
 def search_async(self, *args, **kwds):
-    fetchResultRefs = kwds.pop('fetchResutlRefs', self.defaultFetchResultRefs)
+    fetchResultRefs = kwds.pop('fetchResultRefs', self.defaultFetchResultRefs)
     mID = self._sendSearch(*args, **kwds)
     return AsyncSearchHandle(self, mID, fetchResultRefs)
 
