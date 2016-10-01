@@ -19,5 +19,5 @@ l.saslBind(mech='DIGEST-MD5', username='admin', password=getpass())
 #print(o.formatLDIF())
 #print('========')
 
-for o in l.search_async(l.base.dn, Scope.SUBTREE, '(objectClass=*)').iter():
+for o in l.search(l.base.dn, Scope.SUBTREE, '(objectClass=*)'):
     print(o.formatLDIF())

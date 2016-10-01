@@ -95,9 +95,9 @@ class AsyncSearchHandle(AsyncHandle):
         self._check()
         return self.ldapConn._searchResultsAll(self.messageID, self.fetchResultRefs)
 
-    def iter(self):
+    def results(self):
         self._check()
-        return self.ldapConn._searchResults_iter(self.messageID, self.fetchResultRefs)
+        return self.ldapConn._searchResults(self.messageID, self.fetchResultRefs)
 
 class AsyncCompareHandle(AsyncHandle):
     def wait(self):
