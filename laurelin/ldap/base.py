@@ -1,3 +1,10 @@
+"""Contains base classes for laurelin.ldap
+
+* LDAP
+* LDAP_rw
+* LDAPObject
+"""
+
 from __future__ import absolute_import
 import logging
 from warnings import warn
@@ -52,15 +59,23 @@ logger.addHandler(stderrHandler)
 logger.setLevel(logging.DEBUG)
 
 class Scope:
+    """Scope constants
+
+     These instruct the server how far to take a search, relative to the base object
+     * Scope.BASE - only search the base object
+     * Scope.ONE  - search the base object and its immediate children
+     * Scope.SUB  - search the base object and all of its descendants
+    """
+
     BASE = _Scope('baseObject')
     ONELEVEL = _Scope('singleLevel')
     ONE = ONELEVEL
     SUBTREE = _Scope('wholeSubtree')
     SUB = SUBTREE
 
-    # translate RFC4516 URL scope strings to constant
     @staticmethod
     def string(str):
+        """translate RFC4516 URL scope strings to constant"""
         str = str.lower()
         if str == 'base':
             return Scope.BASE
@@ -72,6 +87,16 @@ class Scope:
             raise ValueError()
 
 class DerefAliases:
+    """DerefAliases constants
+
+     These instruct the server when to automatically resolve an alias object, rather than return the
+     alias object itself
+     * DerefAliases.NEVER  - always return the alias object
+     * DerefAliases.SEARCH - dereferences search results, but not the base object itself
+     * DerefAliases.BASE   - dereferences the search base object, but not search results
+     * DerefAliases.ALWAYS - dereferences both the search base object and results
+    """
+
     NEVER = _DerefAliases('neverDerefAliases')
     SEARCH = _DerefAliases('derefInSearching')
     BASE = _DerefAliases('derefFindingBaseObj')
@@ -95,6 +120,8 @@ class Extensible(object):
 _sockets = {}
 
 class LDAP(Extensible):
+    """Provides the basic connection to the LDAP DB and read-only methods"""
+
     # global defaults
     DEFAULT_FILTER = '(objectClass=*)'
     DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
@@ -142,14 +169,13 @@ class LDAP(Extensible):
         # connect
         if isinstance(connectTo, six.string_types):
             self.hostURI = connectTo
+            socketParams = (self.hostURI, connectTimeout, sslCAFile, sslCAPath, sslCAData)
             if reuseConnection:
                 if self.hostURI not in _sockets:
-                    _sockets[self.hostURI] = LDAPSocket(self.hostURI, connectTimeout, sslCAFile,
-                        sslCAPath, sslCAData)
+                    _sockets[self.hostURI] = LDAPSocket(*socketParams)
                 self.sock = _sockets[self.hostURI]
             else:
-                self.sock = LDAPSocket(self.hostURI, connectTimeout, sslCAFile, sslCAPath,
-                    sslCAData)
+                self.sock = LDAPSocket(*socketParams)
             logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
             if baseDC is not None:
                 for dcpart in baseDC.split(','):
@@ -185,6 +211,10 @@ class LDAP(Extensible):
         self.base = self.obj(self.baseDC, relativeSearchScope=Scope.SUBTREE)
 
     def simpleBind(self, username='', password=''):
+        """Performs a simple bind operation
+
+         Leave arguments as their default (empty strings) to attempt an anonymous simple bind
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
         if self.sock.bound:
@@ -206,6 +236,8 @@ class LDAP(Extensible):
         return ret
 
     def getSASLMechs(self):
+        """Query root DSE for supported SASL mechanisms"""
+
         if self._saslMechs is None:
             logger.debug('Querying server to find supported SASL mechs')
             o = self.get('', ['supportedSASLMechanisms'])
@@ -214,6 +246,8 @@ class LDAP(Extensible):
         return self._saslMechs
 
     def recheckSASLMechs(self):
+        """Query the root DSE again after performing a SASL bind to check for a downgrade attack"""
+
         if self._saslMechs is None:
             raise LDAPError('SASL mechs have not yet been queried')
         else:
@@ -231,6 +265,12 @@ class LDAP(Extensible):
                 return self._saslMechs
 
     def saslBind(self, mech=None, **props):
+        """Perform a SASL bind operation
+
+         Specify a single standard mechanism string for mech, or leave it as None to negotiate the
+         best mutually supported mechanism. Required keyword args are dependent on the mechanism
+         chosen.
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
         if self.sock.bound:
@@ -283,6 +323,7 @@ class LDAP(Extensible):
         raise LDAPError('Programming error - reached end of saslBind')
 
     def unbind(self):
+        """Send an unbind request and close the socket"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
@@ -297,15 +338,15 @@ class LDAP(Extensible):
 
     close = unbind
 
-    # get a tagged object
     def tag(self, tag):
+        """Get a tagged object"""
         try:
             return self._taggedObjects[tag]
         except KeyError:
             raise TagError('tag {0} does not exist'.format(tag))
 
-    # create an LDAPObject without querying the server
     def obj(self, DN, attrs={}, tag=None, *args, **kwds):
+        """Factory for LDAPObjects bound to this connection"""
         obj = LDAPObject(DN, attrs=attrs, ldapConn=self, *args, **kwds)
         if tag is not None:
             if tag in self._taggedObjects:
@@ -314,8 +355,8 @@ class LDAP(Extensible):
                 self._taggedObjects[tag] = obj
         return obj
 
-    # get a specific object by DN
     def get(self, DN, attrList=None):
+        """Get a specific object by DN"""
         if self.sock.unbound:
             raise ConnectionUnbound()
         results = self.search(DN, Scope.BASE, attrList=attrList, limit=2)
@@ -327,8 +368,8 @@ class LDAP(Extensible):
         else:
             return results[0]
 
-    # simply check if a DN exists
     def exists(self, DN):
+        """Simply check if a DN exists"""
         if self.sock.unbound:
             raise ConnectionUnbound()
         try:
@@ -339,9 +380,9 @@ class LDAP(Extensible):
         except MultipleSearchResults:
             return True
 
-    # send a search request
     def _sendSearch(self, baseDN, scope, filterStr=None, attrList=None, searchTimeout=None,
         limit=0, derefAliases=None, attrsOnly=False):
+        """Send a search request and return the internal message ID"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
@@ -487,9 +528,10 @@ class LDAP(Extensible):
 
 
 class LDAP_rw(LDAP):
-    ## add a new object
+    """Contains all methods that perform write operations on the LDAP DB"""
 
     def _sendAdd(self, DN, attrs):
+        """Send an add request and return internal message ID"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
@@ -518,8 +560,8 @@ class LDAP_rw(LDAP):
         logger.debug('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
         return mID
 
-    # returns a corresponding LDAPObject on success
     def add(self, DN, attrs):
+        """Add new object and return corresponding LDAPObject on success"""
         mID = self._sendAdd(DN, attrs)
         self._successResult(mID, 'addResponse')
         return self.obj(DN, attrs)
@@ -527,6 +569,14 @@ class LDAP_rw(LDAP):
     ## search+add patterns
 
     def addOrModAddIfExists(self, DN, attrs):
+        """Add object if it doesn't exist, otherwise addAttrs
+
+         * If the object at DN exists, perform an add modification using the attrs dictionary.
+           Otherwise, create the object using the attrs dictionary.
+         * This ensures that, for the attributes mentioned in attrs, AT LEAST those values will
+           exist on the given DN, regardless of prior state of the DB.
+         * Always returns an LDAPObject corresponding to the final state of the DB
+        """
         try:
             cur = self.get(DN)
             cur.addAttrs(attrs)
@@ -535,6 +585,14 @@ class LDAP_rw(LDAP):
             return self.add(DN, attrs)
 
     def addOrModReplaceIfExists(self, DN, attrs):
+        """Add object if it doesn't exist, otherwise replaceAttrs
+
+         * If the object at DN exists, perform a replace modification using the attrs dictionary
+           Otherwise, create the object using the attrs dictionary
+         * This ensures that, for the attributes mentioned in attrs, ONLY those values will exist on
+           the given DN regardless of prior state of the DB.
+         * Always returns an LDAPObject corresponding to the final state of the DB
+        """
         try:
             cur = self.get(DN)
             cur.replaceAttrs(attrs)
@@ -543,6 +601,12 @@ class LDAP_rw(LDAP):
             return self.add(DN, attrs)
 
     def addIfNotExists(self, DN, attrs):
+        """Add object if it doesn't exist
+
+         * Gets and returns the object at DN if it exists, otherwise create the object using the
+           attrs dictionary
+         * Always returns an LDAPObject corresponding to the final state of the DB
+        """
         try:
             cur = self.get(DN)
             logger.debug('Object {0} already exists on addIfNotExists'.format(DN))
@@ -553,6 +617,7 @@ class LDAP_rw(LDAP):
     ## delete an object
 
     def _sendDelete(self, DN):
+        """Send a delete request and return the internal message ID"""
         if self.sock.unbound:
             raise ConnectionUnbound()
         mID = self.sock.sendMessage('delRequest', DelRequest(DN))
@@ -560,13 +625,14 @@ class LDAP_rw(LDAP):
         return mID
 
     def delete(self, DN):
+        """Delete an object"""
         mID = self._sendDelete(DN)
         return self._successResult(mID, 'delResponse')
 
     ## change object DN
 
-    # exposes all options of the protocol-level ModifyDNRequest
     def modDN(self, DN, newRDN, cleanAttr=True, newParent=None):
+        """Exposes all options of the protocol-level ModifyDNRequest"""
         if self.sock.unbound:
             raise ConnectionUnbound()
         mdr = ModifyDNRequest()
@@ -578,18 +644,19 @@ class LDAP_rw(LDAP):
         mID = self.sock.sendMessage('modDNRequest', mdr)
         return self._successResult(mID, 'modDNResponse')
 
-    # edit the RDN of an object
     def rename(self, DN, newRDN, cleanAttr=True):
+        """Specify a new RDN for an object without changing its location in the tree"""
         return self.modDN(DN, newRDN, cleanAttr)
 
-    # move object, possibly changing RDN as well
     def move(self, DN, newDN, cleanAttr=True):
+        """Specify a new absolute DN for an object"""
         rdn, parent = newDN.split(',', 1)
         return self.modDN(DN, rdn, cleanAttr, parent)
 
     ## change attributes on an object
 
     def _sendModify(self, DN, modlist):
+        """Send a modify request and return the internal message ID"""
         if self.sock.unbound:
             raise ConnectionUnbound()
         mr = ModifyRequest()
@@ -620,6 +687,10 @@ class LDAP_rw(LDAP):
         return mID
 
     def modify(self, DN, modlist):
+        """Perform a series of modify operations on an object
+
+         modlist must be a list of laurelin.ldap.modify.Mod instances
+        """
         if len(modlist) > 0:
             mID = self._sendModify(DN, modlist)
             return self._successResult(mID, 'modifyResponse')
@@ -627,8 +698,8 @@ class LDAP_rw(LDAP):
             logger.debug('Not sending 0-length modlist for DN {0}'.format(DN))
             return True
 
-    # add new attributes and values
     def addAttrs(self, DN, attrsDict, current=None):
+        """Add new attribute values to existing object"""
         if current is not None:
             modlist = AddModlist(current, attrsDict)
         elif not self.strictModify:
@@ -638,9 +709,13 @@ class LDAP_rw(LDAP):
             modlist = Modlist(Mod.ADD, attrsDict)
         return self.modify(DN, modlist)
 
-    # delete specific attribute values
-    # specifying a 0-length entry will delete all values
     def deleteAttrValues(self, DN, attrsDict, current=None):
+        """Delete specific attribute values from dictionary
+
+         Specifying a 0-length entry will delete all values
+        """
+        if not isinstance(attrsDict, dict):
+            raise TypeError('attrsDict must be dict')
         if current is not None:
             modlist = DeleteModlist(current, attrsDict)
         elif not self.strictModify:
@@ -650,22 +725,35 @@ class LDAP_rw(LDAP):
             modlist = Modlist(Mod.DELETE, attrsDict)
         return self.modify(DN, modlist)
 
-    # delete all values for one or more attributes
     def deleteAttrs(self, DN, attrs, current=None):
-        if not isinstance(attrs, list):
-            attrs = [attrs]
-        return self.deleteAttrValues(DN, dict.fromkeys(attrs, []), current)
+        """Delete attributes
 
-    # replace all values on given attributes with the passed values
-    # attributes not mentioned in attrsDict are not touched
-    # attributes will be created if they do not exist
-    # specifying a 0-length entry will delete that attribute
+         * Accepts a list of attribute names, or a single attribute name for which to delete all
+           values
+         * If a dict is passed, it is passed directly into deleteAttrValues
+        """
+        if isinstance(attrs, list):
+            attrs = dict.fromkeys(attrs, [])
+        elif isinstance(attrs, six.string_types):
+            attrs = {attrs: []}
+        elif not isinstance(attrs, dict):
+            raise TypeError('attrs must be list, dict, or string type')
+        return self.deleteAttrValues(DN, attrs, current)
+
     def replaceAttrs(self, DN, attrsDict):
+        """Replace all values on given attributes with the passed values
+
+         * Attributes not mentioned in attrsDict are not touched
+         * Attributes will be created if they do not exist
+         * Specifying a 0-length entry will delete all values for that attribute
+        """
         return self.modify(DN, Modlist(Mod.REPLACE, attrsDict))
 
-    # process a basic LDIF
-    # TODO: full RFC 2849 implementation
     def processLDIF(self, ldifStr):
+        """Process a basic LDIF
+
+         TODO: full RFC 2849 implementation
+        """
         ldifLines = ldifStr.splitlines()
         if not ldifLines[0].startswith('dn:'):
             raise ValueError('Missing dn')
@@ -709,6 +797,12 @@ class LDAP_rw(LDAP):
             raise ValueError('changetype {0} unknown/not yet implemented'.format(changetype))
 
 class LDAPObject(dict, Extensible):
+    """Represents a single object and provides a variety of methods specific to the object
+
+     Attributes and values are stored using the mapping interface inherited from dict. Dict keys are
+     attribute names, and dict values are a list of attribute values.
+    """
+
     def __init__(self, dn,
         attrs={},
         ldapConn=None,
