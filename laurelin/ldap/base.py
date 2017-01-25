@@ -129,6 +129,7 @@ class LDAP(Extensible):
     DEFAULT_CONNECT_TIMEOUT = 5
     DEFAULT_STRICT_MODIFY = False
     DEFAULT_REUSE_CONNECTION = True
+    DEFAULT_SSL_VERIFY = True
     DEFAULT_SSL_CAFILE = None
     DEFAULT_SSL_CAPATH = None
     DEFAULT_SSL_CADATA = None
@@ -147,6 +148,7 @@ class LDAP(Extensible):
         searchTimeout=DEFAULT_SEARCH_TIMEOUT,
         derefAliases=DEFAULT_DEREF_ALIASES,
         strictModify=DEFAULT_STRICT_MODIFY,
+        sslVerify=DEFAULT_SSL_VERIFY,
         sslCAFile=DEFAULT_SSL_CAFILE,
         sslCAPath=DEFAULT_SSL_CAPATH,
         sslCAData=DEFAULT_SSL_CADATA,
@@ -169,7 +171,11 @@ class LDAP(Extensible):
         # connect
         if isinstance(connectTo, six.string_types):
             self.hostURI = connectTo
-            socketParams = (self.hostURI, connectTimeout, sslCAFile, sslCAPath, sslCAData)
+            if sslVerify:
+                sslVerify = LDAPSocket.SSL_REQUIRED
+            else:
+                sslVerify = LDAPSocket.SSL_NOVERIFY
+            socketParams = (self.hostURI, connectTimeout, sslVerify, sslCAFile, sslCAPath, sslCAData)
             if reuseConnection:
                 if self.hostURI not in _sockets:
                     _sockets[self.hostURI] = LDAPSocket(*socketParams)

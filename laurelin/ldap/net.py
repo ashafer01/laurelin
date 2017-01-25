@@ -19,9 +19,13 @@ class LDAPSocket(object):
     """Holds a connection to an LDAP server"""
 
     RECV_BUFFER = 4096
+    SSL_NOVERIFY = ssl.CERT_NONE
+    SSL_OPTIONAL = ssl.CERT_OPTIONAL
+    SSL_REQUIRED = ssl.CERT_REQUIRED
 
     def __init__(self, hostURI,
         connectTimeout=5,
+        sslVerify=SSL_REQUIRED,
         sslCAFile=None,
         sslCAPath=None,
         sslCAData=None,
@@ -37,7 +41,13 @@ class LDAPSocket(object):
         elif parsedURI.scheme == 'ldaps':
             defaultPort = 636
             # N.B. this is presently the only thing breaking 2.6 support
-            ctx = ssl.create_default_context(cafile=sslCAFile, capath=sslCAPath, cadata=sslCAData)
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            ctx.verify_mode = sslVerify
+            if sslVerify != LDAPSocket.SSL_NOVERIFY:
+                ctx.check_hostname = True
+                ctx.load_default_certs()
+            if sslCAFile or sslCAPath or sslCAData:
+                ctx.load_verify_locations(cafile=sslCAFile, capath=sslCAPath, cadata=sslCAData)
             self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
