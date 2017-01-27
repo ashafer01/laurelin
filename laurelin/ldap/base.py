@@ -58,6 +58,9 @@ stderrHandler.setFormatter(logging.Formatter('[%(asctime)s] %(name)s %(levelname
 logger.addHandler(stderrHandler)
 logger.setLevel(logging.DEBUG)
 
+# this delimits key from value in structured description fields
+DESC_ATTR_DELIM = '='
+
 class Scope:
     """Scope constants
 
@@ -228,9 +231,9 @@ class LDAP(Extensible):
 
         br = BindRequest()
         br.setComponentByName('version', Version(3))
-        br.setComponentByName('name', LDAPDN(six.text_type(username)))
+        br.setComponentByName('name', LDAPDN(username))
         ac = AuthenticationChoice()
-        ac.setComponentByName('simple', SimpleCreds(six.text_type(password)))
+        ac.setComponentByName('simple', SimpleCreds(password))
         br.setComponentByName('authentication', ac)
 
         mID = self.sock.sendMessage('bindRequest', br)
@@ -297,12 +300,12 @@ class LDAP(Extensible):
         while True:
             br = BindRequest()
             br.setComponentByName('version', Version(3))
-            br.setComponentByName('name', LDAPDN(six.text_type('')))
+            br.setComponentByName('name', LDAPDN(''))
             ac = AuthenticationChoice()
             sasl = SaslCredentials()
             sasl.setComponentByName('mechanism', six.text_type(self.sock.saslMech))
             if challengeResponse is not None:
-                sasl.setComponentByName('credentials', six.text_type(challengeResponse))
+                sasl.setComponentByName('credentials', challengeResponse)
                 challengeReponse = None
             ac.setComponentByName('sasl', sasl)
             br.setComponentByName('authentication', ac)
@@ -361,11 +364,11 @@ class LDAP(Extensible):
                 self._taggedObjects[tag] = obj
         return obj
 
-    def get(self, DN, attrList=None):
+    def get(self, DN, attrs=None):
         """Get a specific object by DN"""
         if self.sock.unbound:
             raise ConnectionUnbound()
-        results = self.searchAll(DN, Scope.BASE, attrList=attrList, limit=2)
+        results = self.searchAll(DN, Scope.BASE, attrs=attrs, limit=2)
         n = len(results)
         if n == 0:
             raise NoSearchResults()
@@ -386,7 +389,7 @@ class LDAP(Extensible):
         except MultipleSearchResults:
             return True
 
-    def _sendSearch(self, baseDN, scope, filterStr=None, attrList=None, searchTimeout=None,
+    def _sendSearch(self, baseDN, scope, filterStr=None, attrs=None, searchTimeout=None,
         limit=0, derefAliases=None, attrsOnly=False):
         """Send a search request and return the internal message ID"""
         if self.sock.unbound:
@@ -407,20 +410,20 @@ class LDAP(Extensible):
         req.setComponentByName('typesOnly', TypesOnly(attrsOnly))
         req.setComponentByName('filter', parseFilter(filterStr))
 
-        attrs = AttributeSelection()
+        _attrs = AttributeSelection()
         i = 0
-        if attrList is None:
-            attrList = [LDAP.ALL_USER_ATTRS]
-        if not isinstance(attrList, list):
-            attrList = [attrList]
-        for desc in attrList:
-            attrs.setComponentByPosition(i, LDAPString(desc))
+        if attrs is None:
+            attrs = [LDAP.ALL_USER_ATTRS]
+        if not isinstance(attrs, list):
+            attrs = [attrs]
+        for desc in attrs:
+            _attrs.setComponentByPosition(i, LDAPString(desc))
             i += 1
-        req.setComponentByName('attributes', attrs)
+        req.setComponentByName('attributes', _attrs)
 
         mID = self.sock.sendMessage('searchRequest', req)
         logger.debug('Sent search request (ID {0}): baseDN={1}, scope={2}, filterStr={3}, '
-            'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrList)))
+            'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrs)))
         return mID
 
     def _searchResultsAll(self, messageID, fetchResultRefs=None):
@@ -542,21 +545,21 @@ class LDAP(Extensible):
 class LDAP_rw(LDAP):
     """Contains all methods that perform write operations on the LDAP DB"""
 
-    def _sendAdd(self, DN, attrs):
+    def _sendAdd(self, DN, attrsDict):
         """Send an add request and return internal message ID"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
         if not isinstance(DN, six.string_types):
             raise TypeError('DN must be string type')
-        if not isinstance(attrs, dict):
-            raise TypeError('attrs must be dict')
+        if not isinstance(attrsDict, dict):
+            raise TypeError('attrsDict must be dict')
 
         ar = AddRequest()
         ar.setComponentByName('entry', LDAPDN(DN))
         al = AttributeList()
         i = 0
-        for attrType, attrVals in six.iteritems(attrs):
+        for attrType, attrVals in six.iteritems(attrsDict):
             attr = Attribute()
             attr.setComponentByName('type', AttributeDescription(attrType))
             vals = Vals()
@@ -572,15 +575,15 @@ class LDAP_rw(LDAP):
         logger.debug('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
         return mID
 
-    def add(self, DN, attrs):
+    def add(self, DN, attrsDict):
         """Add new object and return corresponding LDAPObject on success"""
-        mID = self._sendAdd(DN, attrs)
+        mID = self._sendAdd(DN, attrsDict)
         self._successResult(mID, 'addResponse')
-        return self.obj(DN, attrs)
+        return self.obj(DN, attrsDict)
 
     ## search+add patterns
 
-    def addOrModAddIfExists(self, DN, attrs):
+    def addOrModAddIfExists(self, DN, attrsDict):
         """Add object if it doesn't exist, otherwise addAttrs
 
          * If the object at DN exists, perform an add modification using the attrs dictionary.
@@ -591,12 +594,12 @@ class LDAP_rw(LDAP):
         """
         try:
             cur = self.get(DN)
-            cur.addAttrs(attrs)
+            cur.addAttrs(attrsDict)
             return cur
         except NoSearchResults:
-            return self.add(DN, attrs)
+            return self.add(DN, attrsDict)
 
-    def addOrModReplaceIfExists(self, DN, attrs):
+    def addOrModReplaceIfExists(self, DN, attrsDict):
         """Add object if it doesn't exist, otherwise replaceAttrs
 
          * If the object at DN exists, perform a replace modification using the attrs dictionary
@@ -607,12 +610,12 @@ class LDAP_rw(LDAP):
         """
         try:
             cur = self.get(DN)
-            cur.replaceAttrs(attrs)
+            cur.replaceAttrs(attrsDict)
             return cur
         except NoSearchResults:
-            return self.add(DN, attrs)
+            return self.add(DN, attrsDict)
 
-    def addIfNotExists(self, DN, attrs):
+    def addIfNotExists(self, DN, attrsDict):
         """Add object if it doesn't exist
 
          * Gets and returns the object at DN if it exists, otherwise create the object using the
@@ -624,7 +627,7 @@ class LDAP_rw(LDAP):
             logger.debug('Object {0} already exists on addIfNotExists'.format(DN))
             return cur
         except NoSearchResults:
-            return self.add(DN, attrs)
+            return self.add(DN, attrsDict)
 
     ## delete an object
 
@@ -950,31 +953,16 @@ class LDAPObject(dict, Extensible):
                 raise ValueError('Invalid mod op')
 
     def addAttrs_local(self, attrsDict):
-        for attr, vals in six.iteritems(attrsDict):
-            if attr not in self:
-                self[attr] = vals
-            else:
-                for val in vals:
-                    if val not in self[attr]:
-                        self[attr].append(val)
+        _addAttrs(self, attrsDict)
 
     def replaceAttrs_local(self, attrsDict):
-        self.update(attrsDict)
+        _replaceAttrs(self, attrsDict)
 
     def deleteAttrValues_local(self, attrsDict):
-        for attr, vals in six.iteritems(attrsDict):
-            if attr in self:
-                if len(vals) > 0:
-                    for val in vals:
-                        try:
-                            self[attr].remove(val)
-                        except:
-                            pass
-                else:
-                    self[attr] = []
+        _deleteAttrValues(self, attrsDict)
 
-    def deleteAttrs_local(self, attrsList):
-        self.deleteAttrValues_local(dict.fromkeys(attrsList, []))
+    def deleteAttrs_local(self, attrs):
+        self.deleteAttrValues_local(dict.fromkeys(attrs, []))
 
     ## online modify methods
     ## these call the LDAP_rw methods of the same name, passing the object's DN as the first
@@ -1076,6 +1064,67 @@ class LDAPObject(dict, Extensible):
         newRDN, newParent = newDN.split(',', 1)
         return self.modDN(newRDN, cleanAttr, newParent)
 
+    # these methods implement the common pattern of storing arbitrary key=value data in
+    # description fields
+
+    def descAttrs(self):
+        self.refreshMissing(['description'])
+        return _parseDescAttrs(self['description'])
+
+    def addDescAttrs(self, attrsDict):
+        descDict = self.descAttrs()
+        _addAttrs(descDict, attrsDict)
+        self.replaceAttrs({'description':_dictToDesc(descDict)})
+
+    def replaceDescAttrs(self, attrsDict):
+        descDict = self.descAttrs()
+        _replaceAttrs(descDict, attrsDict)
+        self.replaceAttrs({'description':_dictToDesc(descDict)})
+
+    def deleteDescAttrs(self, attrsDict):
+        descDict = self.descAttrs()
+        _deleteAttrValues(descDict, attrsDict)
+        self.replaceAttrs({'description':_dictToDesc(descDict)})
+
+def _addAttrs(toDict, attrsDict):
+    for attr, vals in six.iteritems(attrsDict):
+        if attr not in toDict:
+            toDict[attr] = vals
+        else:
+            for val in vals:
+                if val not in toDict[attr]:
+                    toDict[attr].append(val)
+
+def _replaceAttrs(toDict, attrsDict):
+    toDict.update(attrsDict)
+
+def _deleteAttrValues(fromDict, attrsDict):
+    for attr, vals in six.iteritems(attrsDict):
+        if attr in fromDict:
+            if len(vals) > 0:
+                for val in vals:
+                    try:
+                        fromDict[attr].remove(val)
+                    except Exception:
+                        pass
+            else:
+                fromDict[attr] = []
+
+def _parseDescAttrs(descList):
+    ret = {}
+    for desc in descList:
+        if DESC_ATTR_DELIM in desc:
+            key, value = desc.split(DESC_ATTR_DELIM, maxsplit=1)
+            vals = ret.setdefault(key, [])
+            vals.append(value)
+    return ret
+
+def _dictToDesc(descDict):
+    ret = []
+    for key, value in six.iteritems(descDict):
+        ret.append('{0}={1}'.format(key, value))
+    return ret
+
 def searchByURI(uri):
     """Perform a search based on an RFC4516 URI and return an iterator over search results
 
@@ -1085,7 +1134,7 @@ def searchByURI(uri):
     parsedURI = LDAPURI(uri)
     ldap = LDAP(parsedURI.hostURI, reuseConnection=False)
     for obj in ldap.search(parsedURI.DN, parsedURI.scope, filterStr=parsedURI.filter,
-        attrList=parsedURI.attrList):
+        attrs=parsedURI.attrs):
         yield obj
     ldap.unbind()
 
@@ -1094,7 +1143,7 @@ def searchByURIAll(uri):
     parsedURI = LDAPURI(uri)
     ldap = LDAP(parsedURI.hostURI, reuseConnection=False)
     ret = ldap.searchAll(parsedURI.DN, parsedURI.scope, filterStr=parsedURI.filter,
-        attrList=parsedURI.attrList)
+        attrs=parsedURI.attrs)
     ldap.unbind()
     return ret
 
@@ -1106,7 +1155,7 @@ class LDAPURI(object):
      * netloc   - urlparse standard
      * hostURI  - scheme://netloc for use with LDAPSocket
      * DN       - string
-     * attrList - list
+     * attrs    - list
      * scope    - one of the Scope.* constants
      * filter   - string
      * Extensions not yet implemented
@@ -1120,9 +1169,9 @@ class LDAPURI(object):
         params = parsedURI.query.split('?')
         nparams = len(params)
         if (nparams > 0) and (len(params[0]) > 0):
-            self.attrList = params[0].split(',')
+            self.attrs = params[0].split(',')
         else:
-            self.attrList = [LDAP.ALL_USER_ATTRS]
+            self.attrs = [LDAP.ALL_USER_ATTRS]
         if (nparams > 1) and (len(params[1]) > 0):
             self.scope = Scope.string(params[1])
         else:
