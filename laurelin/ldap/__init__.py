@@ -18,6 +18,7 @@ __all__ = [
     'LDAPError',
 ]
 
-from .base import LDAP, LDAP_rw, LDAPObject, Scope, DerefAliases, searchByURI
+from .base import LDAP, LDAP_rw, LDAPObject, Scope, DerefAliases
 from .modify import Mod, Modlist, AddModlist, DeleteModlist, ReplaceModlist
 from .errors import LDAPError, NoSearchResults
+from .ldapuri import searchByURI, searchByURIAll

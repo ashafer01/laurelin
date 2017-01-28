@@ -117,6 +117,8 @@ def ReplaceModlist(*args):
     attrsDict = args[-1]
     return Modlist(Mod.REPLACE, attrsDict)
 
+## Implementation of modify operations with dicts
+
 def dictModAdd(toDict, attrsDict):
     """Implements the "add" modification, adding attributes from attrsDict to toDict"""
     for attr, vals in six.iteritems(attrsDict):
