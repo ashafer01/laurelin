@@ -47,7 +47,15 @@ from .rfc4511 import (
 from .filter import parse as parseFilter
 from .net import LDAPSocket, LDAPConnectionError
 from .errors import *
-from .modify import Mod, Modlist, AddModlist, DeleteModlist
+from .modify import (
+    Mod,
+    Modlist,
+    AddModlist,
+    DeleteModlist,
+    dictModAdd,
+    dictModReplace,
+    dictModDelete,
+)
 import six
 from six.moves import range
 from six.moves.urllib.parse import urlparse
@@ -811,6 +819,7 @@ class LDAP_rw(LDAP):
         else:
             raise ValueError('changetype {0} unknown/not yet implemented'.format(changetype))
 
+
 class LDAPObject(dict, Extensible):
     """Represents a single object and provides a variety of methods specific to the object
 
@@ -829,6 +838,7 @@ class LDAPObject(dict, Extensible):
         self.ldapConn = ldapConn
         self.relativeSearchScope = relativeSearchScope
         self.rdnAttr = rdnAttr
+        self._unstructuredDesc = set()
         dict.__init__(self, attrs)
 
     def __repr__(self):
@@ -923,17 +933,18 @@ class LDAPObject(dict, Extensible):
             self.refresh(['objectClass'])
         return (objectClass in self['objectClass'])
 
-    # update the server with the local attributes dictionary
     def commit(self):
+        """update the server with the local attributes dictionary"""
         if isinstance(self.ldapConn, LDAP_rw):
             self.ldapConn.replaceAttrs(self.dn, self)
             self._removeEmptyAttrs()
         else:
             raise RuntimeError('No LDAP_rw object')
 
-    # clean any 0-length attributes from the local dictionary so as to match the server
-    # called automatically after writing to the server
     def _removeEmptyAttrs(self):
+        """clean any 0-length attributes from the local dictionary so as to match the server
+         called automatically after writing to the server
+        """
         for attr in self.keys():
             if len(self[attr]) == 0:
                 del self[attr]
@@ -953,13 +964,13 @@ class LDAPObject(dict, Extensible):
                 raise ValueError('Invalid mod op')
 
     def addAttrs_local(self, attrsDict):
-        _addAttrs(self, attrsDict)
+        dictModAdd(self, attrsDict)
 
     def replaceAttrs_local(self, attrsDict):
-        _replaceAttrs(self, attrsDict)
+        dictModReplace(self, attrsDict)
 
     def deleteAttrValues_local(self, attrsDict):
-        _deleteAttrValues(self, attrsDict)
+        dictModDelete(self, attrsDict)
 
     def deleteAttrs_local(self, attrs):
         self.deleteAttrValues_local(dict.fromkeys(attrs, []))
@@ -1020,8 +1031,10 @@ class LDAPObject(dict, Extensible):
         else:
             raise RuntimeError('No LDAP_rw object')
 
-    # delete the object
+    ## online-only object-level methods
+
     def delete(self):
+        """delete the entire object from the server, and render this instance useless"""
         if isinstance(self.ldapConn, LDAP_rw):
             self.ldapConn.delete(self.dn)
             self.clear()
@@ -1031,8 +1044,8 @@ class LDAPObject(dict, Extensible):
         else:
             raise RuntimeError('No LDAP_rw object')
 
-    # change object DN
     def modDN(self, newRDN, cleanAttr=True, newParent=None):
+        """change the object DN, and possibly its location in the tree"""
         if isinstance(self.ldapConn, LDAP_rw):
             curRDN, curParent = self.dn.split(',', 1)
             if newParent is None:
@@ -1045,7 +1058,7 @@ class LDAPObject(dict, Extensible):
                 try:
                     self[rdnAttr].remove(rdnVal)
                     self._removeEmptyAttrs()
-                except:
+                except Exception:
                     pass
             rdnAttr, rdnVal = newRDN.split('=', 1)
             if rdnAttr not in self:
@@ -1064,66 +1077,40 @@ class LDAPObject(dict, Extensible):
         newRDN, newParent = newDN.split(',', 1)
         return self.modDN(newRDN, cleanAttr, newParent)
 
-    # these methods implement the common pattern of storing arbitrary key=value data in
-    # description fields
+    ## structured description field methods
+    ## these implement the common pattern of storing arbitrary key=value data in description fields
 
     def descAttrs(self):
         self.refreshMissing(['description'])
-        return _parseDescAttrs(self['description'])
+        ret = {}
+        for desc in self.get('description', []):
+            if DESC_ATTR_DELIM in desc:
+                key, value = desc.split(DESC_ATTR_DELIM, maxsplit=1)
+                vals = ret.setdefault(key, [])
+                vals.append(value)
+            else:
+                self._unstructuredDesc.add(desc)
+        return ret
+
+    def _modifyDescAttrs(self, method, attrsDict):
+        descDict = self.descAttrs()
+        method(descDict, attrsDict)
+        descStrings = []
+        for key, values in six.iteritems(descDict):
+            for value in values:
+                descStrings.append(key + DESC_ATTR_DELIM + value)
+        self.replaceAttrs({'description':descStrings + list(self._unstructuredDesc)})
+        self._unstructuredDesc = set()
 
     def addDescAttrs(self, attrsDict):
-        descDict = self.descAttrs()
-        _addAttrs(descDict, attrsDict)
-        self.replaceAttrs({'description':_dictToDesc(descDict)})
+        self._modifyDescAttrs(dictModAdd, attrsDict)
 
     def replaceDescAttrs(self, attrsDict):
-        descDict = self.descAttrs()
-        _replaceAttrs(descDict, attrsDict)
-        self.replaceAttrs({'description':_dictToDesc(descDict)})
+        self._modifyDescAttrs(dictModReplace, attrsDict)
 
-    def deleteDescAttrs(self, attrsDict):
-        descDict = self.descAttrs()
-        _deleteAttrValues(descDict, attrsDict)
-        self.replaceAttrs({'description':_dictToDesc(descDict)})
+    def deleteDescAttrValues(self, attrsDict):
+        self._modifyDescAttrs(dictModDelete, attrsDict)
 
-def _addAttrs(toDict, attrsDict):
-    for attr, vals in six.iteritems(attrsDict):
-        if attr not in toDict:
-            toDict[attr] = vals
-        else:
-            for val in vals:
-                if val not in toDict[attr]:
-                    toDict[attr].append(val)
-
-def _replaceAttrs(toDict, attrsDict):
-    toDict.update(attrsDict)
-
-def _deleteAttrValues(fromDict, attrsDict):
-    for attr, vals in six.iteritems(attrsDict):
-        if attr in fromDict:
-            if len(vals) > 0:
-                for val in vals:
-                    try:
-                        fromDict[attr].remove(val)
-                    except Exception:
-                        pass
-            else:
-                fromDict[attr] = []
-
-def _parseDescAttrs(descList):
-    ret = {}
-    for desc in descList:
-        if DESC_ATTR_DELIM in desc:
-            key, value = desc.split(DESC_ATTR_DELIM, maxsplit=1)
-            vals = ret.setdefault(key, [])
-            vals.append(value)
-    return ret
-
-def _dictToDesc(descDict):
-    ret = []
-    for key, value in six.iteritems(descDict):
-        ret.append('{0}={1}'.format(key, value))
-    return ret
 
 def searchByURI(uri):
     """Perform a search based on an RFC4516 URI and return an iterator over search results

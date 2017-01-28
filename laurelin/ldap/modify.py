@@ -116,3 +116,34 @@ def ReplaceModlist(*args):
     """
     attrsDict = args[-1]
     return Modlist(Mod.REPLACE, attrsDict)
+
+def dictModAdd(toDict, attrsDict):
+    """Implements the "add" modification, adding attributes from attrsDict to toDict"""
+    for attr, vals in six.iteritems(attrsDict):
+        if attr not in toDict:
+            toDict[attr] = vals
+        else:
+            for val in vals:
+                if val not in toDict[attr]:
+                    toDict[attr].append(val)
+
+def dictModReplace(toDict, attrsDict):
+    """Implements the "replace" modification, replacing attribute values in toDict with those from
+     attrsDict
+    """
+    toDict.update(attrsDict)
+
+def dictModDelete(toDict, attrsDict):
+    """Implements the "delete" modification, deleting attribute values from toDict that appear in
+     attrsDict
+    """
+    for attr, vals in six.iteritems(attrsDict):
+        if attr in toDict:
+            if len(vals) > 0:
+                for val in vals:
+                    try:
+                        toDict[attr].remove(val)
+                    except Exception:
+                        pass
+            else:
+                toDict[attr] = []
