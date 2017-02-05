@@ -891,7 +891,6 @@ class LDAPObject(dict, Extensible):
     def refresh(self, attrs=None):
         if isinstance(self.ldapConn, LDAP):
             self.update(self.ldapConn.get(self.dn, attrs))
-            return True
         else:
             raise RuntimeError('No LDAP object')
 
@@ -902,7 +901,6 @@ class LDAPObject(dict, Extensible):
                 missingAttrs.append(attr)
         if len(missingAttrs) > 0:
             self.refresh(missingAttrs)
-        return True
 
     def commit(self):
         """update the server with the local attributes dictionary"""
@@ -966,7 +964,6 @@ class LDAPObject(dict, Extensible):
                 self.refreshMissing(list(attrsDict.keys()))
             self.ldapConn.addAttrs(self.dn, attrsDict, current=self)
             self.addAttrs_local(attrsDict)
-            return True
         else:
             raise RuntimeError('No LDAP object')
 
@@ -975,7 +972,6 @@ class LDAPObject(dict, Extensible):
             self.ldapConn.replaceAttrs(self.dn, attrsDict)
             self.replaceAttrs_local(attrsDict)
             self._removeEmptyAttrs()
-            return True
         else:
             raise RuntimeError('No LDAP object')
 
@@ -986,7 +982,6 @@ class LDAPObject(dict, Extensible):
             self.ldapConn.deleteAttrs(self.dn, attrsDict, current=self)
             self.deleteAttrs_local(attrsDict)
             self._removeEmptyAttrs()
-            return True
         else:
             raise RuntimeError('No LDAP object')
 
@@ -999,7 +994,6 @@ class LDAPObject(dict, Extensible):
             self.clear()
             self.dn = None
             self.ldapConn = None
-            return True
         else:
             raise RuntimeError('No LDAP object')
 
@@ -1025,7 +1019,6 @@ class LDAPObject(dict, Extensible):
             elif rdnVal not in self[rdnAttr]:
                 self[rdnAttr].append(rdnVal)
             self.dn = '{0},{1}'.format(newRDN, parent)
-            return True
         else:
             raise RuntimeError('No LDAP object')
 
