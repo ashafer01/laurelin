@@ -56,9 +56,9 @@ from .modify import (
     dictModReplace,
     dictModDelete,
 )
-from .ldapuri import SearchReferenceHandle
 import six
 from six.moves import range
+from six.moves.urllib.parse import urlparse
 
 logger = logging.getLogger('laurelin.ldap')
 stderrHandler = logging.StreamHandler()
@@ -68,6 +68,16 @@ logger.setLevel(logging.DEBUG)
 
 # this delimits key from value in structured description fields
 DESC_ATTR_DELIM = '='
+
+def _unpack(op, ldapMessage):
+    """Unpack an object from an LDAPMessage envelope"""
+    mID = ldapMessage.getComponentByName('messageID')
+    po = ldapMessage.getComponentByName('protocolOp')
+    ret = po.getComponentByName(op)
+    if ret is not None:
+        return mID, ret
+    else:
+        raise UnexpectedResponseType()
 
 class Scope:
     """Scope constants
@@ -97,6 +107,7 @@ class Scope:
         else:
             raise ValueError()
 
+
 class DerefAliases:
     """DerefAliases constants
 
@@ -113,6 +124,7 @@ class DerefAliases:
     BASE = _DerefAliases('derefFindingBaseObj')
     ALWAYS = _DerefAliases('derefAlways')
 
+
 class Extensible(object):
     @classmethod
     def EXTEND(cls, methods):
@@ -126,6 +138,7 @@ class Extensible(object):
             else:
                 raise LDAPExtensionError('Cannot add extension attribute {0} - class {1} already '
                     'has an attribute by that name'.format(name, cls.__name__))
+
 
 # for storing reusable sockets
 _sockets = {}
@@ -1080,12 +1093,96 @@ class LDAPObject(dict, Extensible):
         self._modifyDescAttrs(dictModDelete, attrsDict)
 
 
-def _unpack(op, ldapMessage):
-    """Unpack an object from an LDAPMessage envelope"""
-    mID = ldapMessage.getComponentByName('messageID')
-    po = ldapMessage.getComponentByName('protocolOp')
-    ret = po.getComponentByName(op)
-    if ret is not None:
-        return mID, ret
-    else:
-        raise UnexpectedResponseType()
+class LDAPURI(object):
+    """Represents a parsed LDAP URI as specified in RFC4516
+
+     Attributes:
+     * scheme   - urlparse standard
+     * netloc   - urlparse standard
+     * hostURI  - scheme://netloc for use with LDAPSocket
+     * DN       - string
+     * attrs    - list
+     * scope    - one of the Scope.* constants
+     * filter   - string
+     * Extensions not yet implemented
+    """
+    def __init__(self, uri):
+        parsedURI = urlparse(uri)
+        self.scheme = parsedURI.scheme
+        self.netloc = parsedURI.netloc
+        self.hostURI = '{0}://{1}'.format(self.scheme, self.netloc)
+        self.DN = parsedURI.path
+        params = parsedURI.query.split('?')
+        nparams = len(params)
+        if (nparams > 0) and (len(params[0]) > 0):
+            self.attrs = params[0].split(',')
+        else:
+            self.attrs = [LDAP.ALL_USER_ATTRS]
+        if (nparams > 1) and (len(params[1]) > 0):
+            self.scope = Scope.string(params[1])
+        else:
+            self.scope = Scope.BASE
+        if (nparams > 2) and (len(params[2]) > 0):
+            self.filter = params[2]
+        else:
+            self.filter = LDAP.DEFAULT_FILTER
+        if (nparams > 3) and (len(params[3]) > 0):
+            raise LDAPError('Extensions for LDAPURI not yet implemented')
+
+    def search(self, ldapConn):
+        if not isinstnce(ldapConn, LDAP):
+            raise TypeError('ldapConn must be LDAP instance')
+        return ldapConn.search(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
+
+    def searchAll(self, ldapConn):
+        if not isinstnce(ldapConn, LDAP):
+            raise TypeError('ldapConn must be LDAP instance')
+        return ldapConn.searchAll(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
+
+
+class SearchReferenceHandle(object):
+    """Returned when the server returns a SearchResultReference"""
+    def __init__(self, ldapConn, URIs):
+        self.URIs = URIs
+        self.ldapConn = ldapConn
+        self._resultIter = None
+        self._resultList = None
+
+    def fetch(self):
+        """Perform the reference search and return an iterator over results
+
+         Each handle will only create one iterator for its results
+        """
+        if self._resultIter is None:
+            # If multiple URIs are present, the client assumes that any supported URI
+            # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
+            for uri in self.URIs:
+                try:
+                    self._resultIter = uri.search(self.ldapConn)
+                    break
+                except LDAPConnectionError as e:
+                    warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
+            if self._resultIter is None:
+                raise LDAPError('Could not complete reference URI search with any supplied URIs')
+        return self._resultIter
+
+    def fetchAll(self):
+        """Fetch all reference search results into a list
+
+         If fetch() was called prior to this, then all remaining results on the iterator will be
+         fetched into a list and returned.
+        """
+        if self._resultIter is not None and self._resultList is None:
+            self._resultList = []
+            for o in self._resultIter:
+                self._resultList.append(o)
+        if self._resultList is None:
+            for uri in self.URIs:
+                try:
+                    self._resultList = uri.searchAll(self.ldapConn)
+                    break
+                except LDAPConnectionError as e:
+                    warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
+            if self._resultIter is None:
+                raise LDAPError('Could not complete reference URI search with any supplied URIs')
+        return self._resultList
