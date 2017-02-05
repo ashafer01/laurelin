@@ -22,3 +22,6 @@ from .base import LDAP, LDAP_rw, LDAPObject, Scope, DerefAliases
 from .modify import Mod, Modlist, AddModlist, DeleteModlist, ReplaceModlist
 from .errors import LDAPError, NoSearchResults
 from .ldapuri import searchByURI, searchByURIAll
+
+def dc(domain):
+    return ','.join(['dc={0}'.format(dc) for dc in domain.split('.')])

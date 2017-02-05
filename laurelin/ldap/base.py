@@ -153,7 +153,7 @@ class LDAP(Extensible):
     ALL_USER_ATTRS = '*'
 
     def __init__(self, connectTo,
-        baseDC=None,
+        baseDN=None,
         reuseConnection=DEFAULT_REUSE_CONNECTION,
         connectTimeout=DEFAULT_CONNECT_TIMEOUT,
         searchTimeout=DEFAULT_SEARCH_TIMEOUT,
@@ -194,38 +194,38 @@ class LDAP(Extensible):
             else:
                 self.sock = LDAPSocket(*socketParams)
             logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
-            if baseDC is not None:
-                for dcpart in baseDC.split(','):
-                    if not dcpart.startswith('dc='):
-                        raise ValueError('Invalid base domain component')
-                self.baseDC = baseDC
+            if baseDN is not None:
+                self.baseDN = baseDN
             else:
-                logger.debug('Querying server to find baseDC')
+                logger.debug('Querying server to find baseDN')
                 o = self.get('', ['namingContexts', 'defaultNamingContext'])
-                self.baseDC = None
+                self.baseDN = None
                 if 'defaultNamingContext' in o:
-                    self.baseDC = o['defaultNamingContext'][0]
+                    self.baseDN = o['defaultNamingContext'][0]
                 else:
-                    for nc in o.get('namingContexts', []):
-                        if nc.startswith('dc='):
-                            if self.baseDC is None:
-                                self.baseDC = nc
-                            else:
-                                raise RuntimeError('Server supplied multiple dc namingContexts, '
-                                    'baseDC must be provided')
-                if self.baseDC is None:
-                    raise RuntimeError('No baseDC supplied and none found from server')
+                    ncs = o.getAttr('namingContexts')
+                    n = len(ncs)
+                    if n == 0:
+                        raise RuntimeError('Server did not supply any namingContexts, baseDN must '
+                            'be provided')
+                    elif n == 1:
+                        self.baseDN = ncs[0]
+                    else:
+                        raise RuntimeError('Server supplied multiple namingContexts, baseDN must be'
+                            ' provided')
+                if self.baseDN is None:
+                    raise RuntimeError('No baseDN supplied and none found from server')
         elif isinstance(connectTo, LDAP):
             self.hostURI = connectTo.hostURI
             self.sock = connectTo.sock
-            self.baseDC = connectTo.baseDC
+            self.baseDN = connectTo.baseDN
             logger.info('Connected to {0} (#{1}) from existing object'.format(
                 self.hostURI, self.sock.ID))
         else:
             raise TypeError('Must supply URI string or LDAP instance for connectTo')
 
-        logger.debug('Creating base object for {0}'.format(self.baseDC))
-        self.base = self.obj(self.baseDC, relativeSearchScope=Scope.SUBTREE)
+        logger.debug('Creating base object for {0}'.format(self.baseDN))
+        self.base = self.obj(self.baseDN, relativeSearchScope=Scope.SUBTREE)
 
     def simpleBind(self, username='', password=''):
         """Performs a simple bind operation
@@ -258,7 +258,7 @@ class LDAP(Extensible):
         if self._saslMechs is None:
             logger.debug('Querying server to find supported SASL mechs')
             o = self.get('', ['supportedSASLMechanisms'])
-            self._saslMechs = o.get('supportedSASLMechanisms', [])
+            self._saslMechs = o.getAttr('supportedSASLMechanisms')
             logger.debug('Server supported SASL mechs = {0}'.format(','.join(self._saslMechs)))
         return self._saslMechs
 
@@ -504,7 +504,6 @@ class LDAP(Extensible):
         mID = self._sendSearch(*args, **kwds)
         return self._searchResults(mID, fetchResultRefs)
 
-    # send a compare request
     def _sendCompare(self, DN, attr, value):
         """Send a compare request and return internal message ID"""
         if self.sock.unbound:
@@ -732,13 +731,11 @@ class LDAP_rw(LDAP):
             modlist = Modlist(Mod.ADD, attrsDict)
         return self.modify(DN, modlist)
 
-    def deleteAttrValues(self, DN, attrsDict, current=None):
+    def deleteAttrs(self, DN, attrsDict, current=None):
         """Delete specific attribute values from dictionary
 
          Specifying a 0-length entry will delete all values
         """
-        if not isinstance(attrsDict, dict):
-            raise TypeError('attrsDict must be dict')
         if current is not None:
             modlist = DeleteModlist(current, attrsDict)
         elif not self.strictModify:
@@ -747,21 +744,6 @@ class LDAP_rw(LDAP):
         else:
             modlist = Modlist(Mod.DELETE, attrsDict)
         return self.modify(DN, modlist)
-
-    def deleteAttrs(self, DN, attrs, current=None):
-        """Delete attributes
-
-         * Accepts a list of attribute names, or a single attribute name for which to delete all
-           values
-         * If a dict is passed, it is passed directly into deleteAttrValues
-        """
-        if isinstance(attrs, list):
-            attrs = dict.fromkeys(attrs, [])
-        elif isinstance(attrs, six.string_types):
-            attrs = {attrs: []}
-        elif not isinstance(attrs, dict):
-            raise TypeError('attrs must be list, dict, or string type')
-        return self.deleteAttrValues(DN, attrs, current)
 
     def replaceAttrs(self, DN, attrsDict):
         """Replace all values on given attributes with the passed values
@@ -883,6 +865,9 @@ class LDAPObject(dict, Extensible):
 
     ## object-specific methods
 
+    def getAttr(self, attr):
+        return self.get(attr, [])
+
     def iterattrs(self):
         for attr, vals in six.iteritems(self):
             for val in vals:
@@ -891,9 +876,8 @@ class LDAPObject(dict, Extensible):
     def deepcopy(self):
         ret = {}
         for attr, val in self.iterattrs():
-            if attr not in ret:
-                ret[attr] = []
-            ret[attr].append(val)
+            attrs = ret.setdefault(attr, [])
+            attrs.append(val)
         return ret
 
     def formatLDIF(self):
@@ -959,7 +943,7 @@ class LDAPObject(dict, Extensible):
             elif mod.op == Mod.REPLACE:
                 self.replaceAttrs_local({mod.attr: mod.vals})
             elif mod.op == Mod.DELETE:
-                self.deleteAttrValues_local({mod.attr: mod.vals})
+                self.deleteAttrs_local({mod.attr: mod.vals})
             else:
                 raise ValueError('Invalid mod op')
 
@@ -969,11 +953,8 @@ class LDAPObject(dict, Extensible):
     def replaceAttrs_local(self, attrsDict):
         dictModReplace(self, attrsDict)
 
-    def deleteAttrValues_local(self, attrsDict):
+    def deleteAttrs_local(self, attrsDict):
         dictModDelete(self, attrsDict)
-
-    def deleteAttrs_local(self, attrs):
-        self.deleteAttrValues_local(dict.fromkeys(attrs, []))
 
     ## online modify methods
     ## these call the LDAP_rw methods of the same name, passing the object's DN as the first
@@ -1007,25 +988,12 @@ class LDAPObject(dict, Extensible):
         else:
             raise RuntimeError('No LDAP_rw object')
 
-    def deleteAttrValues(self, attrsDict):
+    def deleteAttrs(self, attrsDict):
         if isinstance(self.ldapConn, LDAP_rw):
             if not self.ldapConn.strictModify:
                 self.refreshMissing(list(attrsDict.keys()))
-            self.ldapConn.deleteAttrValues(self.dn, attrsDict, current=self)
-            self.deleteAttrValues_local(attrsDict)
-            self._removeEmptyAttrs()
-            return True
-        else:
-            raise RuntimeError('No LDAP_rw object')
-
-    def deleteAttrs(self, attrs):
-        if isinstance(self.ldapConn, LDAP_rw):
-            if not isinstance(attrs, list):
-                attrs = [attrs]
-            if not self.ldapConn.strictModify:
-                self.refreshMissing(attrs)
-            self.ldapConn.deleteAttrs(self.dn, attrs, current=self)
-            self.deleteAttrs_local(attrs)
+            self.ldapConn.deleteAttrs(self.dn, attrsDict, current=self)
+            self.deleteAttrs_local(attrsDict)
             self._removeEmptyAttrs()
             return True
         else:
@@ -1083,7 +1051,8 @@ class LDAPObject(dict, Extensible):
     def descAttrs(self):
         self.refreshMissing(['description'])
         ret = {}
-        for desc in self.get('description', []):
+        self._unstructuredDesc = set()
+        for desc in self.getAttr('description'):
             if DESC_ATTR_DELIM in desc:
                 key, value = desc.split(DESC_ATTR_DELIM, maxsplit=1)
                 vals = ret.setdefault(key, [])
@@ -1100,7 +1069,6 @@ class LDAPObject(dict, Extensible):
             for value in values:
                 descStrings.append(key + DESC_ATTR_DELIM + value)
         self.replaceAttrs({'description':descStrings + list(self._unstructuredDesc)})
-        self._unstructuredDesc = set()
 
     def addDescAttrs(self, attrsDict):
         self._modifyDescAttrs(dictModAdd, attrsDict)

@@ -59,7 +59,7 @@ def Modlist(op, attrsDict):
     """Generate a modlist from a dictionary"""
 
     if not isinstance(attrsDict, dict):
-        raise TypeError()
+        raise TypeError('attrsDict must be dict')
     modlist = []
     for attr, vals in six.iteritems(attrsDict):
         modlist.append(Mod(op, attr, vals))
