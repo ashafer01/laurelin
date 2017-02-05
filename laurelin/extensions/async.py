@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from laurelin.ldap.base import LDAP, LDAP_rw, LDAPObject
+from laurelin.ldap.base import LDAP, LDAPObject
 from laurelin.ldap.modify import Mod, Modlist
 from laurelin.ldap.errors import LDAPError, ConnectionUnbound
 from laurelin.ldap.rfc4511 import AbandonRequest
@@ -14,13 +14,6 @@ def search_async(self, *args, **kwds):
 def compare_async(self, *args):
     mID = self._sendCompare(*args)
     return AsyncCompareHandle(self, mID)
-
-LDAP.EXTEND([
-    search_async,
-    compare_async,
-])
-
-## LDAP_rw extension methods
 
 def add_async(self, DN, attrs):
     mID = self._sendAdd(DN, attrs)
@@ -48,7 +41,9 @@ def deleteAttrs_async(self, DN, attrs):
 def replaceAttrs_async(self, DN, attrsDict):
     return self.modify_async(DN, Modlist(Mod.REPLACE, attrsDict))
 
-LDAP_rw.EXTEND([
+LDAP.EXTEND([
+    search_async,
+    compare_async,
     add_async,
     delete_async,
     modify_async,

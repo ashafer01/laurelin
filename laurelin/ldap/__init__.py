@@ -3,7 +3,7 @@
 Imports base objects for user import and defines user utility functions
 """
 
-from .base import LDAP, LDAP_rw, LDAPObject, Scope, DerefAliases, LDAPURI
+from .base import LDAP, LDAPObject, Scope, DerefAliases, LDAPURI
 from .errors import LDAPError, NoSearchResults
 
 def dc(domain):

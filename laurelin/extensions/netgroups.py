@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 import re
-from laurelin.ldap import LDAP, LDAP_rw, LDAPObject, LDAPError
+from laurelin.ldap import LDAP, LDAPObject, LDAPError
 import six
 
 TAG = 'netgroup_base'
@@ -31,15 +31,6 @@ def getNetgroupHosts(self, cn, recursive=True):
             users += self.getNetgroupHosts(member, True)
     return users
 
-LDAP.EXTEND([
-    getNetgroup,
-    netgroupSearch,
-    getNetgroupUsers,
-    getNetgroupHosts,
-])
-
-## LDAP_rw extension methods
-
 def addNetgroupUsers(self, DN, members, domain=''):
     if not isinstance(members, list):
         members = [members]
@@ -50,7 +41,11 @@ def addNetgroupHosts(self, DN, members, domain=''):
         members = [members]
     self.addAttrs(DN, _memberHostListToAttrs(members, domain))
 
-LDAP_rw.EXTEND([
+LDAP.EXTEND([
+    getNetgroup,
+    netgroupSearch,
+    getNetgroupUsers,
+    getNetgroupHosts,
     addNetgroupUsers,
     ('addNetgroupUser', addNetgroupUsers),
     addNetgroupHosts,

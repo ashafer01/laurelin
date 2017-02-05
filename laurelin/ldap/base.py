@@ -1,9 +1,4 @@
-"""Contains base classes for laurelin.ldap
-
-* LDAP
-* LDAP_rw
-* LDAPObject
-"""
+"""Contains base classes for laurelin.ldap"""
 
 from __future__ import absolute_import
 import logging
@@ -61,6 +56,8 @@ from six.moves import range
 from six.moves.urllib.parse import urlparse
 
 logger = logging.getLogger('laurelin.ldap')
+
+# TODO don't configure the logger by default
 stderrHandler = logging.StreamHandler()
 stderrHandler.setFormatter(logging.Formatter('[%(asctime)s] %(name)s %(levelname)s : %(message)s'))
 logger.addHandler(stderrHandler)
@@ -560,10 +557,6 @@ class LDAP(Extensible):
             return True
         else:
             raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
-
-
-class LDAP_rw(LDAP):
-    """Contains all methods that perform write operations on the LDAP DB"""
 
     def _sendAdd(self, DN, attrsDict):
         """Send an add request and return internal message ID"""
@@ -1067,7 +1060,7 @@ class LDAPObject(dict, Extensible):
         self._unstructuredDesc = set()
         for desc in self.getAttr('description'):
             if DESC_ATTR_DELIM in desc:
-                key, value = desc.split(DESC_ATTR_DELIM, maxsplit=1)
+                key, value = desc.split(DESC_ATTR_DELIM, 1)
                 vals = ret.setdefault(key, [])
                 vals.append(value)
             else:
@@ -1075,13 +1068,16 @@ class LDAPObject(dict, Extensible):
         return ret
 
     def _modifyDescAttrs(self, method, attrsDict):
-        descDict = self.descAttrs()
-        method(descDict, attrsDict)
-        descStrings = []
-        for key, values in six.iteritems(descDict):
-            for value in values:
-                descStrings.append(key + DESC_ATTR_DELIM + value)
-        self.replaceAttrs({'description':descStrings + list(self._unstructuredDesc)})
+        if isinstance(self.ldapConn, LDAP_rw):
+            descDict = self.descAttrs()
+            method(descDict, attrsDict)
+            descStrings = []
+            for key, values in six.iteritems(descDict):
+                for value in values:
+                    descStrings.append(key + DESC_ATTR_DELIM + value)
+            self.replaceAttrs({'description':descStrings + list(self._unstructuredDesc)})
+        else:
+            raise RuntimeError('No LDAP_rw object')
 
     def addDescAttrs(self, attrsDict):
         self._modifyDescAttrs(dictModAdd, attrsDict)
@@ -1089,7 +1085,7 @@ class LDAPObject(dict, Extensible):
     def replaceDescAttrs(self, attrsDict):
         self._modifyDescAttrs(dictModReplace, attrsDict)
 
-    def deleteDescAttrValues(self, attrsDict):
+    def deleteDescAttrs(self, attrsDict):
         self._modifyDescAttrs(dictModDelete, attrsDict)
 
 
