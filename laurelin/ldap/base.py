@@ -141,7 +141,7 @@ class Extensible(object):
 _sockets = {}
 
 class LDAP(Extensible):
-    """Provides the basic connection to the LDAP DB and read-only methods"""
+    """Provides the connection to the LDAP DB"""
 
     # global defaults
     DEFAULT_FILTER = '(objectClass=*)'
@@ -223,8 +223,6 @@ class LDAP(Extensible):
                     else:
                         raise RuntimeError('Server supplied multiple namingContexts, baseDN must be'
                             ' provided')
-                if self.baseDN is None:
-                    raise RuntimeError('No baseDN supplied and none found from server')
         elif isinstance(connectTo, LDAP):
             self.hostURI = connectTo.hostURI
             self.sock = connectTo.sock
@@ -925,11 +923,11 @@ class LDAPObject(dict, Extensible):
 
     def commit(self):
         """update the server with the local attributes dictionary"""
-        if isinstance(self.ldapConn, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP):
             self.ldapConn.replaceAttrs(self.dn, self)
             self._removeEmptyAttrs()
         else:
-            raise RuntimeError('No LDAP_rw object')
+            raise RuntimeError('No LDAP object')
 
     def _removeEmptyAttrs(self):
         """clean any 0-length attributes from the local dictionary so as to match the server
@@ -963,39 +961,39 @@ class LDAPObject(dict, Extensible):
         dictModDelete(self, attrsDict)
 
     ## online modify methods
-    ## these call the LDAP_rw methods of the same name, passing the object's DN as the first
+    ## these call the LDAP methods of the same name, passing the object's DN as the first
     ## argument, then call the matching local modify method after a successful request to the
     ## server
 
     def modify(self, modlist):
-        if isinstance(self.ldapConn, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP):
             self.ldapConn.modify(self.dn, modlist)
             self.modify_local(modlist)
             self._removeEmptyAttrs()
         else:
-            raise RuntimeError('No LDAP_rw object')
+            raise RuntimeError('No LDAP object')
 
     def addAttrs(self, attrsDict):
-        if isinstance(self.ldapConn, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP):
             if not self.ldapConn.strictModify:
                 self.refreshMissing(list(attrsDict.keys()))
             self.ldapConn.addAttrs(self.dn, attrsDict, current=self)
             self.addAttrs_local(attrsDict)
             return True
         else:
-            raise RuntimeError('No LDAP_rw object')
+            raise RuntimeError('No LDAP object')
 
     def replaceAttrs(self, attrsDict):
-        if isinstance(self.ldapConn, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP):
             self.ldapConn.replaceAttrs(self.dn, attrsDict)
             self.replaceAttrs_local(attrsDict)
             self._removeEmptyAttrs()
             return True
         else:
-            raise RuntimeError('No LDAP_rw object')
+            raise RuntimeError('No LDAP object')
 
     def deleteAttrs(self, attrsDict):
-        if isinstance(self.ldapConn, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP):
             if not self.ldapConn.strictModify:
                 self.refreshMissing(list(attrsDict.keys()))
             self.ldapConn.deleteAttrs(self.dn, attrsDict, current=self)
@@ -1003,24 +1001,24 @@ class LDAPObject(dict, Extensible):
             self._removeEmptyAttrs()
             return True
         else:
-            raise RuntimeError('No LDAP_rw object')
+            raise RuntimeError('No LDAP object')
 
     ## online-only object-level methods
 
     def delete(self):
         """delete the entire object from the server, and render this instance useless"""
-        if isinstance(self.ldapConn, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP):
             self.ldapConn.delete(self.dn)
             self.clear()
             self.dn = None
             self.ldapConn = None
             return True
         else:
-            raise RuntimeError('No LDAP_rw object')
+            raise RuntimeError('No LDAP object')
 
     def modDN(self, newRDN, cleanAttr=True, newParent=None):
         """change the object DN, and possibly its location in the tree"""
-        if isinstance(self.ldapConn, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP):
             curRDN, curParent = self.dn.split(',', 1)
             if newParent is None:
                 parent = curParent
@@ -1042,7 +1040,7 @@ class LDAPObject(dict, Extensible):
             self.dn = '{0},{1}'.format(newRDN, parent)
             return True
         else:
-            raise RuntimeError('No LDAP_rw object')
+            raise RuntimeError('No LDAP object')
 
     def rename(self, newRDN, cleanAttr=True):
         return self.modDN(newRDN, cleanAttr)
@@ -1068,7 +1066,7 @@ class LDAPObject(dict, Extensible):
         return ret
 
     def _modifyDescAttrs(self, method, attrsDict):
-        if isinstance(self.ldapConn, LDAP_rw):
+        if isinstance(self.ldapConn, LDAP):
             descDict = self.descAttrs()
             method(descDict, attrsDict)
             descStrings = []
@@ -1077,7 +1075,7 @@ class LDAPObject(dict, Extensible):
                     descStrings.append(key + DESC_ATTR_DELIM + value)
             self.replaceAttrs({'description':descStrings + list(self._unstructuredDesc)})
         else:
-            raise RuntimeError('No LDAP_rw object')
+            raise RuntimeError('No LDAP object')
 
     def addDescAttrs(self, attrsDict):
         self._modifyDescAttrs(dictModAdd, attrsDict)
