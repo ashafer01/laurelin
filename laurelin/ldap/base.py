@@ -877,19 +877,16 @@ class LDAPObject(dict, Extensible):
             for val in vals:
                 yield (attr, val)
 
-    def deepcopy(self):
-        ret = {}
-        for attr, val in self.iterattrs():
-            attrs = ret.setdefault(attr, [])
-            attrs.append(val)
-        return ret
-
     def formatLDIF(self):
         lines = ['dn: {0}'.format(self.dn)]
         for attr, val in self.iterattrs():
             lines.append('{0}: {1}'.format(attr, val))
         lines.append('')
         return '\n'.join(lines)
+
+    def hasObjectClass(self, objectClass):
+        self.refreshMissing(['objectClass'])
+        return (objectClass in self['objectClass'])
 
     def refresh(self, attrs=None):
         if isinstance(self.ldapConn, LDAP):
@@ -907,20 +904,6 @@ class LDAPObject(dict, Extensible):
             self.refresh(missingAttrs)
         return True
 
-    def compare(self, attr, value):
-        if attr in self:
-            logger.debug('Doing local compare for {0} ({1} = {2})'.format(self.dn, attr, value))
-            return (value in self[attr])
-        elif isinstance(self.ldapConn, LDAP):
-            return self.ldapConn.compare(self.dn, attr, value)
-        else:
-            raise RuntimeError('No LDAP object')
-
-    def hasObjectClass(self, objectClass):
-        if 'objectClass' not in self:
-            self.refresh(['objectClass'])
-        return (objectClass in self['objectClass'])
-
     def commit(self):
         """update the server with the local attributes dictionary"""
         if isinstance(self.ldapConn, LDAP):
@@ -937,6 +920,15 @@ class LDAPObject(dict, Extensible):
             if len(self[attr]) == 0:
                 del self[attr]
 
+    def compare(self, attr, value):
+        if attr in self:
+            logger.debug('Doing local compare for {0} ({1} = {2})'.format(self.dn, attr, value))
+            return (value in self.getAttr(attr))
+        elif isinstance(self.ldapConn, LDAP):
+            return self.ldapConn.compare(self.dn, attr, value)
+        else:
+            raise RuntimeError('No LDAP object')
+
     ## local modify methods
     ## accept same input as online versions, but only update the local attributes dictionary
 
@@ -951,14 +943,9 @@ class LDAPObject(dict, Extensible):
             else:
                 raise ValueError('Invalid mod op')
 
-    def addAttrs_local(self, attrsDict):
-        dictModAdd(self, attrsDict)
-
-    def replaceAttrs_local(self, attrsDict):
-        dictModReplace(self, attrsDict)
-
-    def deleteAttrs_local(self, attrsDict):
-        dictModDelete(self, attrsDict)
+    addAttrs_local = dictModAdd
+    replaceAttrs_local = dictModReplace
+    deleteAttrs_local = dictModDelete
 
     ## online modify methods
     ## these call the LDAP methods of the same name, passing the object's DN as the first
