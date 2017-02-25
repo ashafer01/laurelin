@@ -508,10 +508,10 @@ class LDAP(Extensible):
                     logger.debug('Got search result reference (ID {0}) to: {1}'.format(mID,
                         ' | '.join(URIs)))
                     if fetchResultRefs:
-                        for obj in SearchReferenceHandle(self, URIs).fetch():
+                        for obj in SearchReferenceHandle(URIs).fetch():
                             yield obj
                     else:
-                        yield SearchReferenceHandle(self, URIs)
+                        yield SearchReferenceHandle(URIs)
 
     def search(self, *args, **kwds):
         """Send search and iterate results until we get a SearchResultDone
@@ -1135,10 +1135,16 @@ class LDAPURI(object):
         if (nparams > 3) and (len(params[3]) > 0):
             raise LDAPError('Extensions for LDAPURI not yet implemented')
 
-    def search(self, ldapConn):
-        if not isinstnce(ldapConn, LDAP):
-            raise TypeError('ldapConn must be LDAP instance')
-        return ldapConn.search(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
+    def search(self):
+        """Perform the search operation described by the parsed URI
+
+         First opens a new connection with connection reuse disabled, then performs the search, and
+         unbinds the connection. Server must allow anonymous read.
+        """
+        ldap = LDAP(self.hostURI, reuseConnection=False)
+        ret = ldap.search(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
+        ldap.unbind()
+        return ret
 
     def __str__(self):
         return self._orig
@@ -1151,7 +1157,6 @@ class SearchReferenceHandle(object):
     """Returned when the server returns a SearchResultReference"""
     def __init__(self, ldapConn, URIs):
         self.URIs = URIs
-        self.ldapConn = ldapConn
 
     def fetch(self):
         """Perform the reference search and return an iterator over results"""
@@ -1160,7 +1165,7 @@ class SearchReferenceHandle(object):
         # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
         for uri in self.URIs:
             try:
-                return uri.search(self.ldapConn)
+                return uri.search()
             except LDAPConnectionError as e:
                 warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
         raise LDAPError('Could not complete reference URI search with any supplied URIs')

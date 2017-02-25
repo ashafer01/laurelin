@@ -1,6 +1,5 @@
 from getpass import getpass
 from laurelin.ldap import LDAP, Scope
-import laurelin.extensions.async
 
 l = LDAP('ldap://127.0.0.1')
 #l.simpleBind()
