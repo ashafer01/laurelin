@@ -66,6 +66,13 @@ logger.setLevel(logging.DEBUG)
 # this delimits key from value in structured description fields
 DESC_ATTR_DELIM = '='
 
+# Commonly reused protocol objects
+V3 = Version(3)
+EMPTY_DN = LDAPDN('')
+RESULT_saslBindInProgress = ResultCode('saslBindInProgress')
+RESULT_success = ResultCode('success')
+RESULT_noSuchObject = ResultCode('noSuchObject')
+
 def _unpack(op, ldapMessage):
     """Unpack an object from an LDAPMessage envelope"""
     mID = ldapMessage.getComponentByName('messageID')
@@ -246,7 +253,7 @@ class LDAP(Extensible):
             raise ConnectionAlreadyBound()
 
         br = BindRequest()
-        br.setComponentByName('version', Version(3))
+        br.setComponentByName('version', V3)
         br.setComponentByName('name', LDAPDN(username))
         ac = AuthenticationChoice()
         ac.setComponentByName('simple', SimpleCreds(password))
@@ -315,8 +322,8 @@ class LDAP(Extensible):
         challengeResponse = None
         while True:
             br = BindRequest()
-            br.setComponentByName('version', Version(3))
-            br.setComponentByName('name', LDAPDN(''))
+            br.setComponentByName('version', V3)
+            br.setComponentByName('name', EMPTY_DN)
             ac = AuthenticationChoice()
             sasl = SaslCredentials()
             sasl.setComponentByName('mechanism', six.text_type(self.sock.saslMech))
@@ -332,12 +339,12 @@ class LDAP(Extensible):
 
             mID, res = _unpack('bindResponse', self.sock.recvOne(mID))
             status = res.getComponentByName('resultCode')
-            if status == ResultCode('saslBindInProgress'):
+            if status == RESULT_saslBindInProgress:
                 challengeResponse = self.sock.saslProcessAuthChallenge(
                     six.text_type(res.getComponentByName('serverSaslCreds'))
                 )
                 continue
-            elif status == ResultCode('success'):
+            elif status == RESULT_success:
                 logger.info('SASL bind successful')
                 logger.debug('Negotiated SASL QoP = {0}'.format(self.sock.saslQoP))
                 self.sock.bound = True
@@ -475,7 +482,7 @@ class LDAP(Extensible):
                 try:
                     mID, resobj = _unpack('searchResDone', msg)
                     res = resobj.getComponentByName('resultCode')
-                    if res == ResultCode('success') or res == ResultCode('noSuchObject'):
+                    if res == RESULT_success or res == RESULT_noSuchObject:
                         logger.debug('Got all search results for ID {0}, result is {1}'.format(
                             mID, repr(res)
                         ))
@@ -550,7 +557,7 @@ class LDAP(Extensible):
         """Receive an object from the socket and raise an LDAPError if its not a success result"""
         mID, obj = _unpack(operation, self.sock.recvOne(messageID))
         res = obj.getComponentByName('resultCode')
-        if res == ResultCode('success'):
+        if res == RESULT_success:
             logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
             return True
         else:
@@ -806,11 +813,47 @@ class LDAP(Extensible):
             raise ValueError('changetype {0} unknown/not yet implemented'.format(changetype))
 
 
-class LDAPObject(dict, Extensible):
+class AttrsDict(dict):
+    """Stores attributes and provides utility methods without any server or object affinity"""
+
+    def __contains__(self, attr):
+        if dict.__contains__(self, attr):
+            return (len(self[attr]) > 0)
+        else:
+            return False
+
+    def getAttr(self, attr):
+        return self.get(attr, [])
+
+    def iterattrs(self):
+        for attr, vals in six.iteritems(self):
+            for val in vals:
+                yield (attr, val)
+
+    ## local modify methods
+    ## accept same input as online versions, but only update the local attributes dictionary
+
+    def modify_local(self, modlist):
+        for mod in modlist:
+            if mod.op == Mod.ADD:
+                self.addAttrs_local({mod.attr: mod.vals})
+            elif mod.op == Mod.REPLACE:
+                self.replaceAttrs_local({mod.attr: mod.vals})
+            elif mod.op == Mod.DELETE:
+                self.deleteAttrs_local({mod.attr: mod.vals})
+            else:
+                raise ValueError('Invalid mod op')
+
+    addAttrs_local = dictModAdd
+    replaceAttrs_local = dictModReplace
+    deleteAttrs_local = dictModDelete
+
+
+class LDAPObject(AttrsDict, Extensible):
     """Represents a single object and provides a variety of methods specific to the object
 
-     Attributes and values are stored using the mapping interface inherited from dict. Dict keys are
-     attribute names, and dict values are a list of attribute values.
+     Attributes and values are stored using the mapping interface inherited from AttrsDict. Dict
+     keys are attribute names, and dict values are a list of attribute values.
     """
 
     def __init__(self, dn,
@@ -825,16 +868,10 @@ class LDAPObject(dict, Extensible):
         self.relativeSearchScope = relativeSearchScope
         self.rdnAttr = rdnAttr
         self._unstructuredDesc = set()
-        dict.__init__(self, attrs)
+        AttrsDict.__init__(self, attrs)
 
     def __repr__(self):
-        return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, dict.__repr__(self))
-
-    def __contains__(self, attr):
-        if dict.__contains__(self, attr):
-            return (len(self[attr]) > 0)
-        else:
-            return False
+        return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))
 
     ## relative methods
 
@@ -869,14 +906,6 @@ class LDAPObject(dict, Extensible):
 
     ## object-specific methods
 
-    def getAttr(self, attr):
-        return self.get(attr, [])
-
-    def iterattrs(self):
-        for attr, vals in six.iteritems(self):
-            for val in vals:
-                yield (attr, val)
-
     def formatLDIF(self):
         lines = ['dn: {0}'.format(self.dn)]
         for attr, val in self.iterattrs():
@@ -910,14 +939,6 @@ class LDAPObject(dict, Extensible):
         else:
             raise RuntimeError('No LDAP object')
 
-    def _removeEmptyAttrs(self):
-        """clean any 0-length attributes from the local dictionary so as to match the server
-         called automatically after writing to the server
-        """
-        for attr in self.keys():
-            if len(self[attr]) == 0:
-                del self[attr]
-
     def compare(self, attr, value):
         if attr in self:
             logger.debug('Doing local compare for {0} ({1} = {2})'.format(self.dn, attr, value))
@@ -927,23 +948,13 @@ class LDAPObject(dict, Extensible):
         else:
             raise RuntimeError('No LDAP object')
 
-    ## local modify methods
-    ## accept same input as online versions, but only update the local attributes dictionary
-
-    def modify_local(self, modlist):
-        for mod in modlist:
-            if mod.op == Mod.ADD:
-                self.addAttrs_local({mod.attr: mod.vals})
-            elif mod.op == Mod.REPLACE:
-                self.replaceAttrs_local({mod.attr: mod.vals})
-            elif mod.op == Mod.DELETE:
-                self.deleteAttrs_local({mod.attr: mod.vals})
-            else:
-                raise ValueError('Invalid mod op')
-
-    addAttrs_local = dictModAdd
-    replaceAttrs_local = dictModReplace
-    deleteAttrs_local = dictModDelete
+    def _removeEmptyAttrs(self):
+        """clean any 0-length attributes from the local dictionary so as to match the server
+         called automatically after writing to the server
+        """
+        for attr in self.keys():
+            if len(self[attr]) == 0:
+                del self[attr]
 
     ## online modify methods
     ## these call the LDAP methods of the same name, passing the object's DN as the first
@@ -1034,7 +1045,7 @@ class LDAPObject(dict, Extensible):
 
     def descAttrs(self):
         self.refreshMissing(['description'])
-        ret = {}
+        ret = AttrsDict()
         self._unstructuredDesc = set()
         for desc in self.getAttr('description'):
             if DESC_ATTR_DELIM in desc:
