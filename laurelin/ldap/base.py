@@ -38,6 +38,7 @@ from .rfc4511 import (
     Change,
     Scope as _Scope,
     DerefAliases as _DerefAliases,
+    AbandonRequest,
 )
 from .filter import parse as parseFilter
 from .net import LDAPSocket, LDAPConnectionError
@@ -532,6 +533,11 @@ class LDAP(Extensible):
             return ret
         else:
             raise ValueError('invalid resultMode')
+
+    def _sendAbandon(self, mID):
+        logger.debug('Abandoning messageID={0}'.format(mID))
+        self.sock.sendMessage('abandonRequest', AbandonRequest(mID))
+        self.sock.abandonedMIDs.append(mID)
 
     def _sendCompare(self, DN, attr, value):
         """Send a compare request and return internal message ID"""

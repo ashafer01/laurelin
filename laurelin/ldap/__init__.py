@@ -7,9 +7,11 @@ from .base import LDAP, LDAPObject, Scope, DerefAliases, LDAPURI, ResultMode
 from .errors import LDAPError, NoSearchResults
 
 def dc(domain):
+    """Convert a DNS dotted domain name to a DN with domain components"""
     return ','.join(['dc={0}'.format(dc) for dc in domain.split('.')])
 
 def domain(dc):
+    """Convert a DN with domain components to a DNS dotted domain name"""
     return '.'.join([i.split('=')[1] for i in dc.split(',')])
 
 def searchByURI(uri):
