@@ -129,6 +129,18 @@ class DerefAliases:
     ALWAYS = _DerefAliases('derefAlways')
 
 
+class ResultMode:
+    """Search result mode constants
+
+     These instruct laurelin how to present multiple search results
+     * ResultMode.ITER - returns an iterator from search functions
+     * ResultMode.LIST - returns a list, collecting all available results in memory
+    """
+
+    ITER = 1000
+    LIST = 1001
+
+
 class Extensible(object):
     @classmethod
     def EXTEND(cls, methods):
@@ -153,6 +165,7 @@ class LDAP(Extensible):
     # global defaults
     DEFAULT_FILTER = '(objectClass=*)'
     DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
+    DEFAULT_SEARCH_RESULT_MODE = ResultMode.ITER
     DEFAULT_SEARCH_TIMEOUT = 0
     DEFAULT_CONNECT_TIMEOUT = 5
     DEFAULT_STRICT_MODIFY = False
@@ -175,6 +188,7 @@ class LDAP(Extensible):
         connectTimeout=DEFAULT_CONNECT_TIMEOUT,
         searchTimeout=DEFAULT_SEARCH_TIMEOUT,
         derefAliases=DEFAULT_DEREF_ALIASES,
+        searchResultMode=DEFAULT_SEARCH_RESULT_MODE,
         strictModify=DEFAULT_STRICT_MODIFY,
         sslVerify=DEFAULT_SSL_VERIFY,
         sslCAFile=DEFAULT_SSL_CAFILE,
@@ -189,6 +203,7 @@ class LDAP(Extensible):
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
         self.defaultFetchResultRefs = fetchResultRefs
+        self.defaultSearchResultMode = searchResultMode
         self.defaultSaslMech = saslMech
         self.strictModify = strictModify
         self.saslfatalDowngradeCheck = saslFatalDowngradeCheck
@@ -391,7 +406,7 @@ class LDAP(Extensible):
         """Get a specific object by DN"""
         if self.sock.unbound:
             raise ConnectionUnbound()
-        results = self.searchAll(DN, Scope.BASE, attrs=attrs, limit=2)
+        results = self.search(DN, Scope.BASE, attrs=attrs, limit=2, resultMode=ResultMode.LIST)
         n = len(results)
         if n == 0:
             raise NoSearchResults()
@@ -449,13 +464,6 @@ class LDAP(Extensible):
             'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrs)))
         return mID
 
-    def _searchResultsAll(self, messageID, fetchResultRefs=None):
-        ret = []
-        logger.debug('Receiving all search results for messageID={0}'.format(messageID))
-        for obj in self._searchResults(messageID, fetchResultRefs):
-            ret.append(obj)
-        return ret
-
     def _searchResults(self, messageID, fetchResultRefs=None):
         if fetchResultRefs is None:
             fetchResultRefs = self.defaultFetchResultRefs
@@ -504,11 +512,6 @@ class LDAP(Extensible):
                     else:
                         yield SearchReferenceHandle(URIs)
 
-    def searchAll(self, *args, **kwds):
-        fetchResultRefs = kwds.pop('fetchResultRefs', self.defaultFetchResultRefs)
-        mID = self._sendSearch(*args, **kwds)
-        return self._searchResultsAll(mID, fetchResultRefs)
-
     def search(self, *args, **kwds):
         """Send search and iterate results until we get a SearchResultDone
 
@@ -516,8 +519,19 @@ class LDAP(Extensible):
          references are returned from the server, and the fetchResultRefs keyword arg is False.
         """
         fetchResultRefs = kwds.pop('fetchResultRefs', self.defaultFetchResultRefs)
+        searchResultMode = kwds.pop('resultMode', self.defaultSearchResultMode)
         mID = self._sendSearch(*args, **kwds)
-        return self._searchResults(mID, fetchResultRefs)
+        resIter = self._searchResults(mID, fetchResultRefs)
+        if searchResultMode == ResultMode.ITER:
+            return resIter
+        elif searchResultMode == ResultMode.LIST:
+            ret = []
+            logger.debug('Receiving all search results for messageID={0}'.format(mID))
+            for obj in resIter:
+                ret.append(obj)
+            return ret
+        else:
+            raise ValueError('invalid resultMode')
 
     def _sendCompare(self, DN, attr, value):
         """Send a compare request and return internal message ID"""
@@ -1119,55 +1133,21 @@ class LDAPURI(object):
             raise TypeError('ldapConn must be LDAP instance')
         return ldapConn.search(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
 
-    def searchAll(self, ldapConn):
-        if not isinstnce(ldapConn, LDAP):
-            raise TypeError('ldapConn must be LDAP instance')
-        return ldapConn.searchAll(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
-
 
 class SearchReferenceHandle(object):
     """Returned when the server returns a SearchResultReference"""
     def __init__(self, ldapConn, URIs):
         self.URIs = URIs
         self.ldapConn = ldapConn
-        self._resultIter = None
-        self._resultList = None
 
     def fetch(self):
-        """Perform the reference search and return an iterator over results
+        """Perform the reference search and return an iterator over results"""
 
-         Each handle will only create one iterator for its results
-        """
-        if self._resultIter is None:
-            # If multiple URIs are present, the client assumes that any supported URI
-            # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
-            for uri in self.URIs:
-                try:
-                    self._resultIter = uri.search(self.ldapConn)
-                    break
-                except LDAPConnectionError as e:
-                    warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
-            if self._resultIter is None:
-                raise LDAPError('Could not complete reference URI search with any supplied URIs')
-        return self._resultIter
-
-    def fetchAll(self):
-        """Fetch all reference search results into a list
-
-         If fetch() was called prior to this, then all remaining results on the iterator will be
-         fetched into a list and returned.
-        """
-        if self._resultIter is not None and self._resultList is None:
-            self._resultList = []
-            for o in self._resultIter:
-                self._resultList.append(o)
-        if self._resultList is None:
-            for uri in self.URIs:
-                try:
-                    self._resultList = uri.searchAll(self.ldapConn)
-                    break
-                except LDAPConnectionError as e:
-                    warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
-            if self._resultIter is None:
-                raise LDAPError('Could not complete reference URI search with any supplied URIs')
-        return self._resultList
+        # If multiple URIs are present, the client assumes that any supported URI
+        # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
+        for uri in self.URIs:
+            try:
+                return uri.search(self.ldapConn)
+            except LDAPConnectionError as e:
+                warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
+        raise LDAPError('Could not complete reference URI search with any supplied URIs')
