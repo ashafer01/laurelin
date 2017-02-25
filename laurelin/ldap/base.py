@@ -870,7 +870,9 @@ class AttrsDict(dict):
 
 
 class LDAPObject(AttrsDict, Extensible):
-    """Represents a single object and provides a variety of methods specific to the object
+    """Represents a single object with optional server affinity
+
+     Many methods will raise an exception if used without a server connection.
 
      Attributes and values are stored using the mapping interface inherited from AttrsDict. Dict
      keys are attribute names, and dict values are a list of attribute values.
@@ -908,8 +910,14 @@ class LDAPObject(AttrsDict, Extensible):
             relativeSearchScope = self.relativeSearchScope
         if rdnAttr is None:
             rdnAttr = self.rdnAttr
-        return self.ldapConn.obj(self.RDN(rdn), tag=tag, relativeSearchScope=relativeSearchScope,
-            rdnAttr=rdnAttr, *args, **kwds)
+        if isinstance(self.ldapConn, LDAP):
+            return self.ldapConn.obj(self.RDN(rdn), tag=tag, relativeSearchScope=relativeSearchScope,
+                rdnAttr=rdnAttr, *args, **kwds)
+        else:
+            if tag is not None:
+                raise LDAPError('tagging requires LDAP instance')
+            return LDAPObject(self.RDN(rdn), relativeSearchScope=relativeSearchScope,
+                rdnAttr=rdnAttr, *args, **kwds)
 
     def getChild(self, rdn, attrs=None):
         if isinstance(self.ldapConn, LDAP):
@@ -1156,7 +1164,9 @@ class LDAPURI(object):
 class SearchReferenceHandle(object):
     """Returned when the server returns a SearchResultReference"""
     def __init__(self, ldapConn, URIs):
-        self.URIs = URIs
+        self.URIs = []
+        for uri in URIs:
+            self.URIs.append(LDAPURI(uri))
 
     def fetch(self):
         """Perform the reference search and return an iterator over results"""
