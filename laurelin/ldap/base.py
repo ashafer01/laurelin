@@ -508,10 +508,10 @@ class LDAP(Extensible):
                     logger.debug('Got search result reference (ID {0}) to: {1}'.format(mID,
                         ' | '.join(URIs)))
                     if fetchResultRefs:
-                        for obj in SearchReferenceHandle(URIs).fetch_iter():
+                        for obj in SearchReferenceHandle(self, URIs).fetch():
                             yield obj
                     else:
-                        yield SearchReferenceHandle(URIs)
+                        yield SearchReferenceHandle(self, URIs)
 
     def search(self, *args, **kwds):
         """Send search and iterate results until we get a SearchResultDone
@@ -1112,6 +1112,7 @@ class LDAPURI(object):
      * Extensions not yet implemented
     """
     def __init__(self, uri):
+        self._orig = uri
         parsedURI = urlparse(uri)
         self.scheme = parsedURI.scheme
         self.netloc = parsedURI.netloc
@@ -1138,6 +1139,12 @@ class LDAPURI(object):
         if not isinstnce(ldapConn, LDAP):
             raise TypeError('ldapConn must be LDAP instance')
         return ldapConn.search(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
+
+    def __str__(self):
+        return self._orig
+
+    def __repr__(self):
+        return "LDAPURI('{0}')".format(self._orig)
 
 
 class SearchReferenceHandle(object):
