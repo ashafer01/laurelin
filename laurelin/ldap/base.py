@@ -952,6 +952,17 @@ class LDAPObject(AttrsDict, Extensible):
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))
 
+    def __eq__(self, other):
+        if not isinstance(other, LDAPObject):
+            return False
+        elif self.dn != other.dn:
+            return False
+        else:
+            return AttrsDict.__eq__(self, other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     ## relative methods
 
     def RDN(self, rdn):
