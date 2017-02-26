@@ -241,10 +241,6 @@ class LDAP(Extensible):
         # connect
         if isinstance(connectTo, six.string_types):
             self.hostURI = connectTo
-            if sslVerify:
-                sslVerify = LDAPSocket.SSL_REQUIRED
-            else:
-                sslVerify = LDAPSocket.SSL_NOVERIFY
             socketParams = (self.hostURI, connectTimeout, sslVerify, sslCAFile, sslCAPath, sslCAData)
             if reuseConnection:
                 if self.hostURI not in _sockets:
@@ -421,8 +417,10 @@ class LDAP(Extensible):
         except KeyError:
             raise TagError('tag {0} does not exist'.format(tag))
 
-    def obj(self, DN, attrs={}, tag=None, *args, **kwds):
+    def obj(self, DN, attrs=None, tag=None, *args, **kwds):
         """Factory for LDAPObjects bound to this connection"""
+        if attrs is None:
+            attrs = {}
         obj = LDAPObject(DN, attrs=attrs, ldapConn=self, *args, **kwds)
         if tag is not None:
             if tag in self._taggedObjects:
@@ -923,7 +921,9 @@ class AttrsDict(dict):
         AttrsDict.validateValues(values)
         dict.__setitem__(self, attr, values)
 
-    def setdefault(self, attr, default=[]):
+    def setdefault(self, attr, default=None):
+        if default is None:
+            default = []
         try:
             AttrsDict.validateValues(default)
             return dict.setdefault(self, attr, default)
@@ -963,7 +963,7 @@ class LDAPObject(AttrsDict, Extensible):
     """
 
     def __init__(self, dn,
-        attrs={},
+        attrs=None,
         ldapConn=None,
         relativeSearchScope=Scope.SUBTREE,
         rdnAttr=None
