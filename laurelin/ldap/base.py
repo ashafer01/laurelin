@@ -249,7 +249,10 @@ class LDAP(Extensible):
         elif isinstance(connectTo, LDAP):
             self.hostURI = connectTo.hostURI
             self.sock = connectTo.sock
-            self.baseDN = connectTo.baseDN
+            if baseDN is None:
+                self.baseDN = connectTo.baseDN
+            else:
+                self.baseDN = baseDN
             logger.info('Connected to {0} (#{1}) from existing object'.format(
                 self.hostURI, self.sock.ID))
         else:
@@ -535,6 +538,7 @@ class LDAP(Extensible):
             raise ValueError('invalid resultMode')
 
     def _sendAbandon(self, mID):
+        """Request to abandon an operation in progress"""
         logger.debug('Abandoning messageID={0}'.format(mID))
         self.sock.sendMessage('abandonRequest', AbandonRequest(mID))
         self.sock.abandonedMIDs.append(mID)
@@ -558,7 +562,8 @@ class LDAP(Extensible):
     def _compareResult(self, messageID):
         """Receive compare result and convert to boolean"""
         msg = self.sock.recvOne(messageID)
-        mID, res = _unpack('compareResponse', msg).getComponentByName('resultCode')
+        mID, res = _unpack('compareResponse', msg)
+        res = res.getComponentByName('resultCode')
         if res == ResultCode('compareTrue'):
             logger.debug('Compared True (ID {0})'.format(mID))
             return True
@@ -847,6 +852,15 @@ class AttrsDict(dict):
             for val in vals:
                 yield (attr, val)
 
+    def deepcopy(self):
+        """return a native dict copy of self"""
+        ret = {}
+        for attr, vals in six.iteritems(self):
+            ret[attr] = []
+            for val in vals:
+                ret[attr].append(val)
+        return ret
+
     ## local modify methods
     ## accept same input as online versions, but only update the local attributes dictionary
 
@@ -882,7 +896,7 @@ class AttrsDict(dict):
         AttrsDict.validateValues(values)
         dict.__setitem__(self, attr, values)
 
-    def setdefault(self, attr, default):
+    def setdefault(self, attr, default=[]):
         try:
             AttrsDict.validateValues(default)
             return dict.setdefault(self, attr, default)
