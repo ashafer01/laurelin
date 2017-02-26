@@ -166,7 +166,7 @@ class LDAP(Extensible):
     # global defaults
     DEFAULT_FILTER = '(objectClass=*)'
     DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
-    DEFAULT_SEARCH_RESULT_MODE = ResultMode.ITER
+    DEFAULT_SEARCH_RESULT_MODE = ResultMode.LIST
     DEFAULT_SEARCH_TIMEOUT = 0
     DEFAULT_CONNECT_TIMEOUT = 5
     DEFAULT_STRICT_MODIFY = False
@@ -232,7 +232,6 @@ class LDAP(Extensible):
             else:
                 logger.debug('Querying server to find baseDN')
                 o = self.get('', ['namingContexts', 'defaultNamingContext'])
-                self.baseDN = None
                 if 'defaultNamingContext' in o:
                     self.baseDN = o['defaultNamingContext'][0]
                 else:
@@ -464,7 +463,7 @@ class LDAP(Extensible):
         req.setComponentByName('attributes', _attrs)
 
         mID = self.sock.sendMessage('searchRequest', req)
-        logger.debug('Sent search request (ID {0}): baseDN={1}, scope={2}, filterStr={3}, '
+        logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filterStr={3}, '
             'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrs)))
         return mID
 
@@ -556,7 +555,7 @@ class LDAP(Extensible):
         cr.setComponentByName('ava', ava)
 
         mID = self.sock.sendMessage('compareRequest', cr)
-        logger.debug('Sent compare request (ID {0}): {1} ({2} = {3})'.format(mID, DN, attr, value))
+        logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(mID, DN, attr, value))
         return mID
 
     def _compareResult(self, messageID):
@@ -615,7 +614,7 @@ class LDAP(Extensible):
             i += 1
         ar.setComponentByName('attributes', al)
         mID = self.sock.sendMessage('addRequest', ar)
-        logger.debug('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
+        logger.info('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
         return mID
 
     def add(self, DN, attrsDict):
@@ -679,7 +678,7 @@ class LDAP(Extensible):
         if self.sock.unbound:
             raise ConnectionUnbound()
         mID = self.sock.sendMessage('delRequest', DelRequest(DN))
-        logger.debug('Sent delete request (ID {0}) for DN {1}'.format(mID, DN))
+        logger.info('Sent delete request (ID {0}) for DN {1}'.format(mID, DN))
         return mID
 
     def delete(self, DN):
@@ -700,6 +699,8 @@ class LDAP(Extensible):
         if newParent is not None:
             mdr.setComponentByName('newSuperior', NewSuperior(newParent))
         mID = self.sock.sendMessage('modDNRequest', mdr)
+        logger.info('Sent modDN request (ID {0}) for DN {1} newRDN="{2}" newParent="{3}"'.format(
+            mID, DN, newRDN, newParent))
         return self._successResult(mID, 'modDNResponse')
 
     def rename(self, DN, newRDN, cleanAttr=True):
@@ -723,7 +724,7 @@ class LDAP(Extensible):
         i = 0
         logger.debug('Modifying DN {0}'.format(DN))
         for mod in modlist:
-            logger.debug('> {0}'.format(str(mod)))
+            logger.debug('> {0}'.format(mod))
 
             c = Change()
             c.setComponentByName('operation', mod.op)
@@ -741,7 +742,7 @@ class LDAP(Extensible):
             i += 1
         mr.setComponentByName('changes', cl)
         mID = self.sock.sendMessage('modifyRequest', mr)
-        logger.debug('Sent modify request (ID {0}) for DN {1}'.format(mID, DN))
+        logger.info('Sent modify request (ID {0}) for DN {1}'.format(mID, DN))
         return mID
 
     def modify(self, DN, modlist):
