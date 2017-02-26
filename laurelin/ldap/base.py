@@ -183,31 +183,57 @@ class LDAP(Extensible):
     NO_ATTRS = '1.1'
     ALL_USER_ATTRS = '*'
 
-    def __init__(self, connectTo,
-        baseDN=None,
-        reuseConnection=DEFAULT_REUSE_CONNECTION,
-        connectTimeout=DEFAULT_CONNECT_TIMEOUT,
-        searchTimeout=DEFAULT_SEARCH_TIMEOUT,
-        derefAliases=DEFAULT_DEREF_ALIASES,
-        searchResultMode=DEFAULT_SEARCH_RESULT_MODE,
-        strictModify=DEFAULT_STRICT_MODIFY,
-        sslVerify=DEFAULT_SSL_VERIFY,
-        sslCAFile=DEFAULT_SSL_CAFILE,
-        sslCAPath=DEFAULT_SSL_CAPATH,
-        sslCAData=DEFAULT_SSL_CADATA,
-        fetchResultRefs=DEFAULT_FETCH_RESULT_REFS,
-        saslMech=DEFAULT_SASL_MECH,
-        saslFatalDowngradeCheck=DEFAULT_SASL_FATAL_DOWNGRADE_CHECK,
+    def __init__(self, connectTo, baseDN=None,
+        reuseConnection=None,
+        connectTimeout=None,
+        searchTimeout=None,
+        derefAliases=None,
+        searchResultMode=None,
+        strictModify=None,
+        sslVerify=None,
+        sslCAFile=None,
+        sslCAPath=None,
+        sslCAData=None,
+        fetchResultRefs=None,
+        saslMech=None,
+        saslFatalDowngradeCheck=None,
         ):
 
         # setup
+        if reuseConnection is None:
+            reuseConnection = LDAP.DEFAULT_REUSE_CONNECTION
+        if connectTimeout is None:
+            connectTimeout = LDAP.DEFAULT_CONNECT_TIMEOUT
+        if searchTimeout is None:
+            searchTimeout = LDAP.DEFAULT_SEARCH_TIMEOUT
+        if derefAliases is None:
+            derefAliases = LDAP.DEFAULT_DEREF_ALIASES
+        if searchResultMode is None:
+            searchResultMode = LDAP.DEFAULT_SEARCH_RESULT_MODE
+        if strictModify is None:
+            strictModify = LDAP.DEFAULT_STRICT_MODIFY
+        if sslVerify is None:
+            sslVerify = LDAP.DEFAULT_SSL_VERIFY
+        if sslCAFile is None:
+            sslCAFile = LDAP.DEFAULT_SSL_CAFILE
+        if sslCAPath is None:
+            sslCAPath = LDAP.DEFAULT_SSL_CAPATH
+        if sslCAData is None:
+            sslCAData = LDAP.DEFAULT_SSL_CADATA
+        if fetchResultRefs is None:
+            fetchResultRefs = LDAP.DEFAULT_FETCH_RESULT_REFS
+        if saslMech is None:
+            saslMech = LDAP.DEFAULT_SASL_MECH
+        if saslFatalDowngradeCheck is None:
+            saslFatalDowngradeCheck = LDAP.DEFAULT_SASL_FATAL_DOWNGRADE_CHECK
+
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
         self.defaultFetchResultRefs = fetchResultRefs
         self.defaultSearchResultMode = searchResultMode
         self.defaultSaslMech = saslMech
         self.strictModify = strictModify
-        self.saslfatalDowngradeCheck = saslFatalDowngradeCheck
+        self.saslFatalDowngradeCheck = saslFatalDowngradeCheck
 
         self._taggedObjects = {}
         self._saslMechs = None
@@ -430,8 +456,8 @@ class LDAP(Extensible):
         except MultipleSearchResults:
             return True
 
-    def _sendSearch(self, baseDN, scope, filterStr=None, attrs=None, searchTimeout=None,
-        limit=0, derefAliases=None, attrsOnly=False):
+    def _sendSearch(self, baseDN, scope=Scope.SUBTREE, filterStr=None, attrs=None,
+        searchTimeout=None, limit=0, derefAliases=None, attrsOnly=False):
         """Send a search request and return the internal message ID"""
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -510,7 +536,7 @@ class LDAP(Extensible):
                     logger.debug('Got search result reference (ID {0}) to: {1}'.format(mID,
                         ' | '.join(URIs)))
                     if fetchResultRefs:
-                        for obj in SearchReferenceHandle(URIs).fetch():
+                        for obj in SearchReferenceHandle(URIs).fetch(ResultMode.ITER):
                             yield obj
                     else:
                         yield SearchReferenceHandle(URIs)
@@ -902,7 +928,7 @@ class AttrsDict(dict):
             AttrsDict.validateValues(default)
             return dict.setdefault(self, attr, default)
         except TypeError as e:
-            raise TypeError('invalid default ({0})'.format(e.message))
+            raise TypeError('invalid default - {0}'.format(e.message))
 
     def update(self, attrsDict):
         AttrsDict.validate(attrsDict)
@@ -911,7 +937,7 @@ class AttrsDict(dict):
     @staticmethod
     def validate(attrsDict):
         if not isinstance(attrsDict, dict):
-            raise TypeError('attrsDict must be dict')
+            raise TypeError('must be dict')
         for attr in attrsDict:
             if not isinstance(attr, six.string_types):
                 raise TypeError('attribute name must be string')
@@ -920,7 +946,7 @@ class AttrsDict(dict):
     @staticmethod
     def validateValues(attrValList):
         if not isinstance(attrValList, list):
-            raise TypeError('attrsDict values must be list')
+            raise TypeError('must be list')
         for val in attrValList:
             # TODO binary data support throughout...
             if not isinstance(val, six.string_types):
@@ -1212,13 +1238,15 @@ class LDAPURI(object):
         if (nparams > 3) and (len(params[3]) > 0):
             raise LDAPError('Extensions for LDAPURI not yet implemented')
 
-    def search(self):
+    def search(self, resultMode=None):
         """Perform the search operation described by the parsed URI
 
          First opens a new connection with connection reuse disabled, then performs the search, and
          unbinds the connection. Server must allow anonymous read.
         """
-        ldap = LDAP(self.hostURI, reuseConnection=False)
+        if resultMode is None:
+            resultMode = LDAP.DEFAULT_SEARCH_RESULT_MODE
+        ldap = LDAP(self.hostURI, reuseConnection=False, searchResultMode=resultMode)
         ret = ldap.search(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
         ldap.unbind()
         return ret
@@ -1232,19 +1260,21 @@ class LDAPURI(object):
 
 class SearchReferenceHandle(object):
     """Returned when the server returns a SearchResultReference"""
-    def __init__(self, ldapConn, URIs):
+    def __init__(self, URIs):
         self.URIs = []
         for uri in URIs:
             self.URIs.append(LDAPURI(uri))
 
-    def fetch(self):
+    def fetch(self, resultMode=None):
         """Perform the reference search and return an iterator over results"""
+        if resultMode is None:
+            resultMode = LDAP.DEFAULT_SEARCH_RESULT_MODE
 
         # If multiple URIs are present, the client assumes that any supported URI
         # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
         for uri in self.URIs:
             try:
-                return uri.search()
+                return uri.search(resultMode)
             except LDAPConnectionError as e:
                 warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
         raise LDAPError('Could not complete reference URI search with any supplied URIs')
