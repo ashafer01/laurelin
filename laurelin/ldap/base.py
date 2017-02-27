@@ -57,12 +57,8 @@ from six.moves import range
 from six.moves.urllib.parse import urlparse
 
 logger = logging.getLogger('laurelin.ldap')
-
-# TODO don't configure the logger by default
-stderrHandler = logging.StreamHandler()
-stderrHandler.setFormatter(logging.Formatter('[%(asctime)s] %(name)s %(levelname)s : %(message)s'))
-logger.addHandler(stderrHandler)
-logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.NullHandler())
+logger.setLevel(logging.DEBUG) # set to DEBUG to allow handler levels full discretion
 
 # this delimits key from value in structured description fields
 DESC_ATTR_DELIM = '='
@@ -183,6 +179,16 @@ class LDAP(Extensible):
     NO_ATTRS = '1.1'
     ALL_USER_ATTRS = '*'
 
+    # logging config
+    LOG_FORMAT = '[%(asctime)s] %(name)s %(levelname)s : %(message)s'
+
+    @staticmethod
+    def enableLogging(level=logging.DEBUG):
+        stderrHandler = logging.StreamHandler()
+        stderrHandler.setFormatter(logging.Formatter(LDAP.LOG_FORMAT))
+        stderrHandler.setLevel(level)
+        logger.addHandler(stderrHandler)
+
     def __init__(self, connectTo, baseDN=None,
         reuseConnection=None,
         connectTimeout=None,
@@ -260,12 +266,12 @@ class LDAP(Extensible):
                     ncs = o.getAttr('namingContexts')
                     n = len(ncs)
                     if n == 0:
-                        raise RuntimeError('Server did not supply any namingContexts, baseDN must '
+                        raise LDAPError('Server did not supply any namingContexts, baseDN must '
                             'be provided')
                     elif n == 1:
                         self.baseDN = ncs[0]
                     else:
-                        raise RuntimeError('Server supplied multiple namingContexts, baseDN must be'
+                        raise LDAPError('Server supplied multiple namingContexts, baseDN must be'
                             ' provided')
         elif isinstance(connectTo, LDAP):
             self.hostURI = connectTo.hostURI
