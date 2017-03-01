@@ -189,6 +189,12 @@ class LDAP(Extensible):
         stderrHandler.setLevel(level)
         logger.addHandler(stderrHandler)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, e, trace):
+        self.close()
+
     def __init__(self, connectTo, baseDN=None,
         reuseConnection=None,
         connectTimeout=None,
@@ -284,6 +290,7 @@ class LDAP(Extensible):
                 self.hostURI, self.sock.ID))
         else:
             raise TypeError('Must supply URI string or LDAP instance for connectTo')
+        self.sock.refcount += 1
 
         logger.debug('Creating base object for {0}'.format(self.baseDN))
         self.base = self.obj(self.baseDN, relativeSearchScope=Scope.SUBTREE)
@@ -400,19 +407,23 @@ class LDAP(Extensible):
                 raise LDAPError('Got {0} during SASL bind'.format(repr(status)))
         raise LDAPError('Programming error - reached end of saslBind')
 
-    def unbind(self):
+    def unbind(self, force=False):
         """Send an unbind request and close the socket"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
-        self.sock.sendMessage('unbindRequest', UnbindRequest())
-        self.sock.close()
-        self.sock.unbound = True
-        logger.info('Unbound on {0} (#{1})'.format(self.sock.URI, self.sock.ID))
-        try:
-            del _sockets[self.sock.URI]
-        except KeyError:
-            pass
+        self.sock.refcount -= 1
+        if force or self.sock.refcount == 0:
+            self.sock.sendMessage('unbindRequest', UnbindRequest())
+            self.sock.close()
+            self.sock.unbound = True
+            logger.info('Unbound on {0} (#{1})'.format(self.sock.URI, self.sock.ID))
+            try:
+                del _sockets[self.sock.URI]
+            except KeyError:
+                pass
+        else:
+            logger.debug('Socket still in use')
 
     close = unbind
 

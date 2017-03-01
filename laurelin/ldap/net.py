@@ -28,6 +28,7 @@ class LDAPSocket(object):
         sslCAData=None,
         ):
 
+        self.refcount = 0
         parsedURI = urlparse(hostURI)
         ap = parsedURI.netloc.split(':', 1)
         self.host = ap[0]
