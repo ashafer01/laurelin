@@ -278,6 +278,16 @@ class LDAP(Extensible):
         logger.debug('Creating base object for {0}'.format(self.baseDN))
         self.base = self.obj(self.baseDN, relativeSearchScope=Scope.SUBTREE)
 
+    def _successResult(self, messageID, operation):
+        """Receive an object from the socket and raise an LDAPError if its not a success result"""
+        mID, obj = _unpack(operation, self.sock.recvOne(messageID))
+        res = obj.getComponentByName('resultCode')
+        if res == RESULT_success:
+            logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
+            return True
+        else:
+            raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
+
     def simpleBind(self, username='', password=''):
         """Performs a simple bind operation
 
@@ -524,16 +534,6 @@ class LDAP(Extensible):
         else:
             raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
 
-    def _successResult(self, messageID, operation):
-        """Receive an object from the socket and raise an LDAPError if its not a success result"""
-        mID, obj = _unpack(operation, self.sock.recvOne(messageID))
-        res = obj.getComponentByName('resultCode')
-        if res == RESULT_success:
-            logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
-            return True
-        else:
-            raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
-
     def add(self, DN, attrsDict):
         """Add new object and return corresponding LDAPObject on success"""
         if self.sock.unbound:
@@ -776,8 +776,7 @@ class SearchResultHandle(object):
         self.ldapConn = ldapConn
         self.sock = ldapConn.sock
         self.messageID = messageID
-        if fetchResultRefs is None:
-            self.fetchResultRefs = ldapConn.defaultFetchResultRefs
+        self.fetchResultRefs = fetchResultRefs
         self.done = False
 
     def __iter__(self):
