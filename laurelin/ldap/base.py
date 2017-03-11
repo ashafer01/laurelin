@@ -900,6 +900,8 @@ class AttrsDict(dict):
         dict.__setitem__(self, attr, values)
 
     def setdefault(self, attr, default=None):
+        if not isinstance(attr, six.string_types):
+            raise TypeError('attribute name must be string')
         if default is None:
             default = []
         try:
