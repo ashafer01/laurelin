@@ -69,6 +69,8 @@ EMPTY_DN = LDAPDN('')
 RESULT_saslBindInProgress = ResultCode('saslBindInProgress')
 RESULT_success = ResultCode('success')
 RESULT_noSuchObject = ResultCode('noSuchObject')
+RESULT_compareTrue = ResultCode('compareTrue')
+RESULT_compareFalse = ResultCode('compareFalse')
 
 def _unpack(op, ldapMessage):
     """Unpack an object from an LDAPMessage envelope"""
@@ -527,10 +529,10 @@ class LDAP(Extensible):
         msg = self.sock.recvOne(messageID)
         mID, res = _unpack('compareResponse', msg)
         res = res.getComponentByName('resultCode')
-        if res == ResultCode('compareTrue'):
+        if res == RESULT_compareTrue:
             logger.debug('Compared True (ID {0})'.format(mID))
             return True
-        elif res == ResultCode('compareFalse'):
+        elif res == RESULT_compareFalse:
             logger.debug('Compared False (ID {0})'.format(mID))
             return False
         else:
@@ -809,12 +811,12 @@ class SearchResultHandle(object):
             except UnexpectedResponseType:
                 try:
                     mID, resobj = _unpack('searchResDone', msg)
+                    self.done = True
                     res = resobj.getComponentByName('resultCode')
                     if res == RESULT_success or res == RESULT_noSuchObject:
                         logger.debug('Got all search results for ID {0}, result is {1}'.format(
                             mID, repr(res)
                         ))
-                        self.done = True
                         raise StopIteration()
                     else:
                         raise LDAPError('Got {0} for search results (ID {1})'.format(
