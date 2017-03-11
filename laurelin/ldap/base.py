@@ -454,19 +454,25 @@ class LDAP(Extensible):
         except MultipleSearchResults:
             return True
 
-    def _sendSearch(self, baseDN, scope=Scope.SUBTREE, filterStr=None, attrs=None,
-        searchTimeout=None, limit=0, derefAliases=None, attrsOnly=False):
-        """Send a search request and return the internal message ID"""
+    def search(self, baseDN, scope=Scope.SUBTREE, filterStr=None, attrs=None, searchTimeout=None,
+        limit=0, derefAliases=None, attrsOnly=False, fetchResultRefs=None):
+        """Send search and iterate results until we get a SearchResultDone
+
+         Yields instances of LDAPObject and possibly SearchReferenceHandle, if any result
+         references are returned from the server, and the fetchResultRefs keyword arg is False.
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
 
-        req = SearchRequest()
         if filterStr is None:
             filterStr = LDAP.DEFAULT_FILTER
         if searchTimeout is None:
             searchTimeout = self.defaultSearchTimeout
         if derefAliases is None:
             derefAliases = self.defaultDerefAliases
+        if fetchResultRefs is None:
+            fetchResultRefs = self.defaultFetchResultRefs
+        req = SearchRequest()
         req.setComponentByName('baseObject', LDAPDN(baseDN))
         req.setComponentByName('scope', scope)
         req.setComponentByName('derefAliases', derefAliases)
@@ -489,20 +495,10 @@ class LDAP(Extensible):
         mID = self.sock.sendMessage('searchRequest', req)
         logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filterStr={3}, '
             'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrs)))
-        return mID
-
-    def search(self, *args, **kwds):
-        """Send search and iterate results until we get a SearchResultDone
-
-         Yields instances of LDAPObject and possibly SearchReferenceHandle, if any result
-         references are returned from the server, and the fetchResultRefs keyword arg is False.
-        """
-        fetchResultRefs = kwds.pop('fetchResultRefs', self.defaultFetchResultRefs)
-        mID = self._sendSearch(*args, **kwds)
         return SearchResultHandle(self, mID, fetchResultRefs)
 
-    def _sendCompare(self, DN, attr, value):
-        """Send a compare request and return internal message ID"""
+    def compare(self, DN, attr, value):
+        """Perform a compare operation, returning boolean"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
@@ -513,12 +509,9 @@ class LDAP(Extensible):
         ava.setComponentByName('assertionValue', AssertionValue(six.text_type(value)))
         cr.setComponentByName('ava', ava)
 
-        mID = self.sock.sendMessage('compareRequest', cr)
-        logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(mID, DN, attr, value))
-        return mID
-
-    def _compareResult(self, messageID):
-        """Receive compare result and convert to boolean"""
+        messageID = self.sock.sendMessage('compareRequest', cr)
+        logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(messageID, DN, attr,
+            value))
         msg = self.sock.recvOne(messageID)
         mID, res = _unpack('compareResponse', msg)
         res = res.getComponentByName('resultCode')
@@ -531,11 +524,6 @@ class LDAP(Extensible):
         else:
             raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
 
-    def compare(self, *args):
-        """Perform a compare operation, returning boolean"""
-        mID = self._sendCompare(*args)
-        return self._compareResult(mID)
-
     def _successResult(self, messageID, operation):
         """Receive an object from the socket and raise an LDAPError if its not a success result"""
         mID, obj = _unpack(operation, self.sock.recvOne(messageID))
@@ -546,8 +534,8 @@ class LDAP(Extensible):
         else:
             raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
 
-    def _sendAdd(self, DN, attrsDict):
-        """Send an add request and return internal message ID"""
+    def add(self, DN, attrsDict):
+        """Add new object and return corresponding LDAPObject on success"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
@@ -574,11 +562,6 @@ class LDAP(Extensible):
         ar.setComponentByName('attributes', al)
         mID = self.sock.sendMessage('addRequest', ar)
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
-        return mID
-
-    def add(self, DN, attrsDict):
-        """Add new object and return corresponding LDAPObject on success"""
-        mID = self._sendAdd(DN, attrsDict)
         self._successResult(mID, 'addResponse')
         return self.obj(DN, attrsDict)
 
@@ -632,17 +615,12 @@ class LDAP(Extensible):
 
     ## delete an object
 
-    def _sendDelete(self, DN):
-        """Send a delete request and return the internal message ID"""
+    def delete(self, DN):
+        """Delete an object"""
         if self.sock.unbound:
             raise ConnectionUnbound()
         mID = self.sock.sendMessage('delRequest', DelRequest(DN))
         logger.info('Sent delete request (ID {0}) for DN {1}'.format(mID, DN))
-        return mID
-
-    def delete(self, DN):
-        """Delete an object"""
-        mID = self._sendDelete(DN)
         return self._successResult(mID, 'delResponse')
 
     ## change object DN
@@ -673,44 +651,39 @@ class LDAP(Extensible):
 
     ## change attributes on an object
 
-    def _sendModify(self, DN, modlist):
-        """Send a modify request and return the internal message ID"""
-        if self.sock.unbound:
-            raise ConnectionUnbound()
-        mr = ModifyRequest()
-        mr.setComponentByName('object', LDAPDN(DN))
-        cl = Changes()
-        i = 0
-        logger.debug('Modifying DN {0}'.format(DN))
-        for mod in modlist:
-            logger.debug('> {0}'.format(mod))
-
-            c = Change()
-            c.setComponentByName('operation', mod.op)
-            pa = PartialAttribute()
-            pa.setComponentByName('type', AttributeDescription(mod.attr))
-            vals = Vals()
-            j = 0
-            for v in mod.vals:
-                vals.setComponentByPosition(j, AttributeValue(v))
-                j += 1
-            pa.setComponentByName('vals', vals)
-            c.setComponentByName('modification', pa)
-
-            cl.setComponentByPosition(i, c)
-            i += 1
-        mr.setComponentByName('changes', cl)
-        mID = self.sock.sendMessage('modifyRequest', mr)
-        logger.info('Sent modify request (ID {0}) for DN {1}'.format(mID, DN))
-        return mID
-
     def modify(self, DN, modlist):
         """Perform a series of modify operations on an object
 
          modlist must be a list of laurelin.ldap.modify.Mod instances
         """
         if len(modlist) > 0:
-            mID = self._sendModify(DN, modlist)
+            if self.sock.unbound:
+                raise ConnectionUnbound()
+            mr = ModifyRequest()
+            mr.setComponentByName('object', LDAPDN(DN))
+            cl = Changes()
+            i = 0
+            logger.debug('Modifying DN {0}'.format(DN))
+            for mod in modlist:
+                logger.debug('> {0}'.format(mod))
+
+                c = Change()
+                c.setComponentByName('operation', mod.op)
+                pa = PartialAttribute()
+                pa.setComponentByName('type', AttributeDescription(mod.attr))
+                vals = Vals()
+                j = 0
+                for v in mod.vals:
+                    vals.setComponentByPosition(j, AttributeValue(v))
+                    j += 1
+                pa.setComponentByName('vals', vals)
+                c.setComponentByName('modification', pa)
+
+                cl.setComponentByPosition(i, c)
+                i += 1
+            mr.setComponentByName('changes', cl)
+            mID = self.sock.sendMessage('modifyRequest', mr)
+            logger.info('Sent modify request (ID {0}) for DN {1}'.format(mID, DN))
             return self._successResult(mID, 'modifyResponse')
         else:
             logger.debug('Not sending 0-length modlist for DN {0}'.format(DN))
@@ -799,7 +772,7 @@ class LDAP(Extensible):
 
 
 class SearchResultHandle(object):
-    def __init__(self, ldapConn, messageID, fetchResultRefs=None):
+    def __init__(self, ldapConn, messageID, fetchResultRefs):
         self.ldapConn = ldapConn
         self.sock = ldapConn.sock
         self.messageID = messageID
