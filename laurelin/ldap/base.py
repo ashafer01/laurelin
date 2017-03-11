@@ -126,18 +126,6 @@ class DerefAliases:
     ALWAYS = _DerefAliases('derefAlways')
 
 
-class ResultMode:
-    """Search result mode constants
-
-     These instruct laurelin how to present multiple search results
-     * ResultMode.ITER - returns an iterator from search functions
-     * ResultMode.LIST - returns a list, collecting all available results in memory
-    """
-
-    ITER = 1000
-    LIST = 1001
-
-
 class Extensible(object):
     @classmethod
     def EXTEND(cls, methods):
@@ -162,7 +150,6 @@ class LDAP(Extensible):
     # global defaults
     DEFAULT_FILTER = '(objectClass=*)'
     DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
-    DEFAULT_SEARCH_RESULT_MODE = ResultMode.LIST
     DEFAULT_SEARCH_TIMEOUT = 0
     DEFAULT_CONNECT_TIMEOUT = 5
     DEFAULT_STRICT_MODIFY = False
@@ -200,7 +187,6 @@ class LDAP(Extensible):
         connectTimeout=None,
         searchTimeout=None,
         derefAliases=None,
-        searchResultMode=None,
         strictModify=None,
         sslVerify=None,
         sslCAFile=None,
@@ -220,8 +206,6 @@ class LDAP(Extensible):
             searchTimeout = LDAP.DEFAULT_SEARCH_TIMEOUT
         if derefAliases is None:
             derefAliases = LDAP.DEFAULT_DEREF_ALIASES
-        if searchResultMode is None:
-            searchResultMode = LDAP.DEFAULT_SEARCH_RESULT_MODE
         if strictModify is None:
             strictModify = LDAP.DEFAULT_STRICT_MODIFY
         if sslVerify is None:
@@ -242,7 +226,6 @@ class LDAP(Extensible):
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
         self.defaultFetchResultRefs = fetchResultRefs
-        self.defaultSearchResultMode = searchResultMode
         self.defaultSaslMech = saslMech
         self.strictModify = strictModify
         self.saslFatalDowngradeCheck = saslFatalDowngradeCheck
@@ -450,7 +433,7 @@ class LDAP(Extensible):
         """Get a specific object by DN"""
         if self.sock.unbound:
             raise ConnectionUnbound()
-        results = self.search(DN, Scope.BASE, attrs=attrs, limit=2, resultMode=ResultMode.LIST)
+        results = list(self.search(DN, Scope.BASE, attrs=attrs, limit=2))
         n = len(results)
         if n == 0:
             raise NoSearchResults()
@@ -508,54 +491,6 @@ class LDAP(Extensible):
             'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrs)))
         return mID
 
-    def _searchResults(self, messageID, fetchResultRefs=None):
-        if fetchResultRefs is None:
-            fetchResultRefs = self.defaultFetchResultRefs
-        for msg in self.sock.recvMessages(messageID):
-            if messageID in self.sock.abandonedMIDs:
-                logger.debug('ID={0} abandoned while receiving search results'.format(messageID))
-                raise StopIteration()
-            try:
-                mID, entry = _unpack('searchResEntry', msg)
-                DN = six.text_type(entry.getComponentByName('objectName'))
-                attrs = {}
-                _attrs = entry.getComponentByName('attributes')
-                for i in range(0, len(_attrs)):
-                    _attr = _attrs.getComponentByPosition(i)
-                    attrType = six.text_type(_attr.getComponentByName('type'))
-                    _vals = _attr.getComponentByName('vals')
-                    vals = []
-                    for j in range(0, len(_vals)):
-                        vals.append(six.text_type(_vals.getComponentByPosition(j)))
-                    attrs[attrType] = vals
-                logger.debug('Got search result entry (ID {0}) {1}'.format(mID, DN))
-                yield self.obj(DN, attrs)
-            except UnexpectedResponseType:
-                try:
-                    mID, resobj = _unpack('searchResDone', msg)
-                    res = resobj.getComponentByName('resultCode')
-                    if res == RESULT_success or res == RESULT_noSuchObject:
-                        logger.debug('Got all search results for ID {0}, result is {1}'.format(
-                            mID, repr(res)
-                        ))
-                        raise StopIteration()
-                    else:
-                        raise LDAPError('Got {0} for search results (ID {1})'.format(
-                            repr(res), messageID
-                        ))
-                except UnexpectedResponseType:
-                    mID, resref = _unpack('searchResRef', ldapMessage)
-                    URIs = []
-                    for i in range(0, len(resref)):
-                        URIs.append(six.text_type(resref.getComponentByPosition(i)))
-                    logger.debug('Got search result reference (ID {0}) to: {1}'.format(mID,
-                        ' | '.join(URIs)))
-                    if fetchResultRefs:
-                        for obj in SearchReferenceHandle(URIs).fetch(ResultMode.ITER):
-                            yield obj
-                    else:
-                        yield SearchReferenceHandle(URIs)
-
     def search(self, *args, **kwds):
         """Send search and iterate results until we get a SearchResultDone
 
@@ -563,25 +498,8 @@ class LDAP(Extensible):
          references are returned from the server, and the fetchResultRefs keyword arg is False.
         """
         fetchResultRefs = kwds.pop('fetchResultRefs', self.defaultFetchResultRefs)
-        searchResultMode = kwds.pop('resultMode', self.defaultSearchResultMode)
         mID = self._sendSearch(*args, **kwds)
-        resIter = self._searchResults(mID, fetchResultRefs)
-        if searchResultMode == ResultMode.ITER:
-            return resIter
-        elif searchResultMode == ResultMode.LIST:
-            ret = []
-            logger.debug('Receiving all search results for messageID={0}'.format(mID))
-            for obj in resIter:
-                ret.append(obj)
-            return ret
-        else:
-            raise ValueError('invalid resultMode')
-
-    def _sendAbandon(self, mID):
-        """Request to abandon an operation in progress"""
-        logger.debug('Abandoning messageID={0}'.format(mID))
-        self.sock.sendMessage('abandonRequest', AbandonRequest(mID))
-        self.sock.abandonedMIDs.append(mID)
+        return SearchResultHandle(self, mID, fetchResultRefs)
 
     def _sendCompare(self, DN, attr, value):
         """Send a compare request and return internal message ID"""
@@ -878,6 +796,77 @@ class LDAP(Extensible):
             return self.modify(DN, modlist)
         else:
             raise ValueError('changetype {0} unknown/not yet implemented'.format(changetype))
+
+
+class SearchResultHandle(object):
+    def __init__(self, ldapConn, messageID, fetchResultRefs=None):
+        self.ldapConn = ldapConn
+        self.sock = ldapConn.sock
+        self.messageID = messageID
+        if fetchResultRefs is None:
+            self.fetchResultRefs = ldapConn.defaultFetchResultRefs
+        self.done = False
+
+    def __iter__(self):
+        for msg in self.sock.recvMessages(self.messageID):
+            if self.messageID in self.sock.abandonedMIDs:
+                logger.debug('ID={0} abandoned while receiving search results'.format(
+                    self.messageID))
+                raise StopIteration()
+            try:
+                mID, entry = _unpack('searchResEntry', msg)
+                DN = six.text_type(entry.getComponentByName('objectName'))
+                attrs = {}
+                _attrs = entry.getComponentByName('attributes')
+                for i in range(0, len(_attrs)):
+                    _attr = _attrs.getComponentByPosition(i)
+                    attrType = six.text_type(_attr.getComponentByName('type'))
+                    _vals = _attr.getComponentByName('vals')
+                    vals = []
+                    for j in range(0, len(_vals)):
+                        vals.append(six.text_type(_vals.getComponentByPosition(j)))
+                    attrs[attrType] = vals
+                logger.debug('Got search result entry (ID {0}) {1}'.format(mID, DN))
+                yield self.ldapConn.obj(DN, attrs)
+            except UnexpectedResponseType:
+                try:
+                    mID, resobj = _unpack('searchResDone', msg)
+                    res = resobj.getComponentByName('resultCode')
+                    if res == RESULT_success or res == RESULT_noSuchObject:
+                        logger.debug('Got all search results for ID {0}, result is {1}'.format(
+                            mID, repr(res)
+                        ))
+                        self.done = True
+                        raise StopIteration()
+                    else:
+                        raise LDAPError('Got {0} for search results (ID {1})'.format(
+                            repr(res), mID
+                        ))
+                except UnexpectedResponseType:
+                    mID, resref = _unpack('searchResRef', ldapMessage)
+                    URIs = []
+                    for i in range(0, len(resref)):
+                        URIs.append(six.text_type(resref.getComponentByPosition(i)))
+                    logger.debug('Got search result reference (ID {0}) to: {1}'.format(mID,
+                        ' | '.join(URIs)))
+                    if self.fetchResultRefs:
+                        for obj in SearchReferenceHandle(URIs).fetch():
+                            yield obj
+                    else:
+                        yield SearchReferenceHandle(URIs)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, e, trace):
+        if not self.done:
+            self.abandon()
+
+    def abandon(self):
+        """Request to abandon an operation in progress"""
+        logger.debug('Abandoning messageID={0}'.format(self.messageID))
+        self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
+        self.sock.abandonedMIDs.append(self.messageID)
 
 
 class AttrsDict(dict):
@@ -1255,15 +1244,13 @@ class LDAPURI(object):
         if (nparams > 3) and (len(params[3]) > 0):
             raise LDAPError('Extensions for LDAPURI not yet implemented')
 
-    def search(self, resultMode=None):
+    def search(self):
         """Perform the search operation described by the parsed URI
 
          First opens a new connection with connection reuse disabled, then performs the search, and
          unbinds the connection. Server must allow anonymous read.
         """
-        if resultMode is None:
-            resultMode = LDAP.DEFAULT_SEARCH_RESULT_MODE
-        ldap = LDAP(self.hostURI, reuseConnection=False, searchResultMode=resultMode)
+        ldap = LDAP(self.hostURI, reuseConnection=False)
         ret = ldap.search(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
         ldap.unbind()
         return ret
@@ -1282,16 +1269,14 @@ class SearchReferenceHandle(object):
         for uri in URIs:
             self.URIs.append(LDAPURI(uri))
 
-    def fetch(self, resultMode=None):
+    def fetch(self):
         """Perform the reference search and return an iterator over results"""
-        if resultMode is None:
-            resultMode = LDAP.DEFAULT_SEARCH_RESULT_MODE
 
         # If multiple URIs are present, the client assumes that any supported URI
         # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
         for uri in self.URIs:
             try:
-                return uri.search(resultMode)
+                return uri.search()
             except LDAPConnectionError as e:
                 warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
         raise LDAPError('Could not complete reference URI search with any supplied URIs')

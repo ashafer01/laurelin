@@ -19,5 +19,20 @@ with LDAP('ldap://127.0.0.1') as l:
     #print(o.formatLDIF())
     #print('========')
 
+    #for o in l.search(l.base.dn, Scope.SUBTREE, '(objectClass=*)'):
+    #    print(o.formatLDIF())
+
+    with l.search(l.base.dn, Scope.SUBTREE, '(objectClass=*)') as r:
+        n = 0
+        for o in r:
+            print(o.formatLDIF())
+            n += 1
+            if n > 2:
+                break
+
+    r = list(l.search(l.base.dn, Scope.SUBTREE, '(objectClass=*)'))
+    for o in r:
+        print(o.dn)
+
     for o in l.search(l.base.dn, Scope.SUBTREE, '(objectClass=*)'):
-        print(o.formatLDIF())
+        print(o.dn)
