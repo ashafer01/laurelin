@@ -464,7 +464,7 @@ class LDAP(Extensible):
         except MultipleSearchResults:
             return True
 
-    def search(self, baseDN, scope=Scope.SUBTREE, filterStr=None, attrs=None, searchTimeout=None,
+    def search(self, baseDN, scope=Scope.SUBTREE, filter=None, attrs=None, searchTimeout=None,
         limit=0, derefAliases=None, attrsOnly=False, fetchResultRefs=None):
         """Send search and iterate results until we get a SearchResultDone
 
@@ -474,8 +474,8 @@ class LDAP(Extensible):
         if self.sock.unbound:
             raise ConnectionUnbound()
 
-        if filterStr is None:
-            filterStr = LDAP.DEFAULT_FILTER
+        if filter is None:
+            filter = LDAP.DEFAULT_FILTER
         if searchTimeout is None:
             searchTimeout = self.defaultSearchTimeout
         if derefAliases is None:
@@ -489,7 +489,7 @@ class LDAP(Extensible):
         req.setComponentByName('sizeLimit', NonNegativeInteger(limit))
         req.setComponentByName('timeLimit', NonNegativeInteger(searchTimeout))
         req.setComponentByName('typesOnly', TypesOnly(attrsOnly))
-        req.setComponentByName('filter', parseFilter(filterStr))
+        req.setComponentByName('filter', parseFilter(filter))
 
         _attrs = AttributeSelection()
         i = 0
@@ -503,8 +503,9 @@ class LDAP(Extensible):
         req.setComponentByName('attributes', _attrs)
 
         mID = self.sock.sendMessage('searchRequest', req)
-        logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filterStr={3}, '
-            'attrs={4}'.format(mID, baseDN, scope, filterStr, repr(attrs)))
+        logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filter={3}'.format(
+            mID, baseDN, scope, filter
+        ))
         return SearchResultHandle(self, mID, fetchResultRefs)
 
     def compare(self, DN, attr, value):
@@ -520,8 +521,9 @@ class LDAP(Extensible):
         cr.setComponentByName('ava', ava)
 
         messageID = self.sock.sendMessage('compareRequest', cr)
-        logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(messageID, DN, attr,
-            value))
+        logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(
+            messageID, DN, attr, value
+        ))
         msg = self.sock.recvOne(messageID)
         mID, res = _unpack('compareResponse', msg)
         res = res.getComponentByName('resultCode')
@@ -778,10 +780,14 @@ class SearchResultHandle(object):
         self.messageID = messageID
         self.fetchResultRefs = fetchResultRefs
         self.done = False
+        self.abandoned = False
 
     def __iter__(self):
+        if self.abandoned:
+            logger.debug('ID={0} has been abandoned'.format(self.messageID))
+            raise StopIteration()
         for msg in self.sock.recvMessages(self.messageID):
-            if self.messageID in self.sock.abandonedMIDs:
+            if self.abandoned:
                 logger.debug('ID={0} abandoned while receiving search results'.format(
                     self.messageID))
                 raise StopIteration()
@@ -819,13 +825,15 @@ class SearchResultHandle(object):
                     URIs = []
                     for i in range(0, len(resref)):
                         URIs.append(six.text_type(resref.getComponentByPosition(i)))
-                    logger.debug('Got search result reference (ID {0}) to: {1}'.format(mID,
-                        ' | '.join(URIs)))
+                    logger.debug('Got search result reference (ID {0}) to: {1}'.format(
+                        mID, ' | '.join(URIs)
+                    ))
+                    ref = SearchReferenceHandle(URIs)
                     if self.fetchResultRefs:
-                        for obj in SearchReferenceHandle(URIs).fetch():
+                        for obj in ref.fetch():
                             yield obj
                     else:
-                        yield SearchReferenceHandle(URIs)
+                        yield ref
 
     def __enter__(self):
         return self
@@ -833,12 +841,18 @@ class SearchResultHandle(object):
     def __exit__(self, etype, e, trace):
         if not self.done:
             self.abandon()
+        if etype == Abandon:
+            return True
 
     def abandon(self):
         """Request to abandon an operation in progress"""
-        logger.debug('Abandoning messageID={0}'.format(self.messageID))
-        self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
-        self.sock.abandonedMIDs.append(self.messageID)
+        if not self.abandoned:
+            logger.info('Abandoning search ID={0}'.format(self.messageID))
+            self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
+            self.abandoned = True
+            self.sock.abandonedMIDs.append(self.messageID)
+        else:
+            logger.debug('ID={0} already abandoned'.format(self.messageID))
 
 
 class AttrsDict(dict):
@@ -1225,7 +1239,7 @@ class LDAPURI(object):
          unbinds the connection. Server must allow anonymous read.
         """
         ldap = LDAP(self.hostURI, reuseConnection=False)
-        ret = ldap.search(self.DN, self.scope, filterStr=self.filter, attrs=self.attrs)
+        ret = ldap.search(self.DN, self.scope, filter=self.filter, attrs=self.attrs)
         ldap.unbind()
         return ret
 

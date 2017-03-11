@@ -4,7 +4,7 @@ Imports base objects for user import and defines user utility functions
 """
 
 from .base import LDAP, LDAPObject, LDAPURI, Scope, DerefAliases
-from .errors import LDAPError, NoSearchResults
+from .errors import LDAPError, NoSearchResults, Abandon
 
 def dc(domain):
     """Convert a DNS dotted domain name to a DN with domain components"""

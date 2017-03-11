@@ -2,6 +2,10 @@ class LDAPError(Exception):
     """Base class for all exceptions raised by laurelin"""
     pass
 
+class Abandon(Exception):
+    """Can be raised to cleanly exit a search result context manager and abandon unread results"""
+    pass
+
 class LDAPExtensionError(LDAPError):
     """Error occurred setting up an extension module"""
     pass
