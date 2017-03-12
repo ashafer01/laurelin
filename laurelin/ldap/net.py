@@ -2,8 +2,7 @@
 
 from __future__ import absolute_import
 import ssl
-import os
-import stat
+from glob import glob
 from socket import socket, AF_UNIX, error as SocketError
 from six.moves.urllib.parse import urlparse
 from collections import deque
@@ -23,7 +22,8 @@ class LDAPSocket(object):
     RECV_BUFFER = 4096
 
     # For ldapi:/// try to connect to these socket files in order
-    LDAPI_SOCKET_PATHS = ['/var/run/ldapi', '/var/run/slapd/ldapi']
+    # Globs must match exactly one result
+    LDAPI_SOCKET_PATHS = ['/var/run/ldapi', '/var/run/slapd/ldapi', '/var/run/slapd-*.socket']
 
     def __init__(self, hostURI,
         connectTimeout=5,
@@ -35,7 +35,7 @@ class LDAPSocket(object):
 
         parsedURI = urlparse(hostURI)
 
-        if parsedURI.scheme == 'ldap':
+        if not parsedURI.scheme or parsedURI.scheme == 'ldap':
             self._sock = socket()
             self._inetConnect(parsedURI.netloc, 389, connectTimeout)
         elif parsedURI.scheme == 'ldaps':
@@ -55,26 +55,31 @@ class LDAPSocket(object):
         elif parsedURI.scheme == 'ldapi':
             self._sock = socket(AF_UNIX)
             self.host = 'localhost'
-            sockPath = None
+            self.sockPath = None
             if parsedURI.path == '/':
-                for _sockPath in LDAPSocket.LDAPI_SOCKET_PATHS:
+                for sockGlob in LDAPSocket.LDAPI_SOCKET_PATHS:
+                    fn = glob(sockGlob)
+                    if len(fn) > 1:
+                        raise LDAPError('Multiple results for glob {0} full socket path must be '
+                            'supplied in URI'.format(sockGlob))
+                    fn = fn[0]
                     try:
-                        mode = os.stat(_sockPath).st_mode
-                        if stat.S_ISSOCK(mode):
-                            sockPath = _sockPath
-                            break
-                    except Exception:
+                        self._sock.connect(fn)
+                        self.sockPath = fn
+                        break
+                    except SocketError:
                         continue
+                if self.sockPath is None:
+                    raise LDAPConnectionError('Could not find any local LDAPI unix socket - full '
+                        'socket path must be supplied in URI')
             else:
-                sockPath = parsedURI.path
-            if sockPath is None:
-                raise LDAPError('No local socket path found')
-            try:
-                self._sock.connect(sockPath)
-            except SocketError as e:
-                raise LDAPConnectionError('failed connect to unix socket {0} - {1} ({2})'.format(
-                    sockPath, e.strerror, e.errno
-                ))
+                try:
+                    self._sock.connect(parsedURI.path)
+                    self.sockPath = parsedURI.path
+                except SocketError as e:
+                    raise LDAPConnectionError('failed connect to unix socket {0} - {1} ({2})'.format(
+                        sockPath, e.strerror, e.errno
+                    ))
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
 

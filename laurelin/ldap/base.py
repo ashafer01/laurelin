@@ -241,9 +241,11 @@ class LDAP(Extensible):
             socketParams = (self.hostURI, connectTimeout, sslVerify, sslCAFile, sslCAPath, sslCAData)
             if reuseConnection:
                 if self.hostURI not in _sockets:
+                    logger.info('Opening new socket connection for {0}'.format(self.hostURI))
                     _sockets[self.hostURI] = LDAPSocket(*socketParams)
                 self.sock = _sockets[self.hostURI]
             else:
+                logger.info('Opening exclusive socket connection for {0}'.format(self.hostURI))
                 self.sock = LDAPSocket(*socketParams)
             logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
             if baseDN is not None:
