@@ -72,6 +72,7 @@ def _obj_addNetgroupHosts(self, members, domain=''):
     self.ldapConn.addNetgroupHosts(self.dn, members, domain)
 
 LDAPObject.EXTEND([
+    ('getNetgroupUsers', _obj_getNetgroupUsers),
     ('addNetgroupUsers', _obj_addNetgroupUsers),
     ('addNetgroupUser', _obj_addNetgroupUsers),
     ('addNetgroupHosts', _obj_addNetgroupHosts),

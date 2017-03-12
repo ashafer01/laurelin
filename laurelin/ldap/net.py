@@ -37,7 +37,7 @@ class LDAPSocket(object):
 
         if parsedURI.scheme == 'ldap':
             self._sock = socket()
-            self._tcpConnect(parsedURI.netloc, 389, connectTimeout)
+            self._inetConnect(parsedURI.netloc, 389, connectTimeout)
         elif parsedURI.scheme == 'ldaps':
             # N.B. this is presently the only thing breaking 2.6 support
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
@@ -51,7 +51,7 @@ class LDAPSocket(object):
                 ctx.load_verify_locations(cafile=sslCAFile, capath=sslCAPath, cadata=sslCAData)
             hostname = parsedURI.netloc.split(':', 1)[0]
             self._sock = ctx.wrap_socket(socket(), server_hostname=hostname)
-            self._tcpConnect(parsedURI.netloc, 636, connectTimeout)
+            self._inetConnect(parsedURI.netloc, 636, connectTimeout)
         elif parsedURI.scheme == 'ldapi':
             self._sock = socket(AF_UNIX)
             self.host = 'localhost'
@@ -69,7 +69,12 @@ class LDAPSocket(object):
                 sockPath = parsedURI.path
             if sockPath is None:
                 raise LDAPError('No local socket path found')
-            self._sock.connect(sockPath)
+            try:
+                self._sock.connect(sockPath)
+            except SocketError as e:
+                raise LDAPConnectionError('failed connect to unix socket {0} - {1} ({2})'.format(
+                    sockPath, e.strerror, e.errno
+                ))
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
 
@@ -86,7 +91,7 @@ class LDAPSocket(object):
         self.unbound = False
         self.abandonedMIDs = []
 
-    def _tcpConnect(self, netloc, defaultPort, timeout):
+    def _inetConnect(self, netloc, defaultPort, timeout):
         ap = netloc.split(':', 1)
         self.host = ap[0]
         if len(ap) == 1:
@@ -98,7 +103,9 @@ class LDAPSocket(object):
             self._sock.connect((self.host, port))
             self._sock.settimeout(None)
         except SocketError as e:
-            raise LDAPConnectionError('{0} ({1})'.format(e.strerror, e.errno))
+            raise LDAPConnectionError('failed connect to {0}:{1} - {2} ({3})'.format(
+                self.host, port, e.strerror, e.errno
+            ))
 
     def saslInit(self, mechs, **props):
         """Initialize a puresasl.client.SASLClient"""
