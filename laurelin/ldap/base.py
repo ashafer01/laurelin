@@ -277,6 +277,9 @@ class LDAP(Extensible):
             raise TypeError('Must supply URI string or LDAP instance for connectTo')
         self.sock.refcount += 1
 
+        if self.defaultSaslMech is None and self.hostURI.startswith('ldapi:'):
+            self.defaultSaslMech = 'EXTERNAL'
+
         logger.debug('Creating base object for {0}'.format(self.baseDN))
         self.base = self.obj(self.baseDN, relativeSearchScope=Scope.SUBTREE)
 

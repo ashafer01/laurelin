@@ -33,7 +33,6 @@ class LDAPSocket(object):
         sslCAData=None,
         ):
 
-        self.refcount = 0
         parsedURI = urlparse(hostURI)
 
         if parsedURI.scheme == 'ldap':
@@ -81,6 +80,7 @@ class LDAPSocket(object):
         global _nextSockID
         self.ID = _nextSockID
         _nextSockID += 1
+        self.refcount = 0
         self.URI = hostURI
         self.bound = False
         self.unbound = False
