@@ -994,11 +994,11 @@ class LDAPObject(AttrsDict, Extensible):
     ## relative methods
 
     def RDN(self, rdn):
-        if self.rdnAttr is not None:
-            if not rdn.startswith(self.rdnAttr + '='):
+        if '=' not in rdn:
+            if self.rdnAttr is not None:
                 rdn = '{0}={1}'.format(self.rdnAttr, rdn)
-        elif '=' not in rdn:
-            raise ValueError('No rdnAttr specified, must supply full RDN attr=val')
+            else:
+                raise ValueError('No rdnAttr specified, must supply full RDN attr=val')
         return '{0},{1}'.format(rdn, self.dn)
 
     def obj(self, rdn, tag=None, relativeSearchScope=None, rdnAttr=None, *args, **kwds):
