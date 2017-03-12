@@ -2,7 +2,8 @@ from getpass import getpass
 from laurelin.ldap import LDAP, Scope
 
 LDAP.enableLogging()
-with LDAP('ldap://127.0.0.1') as l:
+#with LDAP('ldap://127.0.0.1') as l:
+with LDAP('ldapi:///') as l:
     #l.simpleBind()
     #l.simpleBind(username='cn=admin,dc=example,dc=org', password=getpass())
     l.saslBind(mech='DIGEST-MD5', username='admin', password=getpass())

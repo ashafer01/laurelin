@@ -2,7 +2,9 @@
 
 from __future__ import absolute_import
 import ssl
-from socket import socket, error as SocketError
+import os
+import stat
+from socket import socket, AF_UNIX, error as SocketError
 from six.moves.urllib.parse import urlparse
 from collections import deque
 from pyasn1.codec.ber.encoder import encode as berEncode
@@ -20,6 +22,9 @@ class LDAPSocket(object):
 
     RECV_BUFFER = 4096
 
+    # For ldapi:/// try to connect to these socket files in order
+    LDAPI_SOCKET_PATHS = ['/var/run/ldapi', '/var/run/slapd/ldapi']
+
     def __init__(self, hostURI,
         connectTimeout=5,
         sslVerify=True,
@@ -30,14 +35,11 @@ class LDAPSocket(object):
 
         self.refcount = 0
         parsedURI = urlparse(hostURI)
-        ap = parsedURI.netloc.split(':', 1)
-        self.host = ap[0]
 
-        self._sock = socket()
         if parsedURI.scheme == 'ldap':
-            defaultPort = 389
+            self._sock = socket()
+            self._tcpConnect(parsedURI.netloc, 389, connectTimeout)
         elif parsedURI.scheme == 'ldaps':
-            defaultPort = 636
             # N.B. this is presently the only thing breaking 2.6 support
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
             if sslVerify:
@@ -48,21 +50,29 @@ class LDAPSocket(object):
                 ctx.verify_mode = ssl.CERT_NONE
             if sslCAFile or sslCAPath or sslCAData:
                 ctx.load_verify_locations(cafile=sslCAFile, capath=sslCAPath, cadata=sslCAData)
-            self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
+            hostname = parsedURI.netloc.split(':', 1)[0]
+            self._sock = ctx.wrap_socket(socket(), server_hostname=hostname)
+            self._tcpConnect(parsedURI.netloc, 636, connectTimeout)
+        elif parsedURI.scheme == 'ldapi':
+            self._sock = socket(AF_UNIX)
+            self.host = 'localhost'
+            sockPath = None
+            if parsedURI.path == '/':
+                for _sockPath in LDAPSocket.LDAPI_SOCKET_PATHS:
+                    try:
+                        mode = os.stat(_sockPath).st_mode
+                        if stat.S_ISSOCK(mode):
+                            sockPath = _sockPath
+                            break
+                    except Exception:
+                        continue
+            else:
+                sockPath = parsedURI.path
+            if sockPath is None:
+                raise LDAPError('No local socket path found')
+            self._sock.connect(sockPath)
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
-
-        if len(ap) == 1:
-            port = defaultPort
-        else:
-            port = int(ap[1])
-
-        try:
-            self._sock.settimeout(connectTimeout)
-            self._sock.connect((self.host, port))
-            self._sock.settimeout(None)
-        except SocketError as e:
-            raise LDAPConnectionError('{0} ({1})'.format(e.strerror, e.errno))
 
         self._messageQueues = {}
         self._nextMessageID = 1
@@ -75,6 +85,20 @@ class LDAPSocket(object):
         self.bound = False
         self.unbound = False
         self.abandonedMIDs = []
+
+    def _tcpConnect(self, netloc, defaultPort, timeout):
+        ap = netloc.split(':', 1)
+        self.host = ap[0]
+        if len(ap) == 1:
+            port = defaultPort
+        else:
+            port = int(ap[1])
+        try:
+            self._sock.settimeout(timeout)
+            self._sock.connect((self.host, port))
+            self._sock.settimeout(None)
+        except SocketError as e:
+            raise LDAPConnectionError('{0} ({1})'.format(e.strerror, e.errno))
 
     def saslInit(self, mechs, **props):
         """Initialize a puresasl.client.SASLClient"""
