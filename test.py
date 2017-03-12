@@ -7,7 +7,7 @@ with LDAP('ldap://127.0.0.1') as l:
     #l.simpleBind(username='cn=admin,dc=example,dc=org', password=getpass())
     l.saslBind(mech='DIGEST-MD5', username='admin', password=getpass())
 
-    with l.search(l.base.dn) as r:
+    with l.base.search() as r:
         n = 0
         for o in r:
             print(o.formatLDIF())
@@ -15,15 +15,15 @@ with LDAP('ldap://127.0.0.1') as l:
             if n > 2:
                 break
 
-    r = list(l.search(l.base.dn))
+    r = list(l.base.search())
     for o in r:
         print(o.dn)
 
-    for o in l.search(l.base.dn):
+    for o in l.base.search():
         print(o.dn)
 
-    print(l.compare('cn=admin,'+l.base.dn, 'cn', 'admin'))
-    print(l.compare('cn=admin,'+l.base.dn, 'cn', 'admxxin'))
+    print(l.base.obj('cn=admin').compare('cn', 'admin'))
+    print(l.base.obj('cn=admin').compare('cn', 'admxxin'))
 
     #l.add('ou=test4,ou=test,dc=example,dc=org', {
     #    'objectClass': ['organizationalUnit'],

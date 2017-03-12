@@ -1016,7 +1016,7 @@ class LDAPObject(AttrsDict, Extensible):
         else:
             raise RuntimeError('No LDAP object')
 
-    def search(self, filter, attrs=None, *args, **kwds):
+    def search(self, filter=None, attrs=None, *args, **kwds):
         if isinstance(self.ldapConn, LDAP):
             return self.ldapConn.search(self.dn, self.relativeSearchScope, filter, attrs,
                 *args, **kwds)
