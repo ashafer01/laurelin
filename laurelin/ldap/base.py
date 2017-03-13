@@ -235,18 +235,19 @@ class LDAP(Extensible):
         self._taggedObjects = {}
         self._saslMechs = None
 
+        self.sockParams = (connectTimeout, sslVerify, sslCAFile, sslCAPath, sslCAData)
+
         # connect
         if isinstance(connectTo, six.string_types):
             self.hostURI = connectTo
-            socketParams = (self.hostURI, connectTimeout, sslVerify, sslCAFile, sslCAPath, sslCAData)
             if reuseConnection:
                 if self.hostURI not in _sockets:
-                    logger.info('Opening new socket connection for {0}'.format(self.hostURI))
-                    _sockets[self.hostURI] = LDAPSocket(*socketParams)
+                    logger.info('Opening new socket connection to {0}'.format(self.hostURI))
+                    _sockets[self.hostURI] = LDAPSocket(self.hostURI, *self.sockParams)
                 self.sock = _sockets[self.hostURI]
             else:
-                logger.info('Opening exclusive socket connection for {0}'.format(self.hostURI))
-                self.sock = LDAPSocket(*socketParams)
+                logger.info('Opening exclusive socket connection to {0}'.format(self.hostURI))
+                self.sock = LDAPSocket(self.hostURI, *self.sockParams)
             logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
             if baseDN is not None:
                 self.baseDN = baseDN
@@ -268,13 +269,18 @@ class LDAP(Extensible):
                             ' provided')
         elif isinstance(connectTo, LDAP):
             self.hostURI = connectTo.hostURI
-            self.sock = connectTo.sock
+            if reuseConnection:
+                self.sock = connectTo.sock
+                logger.info('Connected to {0} (#{1}) from existing object'.format(
+                    self.hostURI, self.sock.ID))
+            else:
+                logger.info('Opening new exclusive socket connection to {0}'.format(self.hostURI))
+                self.sockParams = connectTo.sockParams
+                self.sock = LDAPSocket(self.hostURI, *self.sockParams)
             if baseDN is None:
                 self.baseDN = connectTo.baseDN
             else:
                 self.baseDN = baseDN
-            logger.info('Connected to {0} (#{1}) from existing object'.format(
-                self.hostURI, self.sock.ID))
         else:
             raise TypeError('Must supply URI string or LDAP instance for connectTo')
         self.sock.refcount += 1
@@ -1018,6 +1024,12 @@ class LDAPObject(AttrsDict, Extensible):
     def getChild(self, rdn, attrs=None):
         if isinstance(self.ldapConn, LDAP):
             return self.ldapConn.get(self.RDN(rdn), attrs)
+        else:
+            raise RuntimeError('No LDAP object')
+
+    def addChild(self, rdn, attrsDict):
+        if isinstance(self.ldapConn, LDAP):
+            return self.ldapConn.add(self.RDN(rdn), attrsDict)
         else:
             raise RuntimeError('No LDAP object')
 
