@@ -1000,6 +1000,10 @@ class LDAPObject(AttrsDict, Extensible):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def _requireLDAP(self):
+        if not isinstance(self.ldapConn, LDAP):
+            raise RuntimeError('No LDAP instance')
+
     ## relative methods
 
     def RDN(self, rdn):
@@ -1025,25 +1029,20 @@ class LDAPObject(AttrsDict, Extensible):
             return LDAPObject(self.RDN(rdn), *args, **kwds)
 
     def getChild(self, rdn, attrs=None, **objKwds):
-        if isinstance(self.ldapConn, LDAP):
-            self._setObjKwdDefaults(objKwds)
-            return self.ldapConn.get(self.RDN(rdn), attrs, **objKwds)
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        self._setObjKwdDefaults(objKwds)
+        return self.ldapConn.get(self.RDN(rdn), attrs, **objKwds)
 
     def addChild(self, rdn, attrsDict, **objKwds):
-        if isinstance(self.ldapConn, LDAP):
-            self._setObjKwdDefaults(objKwds)
-            return self.ldapConn.add(self.RDN(rdn), attrsDict, **objKwds)
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        self._setObjKwdDefaults(objKwds)
+        return self.ldapConn.add(self.RDN(rdn), attrsDict, **objKwds)
 
     def search(self, filter=None, attrs=None, *args, **kwds):
-        if isinstance(self.ldapConn, LDAP):
-            return self.ldapConn.search(self.dn, self.relativeSearchScope, filter, attrs,
-                *args, **kwds)
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        self._setObjKwdDefaults(kwds)
+        return self.ldapConn.search(self.dn, self.relativeSearchScope, filter, attrs,
+            *args, **kwds)
 
     ## object-specific methods
 
@@ -1059,10 +1058,8 @@ class LDAPObject(AttrsDict, Extensible):
         return (objectClass in self['objectClass'])
 
     def refresh(self, attrs=None):
-        if isinstance(self.ldapConn, LDAP):
-            self.update(self.ldapConn.get(self.dn, attrs))
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        self.update(self.ldapConn.get(self.dn, attrs))
 
     def refreshMissing(self, attrs):
         missingAttrs = []
@@ -1074,11 +1071,9 @@ class LDAPObject(AttrsDict, Extensible):
 
     def commit(self):
         """update the server with the local attributes dictionary"""
-        if isinstance(self.ldapConn, LDAP):
-            self.ldapConn.replaceAttrs(self.dn, self)
-            self._removeEmptyAttrs()
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        self.ldapConn.replaceAttrs(self.dn, self)
+        self._removeEmptyAttrs()
 
     def compare(self, attr, value):
         if attr in self:
@@ -1103,76 +1098,64 @@ class LDAPObject(AttrsDict, Extensible):
     ## server
 
     def modify(self, modlist):
-        if isinstance(self.ldapConn, LDAP):
-            self.ldapConn.modify(self.dn, modlist)
-            self.modify_local(modlist)
-            self._removeEmptyAttrs()
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        self.ldapConn.modify(self.dn, modlist)
+        self.modify_local(modlist)
+        self._removeEmptyAttrs()
 
     def addAttrs(self, attrsDict):
-        if isinstance(self.ldapConn, LDAP):
-            if not self.ldapConn.strictModify:
-                self.refreshMissing(list(attrsDict.keys()))
-            self.ldapConn.addAttrs(self.dn, attrsDict, current=self)
-            self.addAttrs_local(attrsDict)
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        if not self.ldapConn.strictModify:
+            self.refreshMissing(list(attrsDict.keys()))
+        self.ldapConn.addAttrs(self.dn, attrsDict, current=self)
+        self.addAttrs_local(attrsDict)
 
     def replaceAttrs(self, attrsDict):
-        if isinstance(self.ldapConn, LDAP):
-            self.ldapConn.replaceAttrs(self.dn, attrsDict)
-            self.replaceAttrs_local(attrsDict)
-            self._removeEmptyAttrs()
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        self.ldapConn.replaceAttrs(self.dn, attrsDict)
+        self.replaceAttrs_local(attrsDict)
+        self._removeEmptyAttrs()
 
     def deleteAttrs(self, attrsDict):
-        if isinstance(self.ldapConn, LDAP):
-            if not self.ldapConn.strictModify:
-                self.refreshMissing(list(attrsDict.keys()))
-            self.ldapConn.deleteAttrs(self.dn, attrsDict, current=self)
-            self.deleteAttrs_local(attrsDict)
-            self._removeEmptyAttrs()
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        if not self.ldapConn.strictModify:
+            self.refreshMissing(list(attrsDict.keys()))
+        self.ldapConn.deleteAttrs(self.dn, attrsDict, current=self)
+        self.deleteAttrs_local(attrsDict)
+        self._removeEmptyAttrs()
 
     ## online-only object-level methods
 
     def delete(self):
         """delete the entire object from the server, and render this instance useless"""
-        if isinstance(self.ldapConn, LDAP):
-            self.ldapConn.delete(self.dn)
-            self.clear()
-            self.dn = None
-            self.ldapConn = None
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        self.ldapConn.delete(self.dn)
+        self.clear()
+        self.dn = None
+        self.ldapConn = None
 
     def modDN(self, newRDN, cleanAttr=True, newParent=None):
         """change the object DN, and possibly its location in the tree"""
-        if isinstance(self.ldapConn, LDAP):
-            curRDN, curParent = self.dn.split(',', 1)
-            if newParent is None:
-                parent = curParent
-            else:
-                parent = newParent
-            self.ldapConn.modDN(self.dn, newRDN, cleanAttr, parent)
-            if cleanAttr:
-                rdnAttr, rdnVal = curRDN.split('=', 1)
-                try:
-                    self[rdnAttr].remove(rdnVal)
-                    self._removeEmptyAttrs()
-                except Exception:
-                    pass
-            rdnAttr, rdnVal = newRDN.split('=', 1)
-            if rdnAttr not in self:
-                self[rdnAttr] = [rdnVal]
-            elif rdnVal not in self[rdnAttr]:
-                self[rdnAttr].append(rdnVal)
-            self.dn = '{0},{1}'.format(newRDN, parent)
+        self._requireLDAP()
+        curRDN, curParent = self.dn.split(',', 1)
+        if newParent is None:
+            parent = curParent
         else:
-            raise RuntimeError('No LDAP object')
+            parent = newParent
+        self.ldapConn.modDN(self.dn, newRDN, cleanAttr, parent)
+        if cleanAttr:
+            rdnAttr, rdnVal = curRDN.split('=', 1)
+            try:
+                self[rdnAttr].remove(rdnVal)
+                self._removeEmptyAttrs()
+            except Exception:
+                pass
+        rdnAttr, rdnVal = newRDN.split('=', 1)
+        if rdnAttr not in self:
+            self[rdnAttr] = [rdnVal]
+        elif rdnVal not in self[rdnAttr]:
+            self[rdnAttr].append(rdnVal)
+        self.dn = '{0},{1}'.format(newRDN, parent)
 
     def rename(self, newRDN, cleanAttr=True):
         return self.modDN(newRDN, cleanAttr)
@@ -1198,16 +1181,14 @@ class LDAPObject(AttrsDict, Extensible):
         return ret
 
     def _modifyDescAttrs(self, method, attrsDict):
-        if isinstance(self.ldapConn, LDAP):
-            descDict = self.descAttrs()
-            method(descDict, attrsDict)
-            descStrings = []
-            for key, values in six.iteritems(descDict):
-                for value in values:
-                    descStrings.append(key + DESC_ATTR_DELIM + value)
-            self.replaceAttrs({'description':descStrings + list(self._unstructuredDesc)})
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        descDict = self.descAttrs()
+        method(descDict, attrsDict)
+        descStrings = []
+        for key, values in six.iteritems(descDict):
+            for value in values:
+                descStrings.append(key + DESC_ATTR_DELIM + value)
+        self.replaceAttrs({'description':descStrings + list(self._unstructuredDesc)})
 
     def addDescAttrs(self, attrsDict):
         self._modifyDescAttrs(dictModAdd, attrsDict)
