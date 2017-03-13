@@ -452,11 +452,11 @@ class LDAP(Extensible):
                 self._taggedObjects[tag] = obj
         return obj
 
-    def get(self, DN, attrs=None):
+    def get(self, DN, attrs=None, **objKwds):
         """Get a specific object by DN"""
         if self.sock.unbound:
             raise ConnectionUnbound()
-        results = list(self.search(DN, Scope.BASE, attrs=attrs, limit=2))
+        results = list(self.search(DN, Scope.BASE, attrs=attrs, limit=2, **objKwds))
         n = len(results)
         if n == 0:
             raise NoSearchResults()
@@ -478,7 +478,7 @@ class LDAP(Extensible):
             return True
 
     def search(self, baseDN, scope=Scope.SUBTREE, filter=None, attrs=None, searchTimeout=None,
-        limit=0, derefAliases=None, attrsOnly=False, fetchResultRefs=None):
+        limit=0, derefAliases=None, attrsOnly=False, fetchResultRefs=None, **objKwds):
         """Send search and iterate results until we get a SearchResultDone
 
          Yields instances of LDAPObject and possibly SearchReferenceHandle, if any result
@@ -519,7 +519,7 @@ class LDAP(Extensible):
         logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filter={3}'.format(
             mID, baseDN, scope, filter
         ))
-        return SearchResultHandle(self, mID, fetchResultRefs)
+        return SearchResultHandle(self, mID, fetchResultRefs, objKwds)
 
     def compare(self, DN, attr, value):
         """Perform a compare operation, returning boolean"""
@@ -549,7 +549,7 @@ class LDAP(Extensible):
         else:
             raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
 
-    def add(self, DN, attrsDict):
+    def add(self, DN, attrsDict, **objKwds):
         """Add new object and return corresponding LDAPObject on success"""
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -578,7 +578,7 @@ class LDAP(Extensible):
         mID = self.sock.sendMessage('addRequest', ar)
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
         self._successResult(mID, 'addResponse')
-        return self.obj(DN, attrsDict)
+        return self.obj(DN, attrsDict, **objKwds)
 
     ## search+add patterns
 
@@ -787,11 +787,12 @@ class LDAP(Extensible):
 
 
 class SearchResultHandle(object):
-    def __init__(self, ldapConn, messageID, fetchResultRefs):
+    def __init__(self, ldapConn, messageID, fetchResultRefs, objKwds):
         self.ldapConn = ldapConn
         self.sock = ldapConn.sock
         self.messageID = messageID
         self.fetchResultRefs = fetchResultRefs
+        self.objKwds = objKwds
         self.done = False
         self.abandoned = False
 
@@ -818,7 +819,7 @@ class SearchResultHandle(object):
                         vals.append(six.text_type(_vals.getComponentByPosition(j)))
                     attrs[attrType] = vals
                 logger.debug('Got search result entry (ID {0}) {1}'.format(mID, DN))
-                yield self.ldapConn.obj(DN, attrs)
+                yield self.ldapConn.obj(DN, attrs, **self.objKwds)
             except UnexpectedResponseType:
                 try:
                     mID, resobj = _unpack('searchResDone', msg)
@@ -841,7 +842,7 @@ class SearchResultHandle(object):
                     logger.debug('Got search result reference (ID {0}) to: {1}'.format(
                         mID, ' | '.join(URIs)
                     ))
-                    ref = SearchReferenceHandle(URIs)
+                    ref = SearchReferenceHandle(URIs, self.objKwds)
                     if self.fetchResultRefs:
                         for obj in ref.fetch():
                             yield obj
@@ -943,6 +944,8 @@ class AttrsDict(dict):
 
     @staticmethod
     def validate(attrsDict):
+        if isinstance(attrsDict, AttrsDict):
+            return
         if not isinstance(attrsDict, dict):
             raise TypeError('must be dict')
         for attr in attrsDict:
@@ -1007,29 +1010,31 @@ class LDAPObject(AttrsDict, Extensible):
                 raise ValueError('No rdnAttr specified, must supply full RDN attr=val')
         return '{0},{1}'.format(rdn, self.dn)
 
-    def obj(self, rdn, tag=None, relativeSearchScope=None, rdnAttr=None, *args, **kwds):
-        if relativeSearchScope is None:
-            relativeSearchScope = self.relativeSearchScope
-        if rdnAttr is None:
-            rdnAttr = self.rdnAttr
+    def _setObjKwdDefaults(self, objKwds):
+        """set inherited attributes on keywords dictionary, to make its way into new LDAPObjects"""
+        objKwds.setdefault('relativeSearchScope', self.relativeSearchScope)
+        objKwds.setdefault('rdnAttr', self.rdnAttr)
+
+    def obj(self, rdn, tag=None, *args, **kwds):
+        self._setObjKwdDefaults(kwds)
         if isinstance(self.ldapConn, LDAP):
-            return self.ldapConn.obj(self.RDN(rdn), tag=tag, relativeSearchScope=relativeSearchScope,
-                rdnAttr=rdnAttr, *args, **kwds)
+            return self.ldapConn.obj(self.RDN(rdn), tag=tag, *args, **kwds)
         else:
             if tag is not None:
                 raise LDAPError('tagging requires LDAP instance')
-            return LDAPObject(self.RDN(rdn), relativeSearchScope=relativeSearchScope,
-                rdnAttr=rdnAttr, *args, **kwds)
+            return LDAPObject(self.RDN(rdn), *args, **kwds)
 
-    def getChild(self, rdn, attrs=None):
+    def getChild(self, rdn, attrs=None, **objKwds):
         if isinstance(self.ldapConn, LDAP):
-            return self.ldapConn.get(self.RDN(rdn), attrs)
+            self._setObjKwdDefaults(objKwds)
+            return self.ldapConn.get(self.RDN(rdn), attrs, **objKwds)
         else:
             raise RuntimeError('No LDAP object')
 
-    def addChild(self, rdn, attrsDict):
+    def addChild(self, rdn, attrsDict, **objKwds):
         if isinstance(self.ldapConn, LDAP):
-            return self.ldapConn.add(self.RDN(rdn), attrsDict)
+            self._setObjKwdDefaults(objKwds)
+            return self.ldapConn.add(self.RDN(rdn), attrsDict, **objKwds)
         else:
             raise RuntimeError('No LDAP object')
 
@@ -1251,14 +1256,14 @@ class LDAPURI(object):
         if (nparams > 3) and (len(params[3]) > 0):
             raise LDAPError('Extensions for LDAPURI not yet implemented')
 
-    def search(self):
+    def search(self, **objKwds):
         """Perform the search operation described by the parsed URI
 
          First opens a new connection with connection reuse disabled, then performs the search, and
          unbinds the connection. Server must allow anonymous read.
         """
         ldap = LDAP(self.hostURI, reuseConnection=False)
-        ret = ldap.search(self.DN, self.scope, filter=self.filter, attrs=self.attrs)
+        ret = ldap.search(self.DN, self.scope, filter=self.filter, attrs=self.attrs, **objKwds)
         ldap.unbind()
         return ret
 
@@ -1271,8 +1276,9 @@ class LDAPURI(object):
 
 class SearchReferenceHandle(object):
     """Returned when the server returns a SearchResultReference"""
-    def __init__(self, URIs):
+    def __init__(self, URIs, objKwds):
         self.URIs = []
+        self.objKwds = objKwds
         for uri in URIs:
             self.URIs.append(LDAPURI(uri))
 
@@ -1283,7 +1289,7 @@ class SearchReferenceHandle(object):
         # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
         for uri in self.URIs:
             try:
-                return uri.search()
+                return uri.search(**self.objKwds)
             except LDAPConnectionError as e:
                 warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
         raise LDAPError('Could not complete reference URI search with any supplied URIs')
