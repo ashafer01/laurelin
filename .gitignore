@@ -4,3 +4,4 @@
 *.swo
 *.tar*
 *.egg*
+.DS_Store
