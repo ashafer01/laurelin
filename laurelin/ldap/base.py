@@ -39,6 +39,11 @@ from .rfc4511 import (
     Scope as _Scope,
     DerefAliases as _DerefAliases,
     AbandonRequest,
+    Controls,
+    Control as _Control,
+    LDAPOID,
+    Criticality,
+    ControlValue,
 )
 from .filter import parse as parseFilter
 from .net import LDAPSocket, LDAPConnectionError
@@ -163,6 +168,7 @@ class LDAP(Extensible):
     DEFAULT_FETCH_RESULT_REFS = True
     DEFAULT_SASL_MECH = None
     DEFAULT_SASL_FATAL_DOWNGRADE_CHECK = True
+    DEFAULT_CRITICALITY = False
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -177,6 +183,40 @@ class LDAP(Extensible):
         stderrHandler.setFormatter(logging.Formatter(LDAP.LOG_FORMAT))
         stderrHandler.setLevel(level)
         logger.addHandler(stderrHandler)
+
+    _reservedKwds = set()
+    _controls = {}
+
+    @classmethod
+    def REGISTER_CONTROLS(cls, ctrls):
+        if len(cls._reservedKwds) == 0:
+            from inspect import getargspec
+            # functions that either call sendMessage or have kwds passed through into them
+            reserveFrom = [
+                LDAPObject.__init__,
+                LDAP.obj,
+                LDAP.simpleBind,
+                LDAP.saslBind,
+                LDAP.search,
+                LDAP.compare,
+                LDAP.add,
+                LDAP.delete,
+                LDAP.modify,
+                LDAP.modDN,
+            ]
+            for f in reserveFrom:
+                cls._reservedKwds.update(getargspec(f).args)
+        for ctrl in ctrls:
+            if isinstance(ctrl, tuple):
+                ctrl = Control.generic(*ctrl)
+            if not isinstance(ctrl, Control):
+                raise TypeError('must be Control instance or tuple (method,keyword,OID)')
+            if ctrl.keyword in cls._reservedKwds:
+                raise LDAPExtensionError('Control keyword "{0}" is reserved'.format(ctrl.keyword))
+            if ctrl.keyword in cls._controls:
+                raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(
+                    ctrl.keyword))
+            cls._controls[ctrl.keyword] = ctrl
 
     def __enter__(self):
         return self
@@ -197,6 +237,7 @@ class LDAP(Extensible):
         fetchResultRefs=None,
         saslMech=None,
         saslFatalDowngradeCheck=None,
+        defaultCriticality=None,
         ):
 
         # setup
@@ -224,6 +265,8 @@ class LDAP(Extensible):
             saslMech = LDAP.DEFAULT_SASL_MECH
         if saslFatalDowngradeCheck is None:
             saslFatalDowngradeCheck = LDAP.DEFAULT_SASL_FATAL_DOWNGRADE_CHECK
+        if defaultCriticality is None:
+            defaultCriticality = LDAP.DEFAULT_CRITICALITY
 
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
@@ -231,6 +274,7 @@ class LDAP(Extensible):
         self.defaultSaslMech = saslMech
         self.strictModify = strictModify
         self.saslFatalDowngradeCheck = saslFatalDowngradeCheck
+        self.defaultCriticality = defaultCriticality
 
         self._taggedObjects = {}
         self._saslMechs = None
@@ -302,7 +346,38 @@ class LDAP(Extensible):
         else:
             raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
 
-    def simpleBind(self, username='', password=''):
+    def _processCtrlKwds(self, method, kwds, final=False):
+        """Process keyword arguments for registered controls, returning a protocol-level Controls
+
+         Removes entries from kwds as they are used, allowing the same dictionary to be passed on
+         to another function which may have statically defined arguments. If final is True, then a
+         TypeError will be raised if all kwds are not exhausted.
+        """
+        i = 0
+        ctrls = Controls()
+        for kwd in list(kwds.keys()):
+            if kwd in self._controls:
+                ctrl = self._controls[kwd]
+                if ctrl.method != method:
+                    continue
+                ctrlValue = kwds.pop(kwd)
+                criticality = self.defaultCriticality
+                if isinstance(ctrlValue, critical):
+                    criticality = True
+                    crtlValue = ctrlValue.value
+                if isinstance(ctrlValue, optional):
+                    criticality = False
+                    ctrlValue = ctrlValue.value
+                ctrls.setComponentByPosition(i, ctrl.prepare(ctrlValue, criticality))
+                i += 1
+        if final and (len(kwds) > 0):
+            raise TypeError('Unhandled keyword arguments: {0}'.format(','.join(kwds.keys())))
+        if i > 0:
+            return ctrls
+        else:
+            return None
+
+    def simpleBind(self, username='', password='', **ctrlKwds):
         """Performs a simple bind operation
 
          Leave arguments as their default (empty strings) to attempt an anonymous simple bind
@@ -319,7 +394,9 @@ class LDAP(Extensible):
         ac.setComponentByName('simple', SimpleCreds(password))
         br.setComponentByName('authentication', ac)
 
-        mID = self.sock.sendMessage('bindRequest', br)
+        controls = self._processCtrlKwds('bind', ctrlKwds, final=True)
+
+        mID = self.sock.sendMessage('bindRequest', br, controls)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
             self.sock.ID, username))
         ret = self._successResult(mID, 'bindResponse')
@@ -367,6 +444,8 @@ class LDAP(Extensible):
         if self.sock.bound:
             raise ConnectionAlreadyBound()
 
+        controls = self._processCtrlKwds('bind', props)
+
         mechs = self.getSASLMechs()
         if mech is None:
             mech = self.defaultSaslMech
@@ -392,7 +471,7 @@ class LDAP(Extensible):
             ac.setComponentByName('sasl', sasl)
             br.setComponentByName('authentication', ac)
 
-            mID = self.sock.sendMessage('bindRequest', br)
+            mID = self.sock.sendMessage('bindRequest', br, controls)
             logger.debug('Sent SASL bind request (ID {0}) on connection #{1}'.format(mID,
                 self.sock.ID))
 
@@ -478,7 +557,7 @@ class LDAP(Extensible):
             return True
 
     def search(self, baseDN, scope=Scope.SUBTREE, filter=None, attrs=None, searchTimeout=None,
-        limit=0, derefAliases=None, attrsOnly=False, fetchResultRefs=None, **objKwds):
+        limit=0, derefAliases=None, attrsOnly=False, fetchResultRefs=None, **kwds):
         """Send search and iterate results until we get a SearchResultDone
 
          Yields instances of LDAPObject and possibly SearchReferenceHandle, if any result
@@ -515,13 +594,15 @@ class LDAP(Extensible):
             i += 1
         req.setComponentByName('attributes', _attrs)
 
-        mID = self.sock.sendMessage('searchRequest', req)
+        controls = self._processCtrlKwds('search', kwds)
+
+        mID = self.sock.sendMessage('searchRequest', req, controls)
         logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filter={3}'.format(
             mID, baseDN, scope, filter
         ))
-        return SearchResultHandle(self, mID, fetchResultRefs, objKwds)
+        return SearchResultHandle(self, mID, fetchResultRefs, kwds)
 
-    def compare(self, DN, attr, value):
+    def compare(self, DN, attr, value, **ctrlKwds):
         """Perform a compare operation, returning boolean"""
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -533,7 +614,9 @@ class LDAP(Extensible):
         ava.setComponentByName('assertionValue', AssertionValue(six.text_type(value)))
         cr.setComponentByName('ava', ava)
 
-        messageID = self.sock.sendMessage('compareRequest', cr)
+        controls = self._processCtrlKwds('compare', ctrlKwds, final=True)
+
+        messageID = self.sock.sendMessage('compareRequest', cr, controls)
         logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(
             messageID, DN, attr, value
         ))
@@ -549,7 +632,7 @@ class LDAP(Extensible):
         else:
             raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
 
-    def add(self, DN, attrsDict, **objKwds):
+    def add(self, DN, attrsDict, **kwds):
         """Add new object and return corresponding LDAPObject on success"""
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -575,10 +658,13 @@ class LDAP(Extensible):
             al.setComponentByPosition(i, attr)
             i += 1
         ar.setComponentByName('attributes', al)
-        mID = self.sock.sendMessage('addRequest', ar)
+
+        controls = self._processCtrlKwds('add', kwds)
+
+        mID = self.sock.sendMessage('addRequest', ar, controls)
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
         self._successResult(mID, 'addResponse')
-        return self.obj(DN, attrsDict, **objKwds)
+        return self.obj(DN, attrsDict, **kwds)
 
     ## search+add patterns
 
@@ -630,17 +716,18 @@ class LDAP(Extensible):
 
     ## delete an object
 
-    def delete(self, DN):
+    def delete(self, DN, **ctrlKwds):
         """Delete an object"""
         if self.sock.unbound:
             raise ConnectionUnbound()
-        mID = self.sock.sendMessage('delRequest', DelRequest(DN))
+        controls = self._processCtrlKwds('delete', ctrlKwds, final=True)
+        mID = self.sock.sendMessage('delRequest', DelRequest(DN), controls)
         logger.info('Sent delete request (ID {0}) for DN {1}'.format(mID, DN))
         return self._successResult(mID, 'delResponse')
 
     ## change object DN
 
-    def modDN(self, DN, newRDN, cleanAttr=True, newParent=None):
+    def modDN(self, DN, newRDN, cleanAttr=True, newParent=None, **ctrlKwds):
         """Exposes all options of the protocol-level ModifyDNRequest"""
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -650,23 +737,24 @@ class LDAP(Extensible):
         mdr.setComponentByName('deleteoldrdn', cleanAttr)
         if newParent is not None:
             mdr.setComponentByName('newSuperior', NewSuperior(newParent))
-        mID = self.sock.sendMessage('modDNRequest', mdr)
+        controls = self._processCtrlKwds('modDN', ctrlKwds, final=True)
+        mID = self.sock.sendMessage('modDNRequest', mdr, controls)
         logger.info('Sent modDN request (ID {0}) for DN {1} newRDN="{2}" newParent="{3}"'.format(
             mID, DN, newRDN, newParent))
         return self._successResult(mID, 'modDNResponse')
 
-    def rename(self, DN, newRDN, cleanAttr=True):
+    def rename(self, DN, newRDN, cleanAttr=True, **ctrlKwds):
         """Specify a new RDN for an object without changing its location in the tree"""
-        return self.modDN(DN, newRDN, cleanAttr)
+        return self.modDN(DN, newRDN, cleanAttr, **ctrlKwds)
 
-    def move(self, DN, newDN, cleanAttr=True):
+    def move(self, DN, newDN, cleanAttr=True, **ctrlKwds):
         """Specify a new absolute DN for an object"""
         rdn, parent = newDN.split(',', 1)
-        return self.modDN(DN, rdn, cleanAttr, parent)
+        return self.modDN(DN, rdn, cleanAttr, parent, **ctrlKwds)
 
     ## change attributes on an object
 
-    def modify(self, DN, modlist):
+    def modify(self, DN, modlist, **ctrlKwds):
         """Perform a series of modify operations on an object
 
          modlist must be a list of laurelin.ldap.modify.Mod instances
@@ -697,14 +785,15 @@ class LDAP(Extensible):
                 cl.setComponentByPosition(i, c)
                 i += 1
             mr.setComponentByName('changes', cl)
-            mID = self.sock.sendMessage('modifyRequest', mr)
+            controls = self._processCtrlKwds('modify', ctrlKwds, final=True)
+            mID = self.sock.sendMessage('modifyRequest', mr, controls)
             logger.info('Sent modify request (ID {0}) for DN {1}'.format(mID, DN))
             return self._successResult(mID, 'modifyResponse')
         else:
             logger.debug('Not sending 0-length modlist for DN {0}'.format(DN))
             return True
 
-    def addAttrs(self, DN, attrsDict, current=None):
+    def addAttrs(self, DN, attrsDict, current=None, **ctrlKwds):
         """Add new attribute values to existing object"""
         if current is not None:
             modlist = AddModlist(current, attrsDict)
@@ -713,9 +802,9 @@ class LDAP(Extensible):
             modlist = AddModlist(current, attrsDict)
         else:
             modlist = Modlist(Mod.ADD, attrsDict)
-        return self.modify(DN, modlist)
+        return self.modify(DN, modlist, **ctrlKwds)
 
-    def deleteAttrs(self, DN, attrsDict, current=None):
+    def deleteAttrs(self, DN, attrsDict, current=None, **ctrlKwds):
         """Delete specific attribute values from dictionary
 
          Specifying a 0-length entry will delete all values
@@ -727,16 +816,16 @@ class LDAP(Extensible):
             modlist = DeleteModlist(current, attrsDict)
         else:
             modlist = Modlist(Mod.DELETE, attrsDict)
-        return self.modify(DN, modlist)
+        return self.modify(DN, modlist, **ctrlKwds)
 
-    def replaceAttrs(self, DN, attrsDict):
+    def replaceAttrs(self, DN, attrsDict, **ctrlKwds):
         """Replace all values on given attributes with the passed values
 
          * Attributes not mentioned in attrsDict are not touched
          * Attributes will be created if they do not exist
          * Specifying a 0-length entry will delete all values for that attribute
         """
-        return self.modify(DN, Modlist(Mod.REPLACE, attrsDict))
+        return self.modify(DN, Modlist(Mod.REPLACE, attrsDict), **ctrlKwds)
 
     def processLDIF(self, ldifStr):
         """Process a basic LDIF
@@ -1274,3 +1363,43 @@ class SearchReferenceHandle(object):
             except LDAPConnectionError as e:
                 warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
         raise LDAPError('Could not complete reference URI search with any supplied URIs')
+
+
+class Control(object):
+    # Controls are exposed by allowing additional keyword arguments on particular methods
+    method = ''  # name of the method which this control is used with
+    keyword = '' # keyword argument name
+    OID = ''     # OID of the control
+
+    @classmethod
+    def generic(cls, method=None, keyword=None, OID=None):
+        c = cls()
+        if method is not None:
+            c.method = method
+        if keyword is not None:
+            c.keyword = keyword
+        if OID is not None:
+            c.OID = OID
+        return c
+
+    def prepare(self, ctrlValue, criticality):
+        c = _Control()
+        c.setComponentByName('controlType', LDAPOID(self.OID))
+        c.setComponentByName('criticality', Criticality(criticality))
+        if not isinstance(ctrlValue, six.string_types):
+            raise TypeError('Control value must be string')
+        if len(ctrlValue) > 0:
+            c.setComponentByName('controlValue', ControlValue(ctrlValue))
+        return c
+
+
+class critical(object):
+    """used to mark controls with criticality"""
+    def __init__(self, value):
+        self.value = value
+
+
+class optional(object):
+    """used to mark controls as not having criticality"""
+    def __init__(self, value):
+        self.value = value

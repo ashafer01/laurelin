@@ -152,7 +152,7 @@ class LDAPSocket(object):
         else:
             raise LDAPSASLError('SASL init not complete')
 
-    def sendMessage(self, op, obj):
+    def sendMessage(self, op, obj, controls=None):
         """Create and send an LDAPMessage given an operation name and a corresponding object
 
          Operation names must be defined as component names in laurelin.ldap.rfc4511.ProtocolOp and
@@ -165,6 +165,8 @@ class LDAPSocket(object):
         po = ProtocolOp()
         po.setComponentByName(op, obj)
         lm.setComponentByName('protocolOp', po)
+        if controls:
+            lm.setComponentByName('controls', controls)
         raw = berEncode(lm)
         if self.saslOK:
             raw = self._saslClient.wrap(raw)
