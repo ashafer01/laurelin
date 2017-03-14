@@ -11,6 +11,8 @@ The following features have not yet been implemented or are incomplete
 * Docs
 * Possibly others - kindly open a ticket on github if you spot anything
 
+Further, at this stage in development, things like default settings and naming are open for discussion. Please open a ticket if you think anything should change.
+
 # Walkthrough
 
 Begin by initializing a connection to an LDAP server. Pass a URI string to the `LDAP` constructor:
@@ -52,7 +54,7 @@ Use **`LDAP.get()`** if you just need to get a single object by its DN. Also acc
 
 -----
 
-A python-ldap-style interface for specifying a complex atomic modify operation is provided, but it is discussed later. The following methods are preferred:
+The following methods are preferred for modification, however raw [modify methods](#modify-operations) are provided.
 
 All accept the absolute DN of the object to modify, and an [attributes dictionary](#attributes-dictionaries).
 
@@ -110,6 +112,55 @@ This common interface is used both for input and output of LDAP attributes. In s
 }
 ```
 Note that there is an `AttrsDict` class defined in `laurelin.ldap.base`. There is **no requirement** to create instances of this class to pass as arguments, though you are welcome to if you find the additional methods on this class convenient. It provides methods like `getAttr()`, and local versions of all modify methods (used internally by online modify methods after success, e.g. `addAttrs_local()`). Further, it overrides `dict` special methods to enforce type requirements.
+
+# Modify Operations
+## Raw modify methods
+**`LDAP.modify()`** and **`LDAPObject.modify()`** work similarly to the modify functions in python-ldap, which in turn very closely align with how modify operations are described at the protocol level. A list of `Mod` instances is required with 3 arguments:
+
+1. One of the `Mod.*` constants which describe the operation to perform on an attribute:
+  * **`Mod.ADD`** adds new attributes/values
+  * **`Mod.REPLACE`** replaces all values for an attribute, creating new attributes if necessary
+  * **`Mod.DELETE`** removes attributes/values.
+2. The name of the attribute to modify. Each entry may only modify one attribute, but an unlimited number of entries may be specified in a single modify operation.
+3. A list of attribute values to use with the modify operation:
+  * The list may be empty for `Mod.REPLACE` and `Mod.DELETE`, both of which will cause all values for the given attribute to be removed from the object. The list may not be empty for `Mod.ADD`.
+  * A non-empty list for `Mod.ADD` lists all new attribute values to add
+  * A non-empty list for `Mod.DELETE` lists specific attribute values to remove
+  * A non-empty list for `Mod.REPLACE` indicates ALL new values for the attribute - all others will be removed.
+
+Example custom modify operation:
+
+```python
+from laurelin.ldap.modify import Mod
+
+ldap.modify('uid=ashafer01,ou=people,dc=example,dc=org', [
+    Mod(Mod.ADD, 'mobile', ['+1 401 555 1234', '+1 403 555 4321']),
+    Mod(Mod.ADD, 'homePhone', ['+1 404 555 6789']),
+    Mod(Mod.REPLACE, 'homeDirectory', ['/export/home/ashafer01']),
+])
+```
+
+Using an `LDAPObject` instead:
+
+```python
+ldap.base.obj('uid=ashafer01,ou=people').modify([
+    Mod(Mod.DELETE, 'mobile', ['+1 401 555 1234']),
+    Mod(Mod.DELETE, 'homePhone', []), # delete all homePhone values
+])
+```
+
+Again, an arbitrary number of `Mod` entries may be specified for each `modify` call.
+
+## Strict modification and higher-level modify functions
+The higher-level modify functions (`addAttrs`, `deleteAttrs`, and `replaceAttrs`) all rely on the concept of *strict modification* - that is, to only send the modify operation, and to never perform an additional search. By default, strict modification is **disabled**, meaning that, if necessary, an extra search **will** be performed before sending a modify request if needed. (The default setting is open for discussion at this stage - please open a github ticket if you think it should change)
+
+You can enable strict modification by passing `strictModify=True` to the `LDAP` constructor.
+
+With strict modification disabled, the `LDAP` modify functions will engage a more intelligent modification strategy after performing the extra query: for `addAttrs`, no duplicate values are sent to the server to be added. Likewise for `deleteAttrs`, deletion will not be requested for values that are not known to exist. This prevents many unnecessary failures, as ultimately the final semantic state of the object is unchanged with or without such failures. (Note that with `replaceAttrs` no such failures are possible)
+
+With the `LDAPObject` modify functions, the situaiton is slightly more complex. Regardless of the `strictModify` setting, the more intelligent modify strategy will always be used, using at least any already-queried attribute data stored with the object (which could be complete data depending on how the object was originally obtained). If `strictModify` is disabled, however, another search *may* still be performed to fill in any missing attributes that are mentioned in the passed attributes dict.
+
+The raw `modify` functions on both `LDAP` and `LDAPObject` are unaffected by the `strictModify` setting - they will always attempt the modify operation exactly as specified. 
 
 # Basic usage examples
 
