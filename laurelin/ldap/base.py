@@ -59,7 +59,7 @@ from .modify import (
 )
 import six
 from six.moves import range
-from six.moves.urllib.parse import urlparse, quote
+from six.moves.urllib.parse import urlparse
 
 logger = logging.getLogger('laurelin.ldap')
 logger.addHandler(logging.NullHandler())
@@ -365,7 +365,7 @@ class LDAP(Extensible):
                 if isinstance(ctrlValue, critical):
                     criticality = True
                     crtlValue = ctrlValue.value
-                if isinstance(ctrlValue, optional):
+                elif isinstance(ctrlValue, optional):
                     criticality = False
                     ctrlValue = ctrlValue.value
                 ctrls.setComponentByPosition(i, ctrl.prepare(ctrlValue, criticality))
@@ -1309,7 +1309,7 @@ class LDAPURI(object):
         if self.scheme == '':
             self.scheme = 'ldap'
         self.netloc = parsedURI.netloc
-        self.hostURI = '{0}://{1}'.format(self.scheme, quote(self.netloc))
+        self.hostURI = '{0}://{1}'.format(self.scheme, self.netloc)
         self.DN = parsedURI.path
         params = parsedURI.query.split('?')
         nparams = len(params)
@@ -1328,14 +1328,14 @@ class LDAPURI(object):
         if (nparams > 3) and (len(params[3]) > 0):
             raise LDAPError('Extensions for LDAPURI not yet implemented')
 
-    def search(self, **objKwds):
+    def search(self, **kwds):
         """Perform the search operation described by the parsed URI
 
          First opens a new connection with connection reuse disabled, then performs the search, and
          unbinds the connection. Server must allow anonymous read.
         """
         ldap = LDAP(self.hostURI, reuseConnection=False)
-        ret = ldap.search(self.DN, self.scope, filter=self.filter, attrs=self.attrs, **objKwds)
+        ret = ldap.search(self.DN, self.scope, filter=self.filter, attrs=self.attrs, **kwds)
         ldap.unbind()
         return ret
 
