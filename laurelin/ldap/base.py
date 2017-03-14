@@ -277,6 +277,7 @@ class LDAP(Extensible):
                 logger.info('Opening new exclusive socket connection to {0}'.format(self.hostURI))
                 self.sockParams = connectTo.sockParams
                 self.sock = LDAPSocket(self.hostURI, *self.sockParams)
+                logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
             if baseDN is None:
                 self.baseDN = connectTo.baseDN
             else:
@@ -353,7 +354,6 @@ class LDAP(Extensible):
                     warn(msg)
             else:
                 logger.debug('No evidence of downgrade attack')
-                return self._saslMechs
 
     def saslBind(self, mech=None, **props):
         """Perform a SASL bind operation
