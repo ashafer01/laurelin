@@ -54,7 +54,7 @@ from .modify import (
 )
 import six
 from six.moves import range
-from six.moves.urllib.parse import urlparse
+from six.moves.urllib.parse import urlparse, quote
 
 logger = logging.getLogger('laurelin.ldap')
 logger.addHandler(logging.NullHandler())
@@ -1217,8 +1217,10 @@ class LDAPURI(object):
         self._orig = uri
         parsedURI = urlparse(uri)
         self.scheme = parsedURI.scheme
+        if self.scheme == '':
+            self.scheme = 'ldap'
         self.netloc = parsedURI.netloc
-        self.hostURI = '{0}://{1}'.format(self.scheme, self.netloc)
+        self.hostURI = '{0}://{1}'.format(self.scheme, quote(self.netloc))
         self.DN = parsedURI.path
         params = parsedURI.query.split('?')
         nparams = len(params)

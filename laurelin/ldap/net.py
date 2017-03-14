@@ -4,7 +4,7 @@ from __future__ import absolute_import
 import ssl
 from glob import glob
 from socket import socket, AF_UNIX, error as SocketError
-from six.moves.urllib.parse import urlparse
+from six.moves.urllib.parse import urlparse, unquote
 from collections import deque
 from pyasn1.codec.ber.encoder import encode as berEncode
 from pyasn1.codec.ber.decoder import decode as berDecode
@@ -53,10 +53,20 @@ class LDAPSocket(object):
             self._sock = ctx.wrap_socket(socket(), server_hostname=hostname)
             self._inetConnect(parsedURI.netloc, 636, connectTimeout)
         elif parsedURI.scheme == 'ldapi':
+            # allow a quoted path in netloc, or just use the path component (technically incorrect
+            # since the path component contains a DN for a proper LDAP URI)
+            if parsedURI.netloc != '':
+                path = unquote(parsedURI.netloc)
+            elif parsedURI.path != '':
+                path = parsedURI.path
+            else:
+                raise ValueError('No socket path found in URI')
+
+            self.sockPath = None
             self._sock = socket(AF_UNIX)
             self.host = 'localhost'
-            self.sockPath = None
-            if parsedURI.path == '/':
+
+            if path == '/':
                 for sockGlob in LDAPSocket.LDAPI_SOCKET_PATHS:
                     fn = glob(sockGlob)
                     if len(fn) > 1:
@@ -74,8 +84,8 @@ class LDAPSocket(object):
                         'socket path must be supplied in URI')
             else:
                 try:
-                    self._sock.connect(parsedURI.path)
-                    self.sockPath = parsedURI.path
+                    self._sock.connect(path)
+                    self.sockPath = path
                 except SocketError as e:
                     raise LDAPConnectionError('failed connect to unix socket {0} - {1} ({2})'.format(
                         sockPath, e.strerror, e.errno
