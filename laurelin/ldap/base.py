@@ -1117,15 +1117,15 @@ class LDAPObject(AttrsDict, Extensible):
                 raise LDAPError('tagging requires LDAP instance')
             return LDAPObject(self.RDN(rdn), *args, **kwds)
 
-    def getChild(self, rdn, attrs=None, **objKwds):
+    def getChild(self, rdn, attrs=None, **kwds):
         self._requireLDAP()
-        self._setObjKwdDefaults(objKwds)
-        return self.ldapConn.get(self.RDN(rdn), attrs, **objKwds)
+        self._setObjKwdDefaults(kwds)
+        return self.ldapConn.get(self.RDN(rdn), attrs, **kwds)
 
-    def addChild(self, rdn, attrsDict, **objKwds):
+    def addChild(self, rdn, attrsDict, **kwds):
         self._requireLDAP()
-        self._setObjKwdDefaults(objKwds)
-        return self.ldapConn.add(self.RDN(rdn), attrsDict, **objKwds)
+        self._setObjKwdDefaults(kwds)
+        return self.ldapConn.add(self.RDN(rdn), attrsDict, **kwds)
 
     def search(self, filter=None, attrs=None, *args, **kwds):
         self._requireLDAP()
@@ -1186,44 +1186,44 @@ class LDAPObject(AttrsDict, Extensible):
     ## argument, then call the matching local modify method after a successful request to the
     ## server
 
-    def modify(self, modlist):
+    def modify(self, modlist, **ctrlKwds):
         self._requireLDAP()
-        self.ldapConn.modify(self.dn, modlist)
+        self.ldapConn.modify(self.dn, modlist, **ctrlKwds)
         self.modify_local(modlist)
         self._removeEmptyAttrs()
 
-    def addAttrs(self, attrsDict):
+    def addAttrs(self, attrsDict, **ctrlKwds):
         self._requireLDAP()
         if not self.ldapConn.strictModify:
             self.refreshMissing(list(attrsDict.keys()))
-        self.ldapConn.addAttrs(self.dn, attrsDict, current=self)
+        self.ldapConn.addAttrs(self.dn, attrsDict, current=self, **ctrlKwds)
         self.addAttrs_local(attrsDict)
 
-    def replaceAttrs(self, attrsDict):
+    def replaceAttrs(self, attrsDict, **ctrlKwds):
         self._requireLDAP()
-        self.ldapConn.replaceAttrs(self.dn, attrsDict)
+        self.ldapConn.replaceAttrs(self.dn, attrsDict, **ctrlKwds)
         self.replaceAttrs_local(attrsDict)
         self._removeEmptyAttrs()
 
-    def deleteAttrs(self, attrsDict):
+    def deleteAttrs(self, attrsDict, **ctrlKwds):
         self._requireLDAP()
         if not self.ldapConn.strictModify:
             self.refreshMissing(list(attrsDict.keys()))
-        self.ldapConn.deleteAttrs(self.dn, attrsDict, current=self)
+        self.ldapConn.deleteAttrs(self.dn, attrsDict, current=self, **ctrlKwds)
         self.deleteAttrs_local(attrsDict)
         self._removeEmptyAttrs()
 
     ## online-only object-level methods
 
-    def delete(self):
+    def delete(self, **ctrlKwds):
         """delete the entire object from the server, and render this instance useless"""
         self._requireLDAP()
-        self.ldapConn.delete(self.dn)
+        self.ldapConn.delete(self.dn, **ctrlKwds)
         self.clear()
         self.dn = None
         self.ldapConn = None
 
-    def modDN(self, newRDN, cleanAttr=True, newParent=None):
+    def modDN(self, newRDN, cleanAttr=True, newParent=None, **ctrlKwds):
         """change the object DN, and possibly its location in the tree"""
         self._requireLDAP()
         curRDN, curParent = self.dn.split(',', 1)
@@ -1231,7 +1231,7 @@ class LDAPObject(AttrsDict, Extensible):
             parent = curParent
         else:
             parent = newParent
-        self.ldapConn.modDN(self.dn, newRDN, cleanAttr, parent)
+        self.ldapConn.modDN(self.dn, newRDN, cleanAttr, parent, **ctrlKwds)
         if cleanAttr:
             rdnAttr, rdnVal = curRDN.split('=', 1)
             try:
@@ -1246,12 +1246,12 @@ class LDAPObject(AttrsDict, Extensible):
             self[rdnAttr].append(rdnVal)
         self.dn = '{0},{1}'.format(newRDN, parent)
 
-    def rename(self, newRDN, cleanAttr=True):
-        return self.modDN(newRDN, cleanAttr)
+    def rename(self, newRDN, cleanAttr=True, **ctrlKwds):
+        return self.modDN(newRDN, cleanAttr, **ctrlKwds)
 
-    def move(self, newDN, cleanAttr=True):
+    def move(self, newDN, cleanAttr=True, **ctrlKwds):
         newRDN, newParent = newDN.split(',', 1)
-        return self.modDN(newRDN, cleanAttr, newParent)
+        return self.modDN(newRDN, cleanAttr, newParent, **ctrlKwds)
 
     ## structured description field methods
     ## these implement the common pattern of storing arbitrary key=value data in description fields
