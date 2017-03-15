@@ -9,6 +9,10 @@ with LDAP('ldapi:///') as l:
     #l.saslBind(mech='DIGEST-MD5', username='admin', password=getpass())
     l.saslBind()
 
+    print('WHO AM I? {0}'.format(l.whoAmI()))
+
+    print(l.rootDSE.formatLDIF())
+
     #print(l.get('cn=config').formatLDIF())
 
     with l.base.search() as r:

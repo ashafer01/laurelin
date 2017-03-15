@@ -88,7 +88,7 @@ class LDAPSocket(object):
                     self.sockPath = path
                 except SocketError as e:
                     raise LDAPConnectionError('failed connect to unix socket {0} - {1} ({2})'.format(
-                        sockPath, e.strerror, e.errno
+                        path, e.strerror, e.errno
                     ))
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))

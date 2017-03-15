@@ -44,6 +44,9 @@ from .rfc4511 import (
     LDAPOID,
     Criticality,
     ControlValue,
+    ExtendedRequest,
+    RequestName,
+    RequestValue,
 )
 from .filter import parse as parseFilter
 from .net import LDAPSocket, LDAPConnectionError
@@ -177,6 +180,9 @@ class LDAP(Extensible):
     # logging config
     LOG_FORMAT = '[%(asctime)s] %(name)s %(levelname)s : %(message)s'
 
+    # OIDs
+    OID_WHOAMI = '1.3.6.1.4.1.4203.1.11.3'
+
     @staticmethod
     def enableLogging(level=logging.DEBUG):
         stderrHandler = logging.StreamHandler()
@@ -293,24 +299,6 @@ class LDAP(Extensible):
                 logger.info('Opening exclusive socket connection to {0}'.format(self.hostURI))
                 self.sock = LDAPSocket(self.hostURI, *self.sockParams)
             logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
-            if baseDN is not None:
-                self.baseDN = baseDN
-            else:
-                logger.debug('Querying server to find baseDN')
-                o = self.get('', ['namingContexts', 'defaultNamingContext'])
-                if 'defaultNamingContext' in o:
-                    self.baseDN = o['defaultNamingContext'][0]
-                else:
-                    ncs = o.getAttr('namingContexts')
-                    n = len(ncs)
-                    if n == 0:
-                        raise LDAPError('Server did not supply any namingContexts, baseDN must '
-                            'be provided')
-                    elif n == 1:
-                        self.baseDN = ncs[0]
-                    else:
-                        raise LDAPError('Server supplied multiple namingContexts, baseDN must be'
-                            ' provided')
         elif isinstance(connectTo, LDAP):
             self.hostURI = connectTo.hostURI
             if reuseConnection:
@@ -323,12 +311,26 @@ class LDAP(Extensible):
                 self.sock = LDAPSocket(self.hostURI, *self.sockParams)
                 logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
             if baseDN is None:
-                self.baseDN = connectTo.baseDN
-            else:
-                self.baseDN = baseDN
+                baseDN = connectTo.baseDN
         else:
             raise TypeError('Must supply URI string or LDAP instance for connectTo')
         self.sock.refcount += 1
+
+        self.rootDSE = self.get('', ['*', '+'])
+        self._saslMechs = self.rootDSE.getAttr('supportedSASLMechanisms')
+        if baseDN is None:
+            if 'defaultNamingContext' in self.rootDSE:
+                baseDN = self.rootDSE['defaultNamingContext'][0]
+            else:
+                ncs = self.rootDSE.getAttr('namingContexts')
+                n = len(ncs)
+                if n == 0:
+                    raise LDAPError('baseDN must be provided - no namingContexts')
+                elif n == 1:
+                    baseDN = ncs[0]
+                else:
+                    raise LDAPError('baseDN must be provided - multiple namingContexts')
+        self.baseDN = baseDN
 
         if self.defaultSaslMech is None and self.hostURI.startswith('ldapi:'):
             self.defaultSaslMech = 'EXTERNAL'
@@ -368,6 +370,8 @@ class LDAP(Extensible):
                 elif isinstance(ctrlValue, optional):
                     criticality = False
                     ctrlValue = ctrlValue.value
+                if criticality and (ctrl.OID not in self.rootDSE.getAttr('supportedControl')):
+                    raise LDAPError('Control keyword {0} is not supported by the server'.format(kwd))
                 ctrls.setComponentByPosition(i, ctrl.prepare(ctrlValue, criticality))
                 i += 1
         if final and (len(kwds) > 0):
@@ -826,6 +830,28 @@ class LDAP(Extensible):
          * Specifying a 0-length entry will delete all values for that attribute
         """
         return self.modify(DN, Modlist(Mod.REPLACE, attrsDict), **ctrlKwds)
+
+    def sendExtendedRequest(self, OID, value=None, **ctrlKwds):
+        """Send an extended request, returns internal message ID
+
+         This is mainly meant to be called by other built-in methods and client extensions. No
+         results are received from the server.
+        """
+        if OID not in self.rootDSE.getAttr('supportedExtension'):
+            raise LDAPError('Extension operation is not supported by the server')
+        xr = ExtendedRequest()
+        xr.setComponentByName('requestName', RequestName(OID))
+        if value is not None:
+            if not isinstance(value, six.string_types):
+                raise TypeError('extendedRequest value must be string')
+            xr.setComponentByName('requestValue', RequestValue(value))
+        controls = self._processCtrlKwds('extended', ctrlKwds, final=True)
+        return self.sock.sendMessage('extendedReq', xr, controls)
+
+    def whoAmI(self):
+        mID = self.sendExtendedRequest(LDAP.OID_WHOAMI)
+        _, xr = _unpack('extendedResp', self.sock.recvOne(mID))
+        return six.text_type(xr.getComponentByName('responseValue'))
 
     def processLDIF(self, ldifStr):
         """Process a basic LDIF
