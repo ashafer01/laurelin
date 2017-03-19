@@ -138,17 +138,20 @@ class DerefAliases:
 
 class Extensible(object):
     @classmethod
-    def EXTEND(cls, methods):
-        for method in methods:
-            if isinstance(method, tuple):
-                name, method = method
+    def EXTEND(cls, *names):
+        def _extend(method):
+            if len(names) == 0:
+                _names = (method.__name__,)
             else:
-                name = method.__name__
-            if not hasattr(cls, name):
-                setattr(cls, name, method)
-            else:
-                raise LDAPExtensionError('Cannot add extension attribute {0} - class {1} already '
-                    'has an attribute by that name'.format(name, cls.__name__))
+                _names = names
+            for name in _names:
+                if not hasattr(cls, name):
+                    setattr(cls, name, method)
+                else:
+                    raise LDAPExtensionError('Cannot add extension attribute {0} - class {1}'
+                        ' already has an attribute by that name'.format(name, cls.__name__))
+            return method
+        return _extend
 
 
 # for storing reusable sockets
@@ -158,6 +161,7 @@ class LDAP(Extensible):
     """Provides the connection to the LDAP DB"""
 
     # global defaults
+    DEFAULT_SERVER = 'ldap://localhost'
     DEFAULT_FILTER = '(objectClass=*)'
     DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
     DEFAULT_SEARCH_TIMEOUT = 0
@@ -229,7 +233,7 @@ class LDAP(Extensible):
     def __exit__(self, etype, e, trace):
         self.close()
 
-    def __init__(self, connectTo, baseDN=None,
+    def __init__(self, connectTo=None, baseDN=None,
         reuseConnection=None,
         connectTimeout=None,
         searchTimeout=None,
@@ -246,6 +250,8 @@ class LDAP(Extensible):
         ):
 
         # setup
+        if connectTo is None:
+            connectTo = LDAP.DEFAULT_SERVER
         if reuseConnection is None:
             reuseConnection = LDAP.DEFAULT_REUSE_CONNECTION
         if connectTimeout is None:
@@ -360,7 +366,8 @@ class LDAP(Extensible):
             if kwd in self._controls:
                 ctrl = self._controls[kwd]
                 if ctrl.method != method:
-                    continue
+                    raise LDAPError('Control keyword {0} not allowed for method "{1}"'.format(
+                        kwd, method))
                 ctrlValue = kwds.pop(kwd)
                 if isinstance(ctrlValue, critical):
                     criticality = True
@@ -600,8 +607,7 @@ class LDAP(Extensible):
 
         mID = self.sock.sendMessage('searchRequest', req, controls)
         logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filter={3}'.format(
-            mID, baseDN, scope, filter
-        ))
+            mID, baseDN, scope, filter))
         return SearchResultHandle(self, mID, fetchResultRefs, kwds)
 
     def compare(self, DN, attr, value, **ctrlKwds):
@@ -620,8 +626,7 @@ class LDAP(Extensible):
 
         messageID = self.sock.sendMessage('compareRequest', cr, controls)
         logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(
-            messageID, DN, attr, value
-        ))
+            messageID, DN, attr, value))
         msg = self.sock.recvOne(messageID)
         mID, res = _unpack('compareResponse', msg)
         res = res.getComponentByName('resultCode')

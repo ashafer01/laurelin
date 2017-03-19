@@ -9,12 +9,15 @@ NETGROUP_ATTRS = ['nisNetgroupTriple', 'memberNisNetgroup', 'objectClass', 'desc
 
 ## LDAP extension methods
 
+@LDAP.EXTEND()
 def getNetgroup(self, cn, attrs=NETGROUP_ATTRS):
     return self.tag(TAG).get(cn, attrs)
 
+@LDAP.EXTEND()
 def netgroupSearch(self, filter, attrs=NETGROUP_ATTRS):
     return self.tag(TAG).search(_netgroupFilter(filter), attrs)
 
+@LDAP.EXTEND()
 def getNetgroupUsers(self, cn, recursive=True):
     ng = self.getNetgroup(cn)
     users = _extractTripleField(ng, 2)
@@ -23,6 +26,7 @@ def getNetgroupUsers(self, cn, recursive=True):
             users += self.getNetgroupUsers(member, True)
     return users
 
+@LDAP.EXTEND()
 def getNetgroupHosts(self, cn, recursive=True):
     ng = self.getNetgroup(cn)
     users = _extractTripleField(ng, 1)
@@ -31,53 +35,38 @@ def getNetgroupHosts(self, cn, recursive=True):
             users += self.getNetgroupHosts(member, True)
     return users
 
+@LDAP.EXTEND()
 def addNetgroupUsers(self, DN, members, domain=''):
     if not isinstance(members, list):
         members = [members]
     self.addAttrs(DN, _memberUserListToAttrs(members, domain))
 
+@LDAP.EXTEND()
 def addNetgroupHosts(self, DN, members, domain=''):
     if not isinstance(members, list):
         members = [members]
     self.addAttrs(DN, _memberHostListToAttrs(members, domain))
 
-LDAP.EXTEND([
-    getNetgroup,
-    netgroupSearch,
-    getNetgroupUsers,
-    getNetgroupHosts,
-    addNetgroupUsers,
-    ('addNetgroupUser', addNetgroupUsers),
-    addNetgroupHosts,
-    ('addNetgroupHost', addNetgroupHosts),
-])
-
 ## LDAPObject extension methods
 
-def _obj_getNetgroupUsers(self):
+@LDAPObject.EXTEND()
+def _requireNetgroup(self):
     if not self.hasObjectClass(OBJECT_CLASS):
-        raise RuntimeError('Invalid objectClass for addNetgroupUsers '
-            '(must have {0})'.format(OBJECT_CLASS))
+        raise RuntimeError('objectClass {0} is required'.format(OBJECT_CLASS))
 
-def _obj_addNetgroupUsers(self, members, domain=''):
-    if not self.hasObjectClass(OBJECT_CLASS):
-        raise RuntimeError('Invalid objectClass for addNetgroupUsers '
-            '(must have {0})'.format(OBJECT_CLASS))
+@LDAPObject.EXTEND('getNetgroupUsers')
+def obj_getNetgroupUsers(self):
+    self._requireNetgroup()
+
+@LDAPObject.EXTEND('addNetgroupUsers')
+def obj_addNetgroupUsers(self, members, domain=''):
+    self._requireNetgroup()
     self.ldapConn.addNetgroupUsers(self.dn, members, domain)
 
-def _obj_addNetgroupHosts(self, members, domain=''):
-    if not self.hasObjectClass(OBJECT_CLASS):
-        raise RuntimeError('Invalid objectClass for addNetgroupHosts '
-            '(must have {0})'.format(OBJECT_CLASS))
+@LDAPObject.EXTEND('addNetgroupHosts')
+def obj_addNetgroupHosts(self, members, domain=''):
+    self._requireNetgroup()
     self.ldapConn.addNetgroupHosts(self.dn, members, domain)
-
-LDAPObject.EXTEND([
-    ('getNetgroupUsers', _obj_getNetgroupUsers),
-    ('addNetgroupUsers', _obj_addNetgroupUsers),
-    ('addNetgroupUser', _obj_addNetgroupUsers),
-    ('addNetgroupHosts', _obj_addNetgroupHosts),
-    ('addNetgroupHost', _obj_addNetgroupHosts),
-])
 
 ## private functions
 
