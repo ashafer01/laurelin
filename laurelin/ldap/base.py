@@ -194,7 +194,7 @@ class LDAP(Extensible):
     _controls = {}
 
     @classmethod
-    def REGISTER_CONTROLS(cls, ctrls):
+    def REGISTER_CONTROL(cls, ctrl):
         if len(cls._reservedKwds) == 0:
             from inspect import getargspec
             # functions that either call sendMessage or have kwds passed through into them
@@ -209,20 +209,19 @@ class LDAP(Extensible):
                 LDAP.delete,
                 LDAP.modify,
                 LDAP.modDN,
+                LDAP.sendExtendedRequest,
+                ExtendedResponseHandle.__init__,
             ]
             for f in reserveFrom:
                 cls._reservedKwds.update(getargspec(f).args)
-        for ctrl in ctrls:
-            if isinstance(ctrl, tuple):
-                ctrl = Control.generic(*ctrl)
-            if not isinstance(ctrl, Control):
-                raise TypeError('must be Control instance or tuple (method,keyword,OID)')
-            if ctrl.keyword in cls._reservedKwds:
-                raise LDAPExtensionError('Control keyword "{0}" is reserved'.format(ctrl.keyword))
-            if ctrl.keyword in cls._controls:
-                raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(
-                    ctrl.keyword))
-            cls._controls[ctrl.keyword] = ctrl
+        if not isinstance(ctrl, Control):
+            raise TypeError('must be Control instance')
+        if ctrl.keyword in cls._reservedKwds:
+            raise LDAPExtensionError('Control keyword "{0}" is reserved'.format(ctrl.keyword))
+        if ctrl.keyword in cls._controls:
+            raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(
+                ctrl.keyword))
+        cls._controls[ctrl.keyword] = ctrl
 
     def __enter__(self):
         return self
@@ -363,19 +362,20 @@ class LDAP(Extensible):
                 if ctrl.method != method:
                     continue
                 ctrlValue = kwds.pop(kwd)
-                criticality = self.defaultCriticality
                 if isinstance(ctrlValue, critical):
                     criticality = True
                     crtlValue = ctrlValue.value
                 elif isinstance(ctrlValue, optional):
                     criticality = False
                     ctrlValue = ctrlValue.value
+                else:
+                    criticality = self.defaultCriticality
                 if criticality and (ctrl.OID not in self.rootDSE.getAttr('supportedControl')):
                     raise LDAPError('Control keyword {0} is not supported by the server'.format(kwd))
                 ctrls.setComponentByPosition(i, ctrl.prepare(ctrlValue, criticality))
                 i += 1
         if final and (len(kwds) > 0):
-            raise TypeError('Unhandled keyword arguments: {0}'.format(','.join(kwds.keys())))
+            raise TypeError('Unhandled keyword arguments: {0}'.format(', '.join(kwds.keys())))
         if i > 0:
             return ctrls
         else:
@@ -523,11 +523,9 @@ class LDAP(Extensible):
         except KeyError:
             raise TagError('tag {0} does not exist'.format(tag))
 
-    def obj(self, DN, attrs=None, tag=None, *args, **kwds):
+    def obj(self, DN, attrsDict=None, tag=None, *args, **kwds):
         """Factory for LDAPObjects bound to this connection"""
-        if attrs is None:
-            attrs = {}
-        obj = LDAPObject(DN, attrs=attrs, ldapConn=self, *args, **kwds)
+        obj = LDAPObject(DN, attrsDict=attrsDict, ldapConn=self, *args, **kwds)
         if tag is not None:
             if tag in self._taggedObjects:
                 raise TagError('tag {0} already exists'.format(tag))
@@ -831,26 +829,28 @@ class LDAP(Extensible):
         """
         return self.modify(DN, Modlist(Mod.REPLACE, attrsDict), **ctrlKwds)
 
-    def sendExtendedRequest(self, OID, value=None, **ctrlKwds):
-        """Send an extended request, returns internal message ID
+    def sendExtendedRequest(self, OID, value=None, **kwds):
+        """Send an extended request, returns instance of ExtendedResponseHandle
 
-         This is mainly meant to be called by other built-in methods and client extensions. No
-         results are received from the server.
+         This is mainly meant to be called by other built-in methods and client extensions. Requires
+         handling of raw pyasn1 protocol objects
         """
         if OID not in self.rootDSE.getAttr('supportedExtension'):
-            raise LDAPError('Extension operation is not supported by the server')
+            raise LDAPError('Extended operation is not supported by the server')
         xr = ExtendedRequest()
         xr.setComponentByName('requestName', RequestName(OID))
         if value is not None:
             if not isinstance(value, six.string_types):
                 raise TypeError('extendedRequest value must be string')
             xr.setComponentByName('requestValue', RequestValue(value))
-        controls = self._processCtrlKwds('extended', ctrlKwds, final=True)
-        return self.sock.sendMessage('extendedReq', xr, controls)
+        controls = self._processCtrlKwds('ext', kwds)
+        mID = self.sock.sendMessage('extendedReq', xr, controls)
+        logger.info('Sent extended request ID={0} OID={1}'.format(mID, OID))
+        return ExtendedResponseHandle(ldapConn=self, mID=mID, **kwds)
 
-    def whoAmI(self):
-        mID = self.sendExtendedRequest(LDAP.OID_WHOAMI)
-        _, xr = _unpack('extendedResp', self.sock.recvOne(mID))
+    def whoAmI(self, **ctrlKwds):
+        handle = self.sendExtendedRequest(LDAP.OID_WHOAMI, requireSuccess=True, **ctrlKwds)
+        xr = handle.recvResponse()
         return six.text_type(xr.getComponentByName('responseValue'))
 
     def processLDIF(self, ldifStr):
@@ -901,10 +901,30 @@ class LDAP(Extensible):
             raise ValueError('changetype {0} unknown/not yet implemented'.format(changetype))
 
 
-class SearchResultHandle(object):
+class ResponseHandle(object):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, e, trace):
+        if not self.done:
+            self.abandon()
+        if etype == Abandon:
+            return True
+
+    def abandon(self):
+        """Request to abandon an operation in progress"""
+        if not self.abandoned:
+            logger.info('Abandoning ID={0}'.format(self.messageID))
+            self.ldapConn.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
+            self.abandoned = True
+            self.ldapConn.sock.abandonedMIDs.append(self.messageID)
+        else:
+            logger.debug('ID={0} already abandoned'.format(self.messageID))
+
+
+class SearchResultHandle(ResponseHandle):
     def __init__(self, ldapConn, messageID, fetchResultRefs, objKwds):
         self.ldapConn = ldapConn
-        self.sock = ldapConn.sock
         self.messageID = messageID
         self.fetchResultRefs = fetchResultRefs
         self.objKwds = objKwds
@@ -915,11 +935,7 @@ class SearchResultHandle(object):
         if self.abandoned:
             logger.debug('ID={0} has been abandoned'.format(self.messageID))
             raise StopIteration()
-        for msg in self.sock.recvMessages(self.messageID):
-            if self.abandoned:
-                logger.debug('ID={0} abandoned while receiving search results'.format(
-                    self.messageID))
-                raise StopIteration()
+        for msg in self.ldapConn.sock.recvMessages(self.messageID):
             try:
                 mID, entry = _unpack('searchResEntry', msg)
                 DN = six.text_type(entry.getComponentByName('objectName'))
@@ -964,24 +980,45 @@ class SearchResultHandle(object):
                     else:
                         yield ref
 
-    def __enter__(self):
-        return self
 
-    def __exit__(self, etype, e, trace):
-        if not self.done:
-            self.abandon()
-        if etype == Abandon:
-            return True
+class ExtendedResponseHandle(ResponseHandle):
+    """Obtains rfc4511.ExtendedResponse or rfc4511.IntermediateResponse instances from the server
+     for a particular message ID
+    """
 
-    def abandon(self):
-        """Request to abandon an operation in progress"""
-        if not self.abandoned:
-            logger.info('Abandoning search ID={0}'.format(self.messageID))
-            self.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
-            self.abandoned = True
-            self.sock.abandonedMIDs.append(self.messageID)
-        else:
-            logger.debug('ID={0} already abandoned'.format(self.messageID))
+    def __init__(self, mID, ldapConn, requireSuccess=False):
+        self.messageID = mID
+        self.ldapConn = ldapConn
+        self.requireSuccess = requireSuccess
+        self._recvr = ldapConn.sock.recvMessages(mID)
+        self.done = False
+        self.abandoned = False
+
+    def _handleMsg(self, lm):
+        try:
+            mID, ir = _unpack('intermediateResponse', lm)
+            resName = ir.getComponentByName('responseName')
+            logger.debug('Got name={0} intermediate response for ID={1}'.format(resName, mID))
+            return ir
+        except UnexpectedResponseType:
+            mID, xr = _unpack('extendedResp', lm)
+            self.done = True
+            resName = xr.getComponentByName('responseName')
+            logger.debug('Got name={0} extended response for ID={1}'.format(resName, mID))
+            if self.requireSuccess:
+                res = xr.getComponentByName('resultCode')
+                if res != RESULT_success:
+                    raise LDAPError('Got {0} for ID={1}'.format(repr(res), mID))
+            return xr
+
+    def __iter__(self):
+        for lm in self._recvr:
+            yield self._handleMsg(lm)
+            if self.done:
+                break
+
+    def recvResponse(self):
+        return self._handleMsg(next(self._recvr))
 
 
 class AttrsDict(dict):
@@ -1088,7 +1125,7 @@ class LDAPObject(AttrsDict, Extensible):
     """
 
     def __init__(self, dn,
-        attrs=None,
+        attrsDict=None,
         ldapConn=None,
         relativeSearchScope=Scope.SUBTREE,
         rdnAttr=None
@@ -1099,7 +1136,7 @@ class LDAPObject(AttrsDict, Extensible):
         self.relativeSearchScope = relativeSearchScope
         self.rdnAttr = rdnAttr
         self._unstructuredDesc = set()
-        AttrsDict.__init__(self, attrs)
+        AttrsDict.__init__(self, attrsDict)
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))
@@ -1134,14 +1171,14 @@ class LDAPObject(AttrsDict, Extensible):
         objKwds.setdefault('relativeSearchScope', self.relativeSearchScope)
         objKwds.setdefault('rdnAttr', self.rdnAttr)
 
-    def obj(self, rdn, tag=None, *args, **kwds):
+    def obj(self, rdn, attrsDict=None, tag=None, *args, **kwds):
         self._setObjKwdDefaults(kwds)
         if isinstance(self.ldapConn, LDAP):
-            return self.ldapConn.obj(self.RDN(rdn), tag=tag, *args, **kwds)
+            return self.ldapConn.obj(self.RDN(rdn), attrsDict=attrsDict, tag=tag, *args, **kwds)
         else:
             if tag is not None:
                 raise LDAPError('tagging requires LDAP instance')
-            return LDAPObject(self.RDN(rdn), *args, **kwds)
+            return LDAPObject(self.RDN(rdn), attrsDict=attrsDict, *args, **kwds)
 
     def getChild(self, rdn, attrs=None, **kwds):
         self._requireLDAP()
@@ -1399,18 +1436,8 @@ class Control(object):
     keyword = '' # keyword argument name
     OID = ''     # OID of the control
 
-    @classmethod
-    def generic(cls, method=None, keyword=None, OID=None):
-        c = cls()
-        if method is not None:
-            c.method = method
-        if keyword is not None:
-            c.keyword = keyword
-        if OID is not None:
-            c.OID = OID
-        return c
-
     def prepare(self, ctrlValue, criticality):
+        """Accepts string controlValue and returns an rfc4511.Control instance"""
         c = _Control()
         c.setComponentByName('controlType', LDAPOID(self.OID))
         c.setComponentByName('criticality', Criticality(criticality))
@@ -1419,6 +1446,32 @@ class Control(object):
         if len(ctrlValue) > 0:
             c.setComponentByName('controlValue', ControlValue(ctrlValue))
         return c
+
+    @staticmethod
+    def REGISTER_GENERIC(method, keyword, OID):
+        """Call this to define a simple control that only needs a string controlValue"""
+        c = Control()
+        c.method = method
+        c.keyword = keyword
+        c.OID = OID
+        LDAP.REGISTER_CONTROL(c)
+
+    @staticmethod
+    def REGISTER(cls):
+        """If extending the Control class (to accept complex controlValues), use this as a class
+         decorator
+        """
+        if issubclass(cls, Control):
+            if not cls.method:
+                raise ValueError('no method set on class {0}'.format(cls.__name__))
+            if not cls.keyword:
+                raise ValueError('no keyword set on class {0}'.format(cls.__name__))
+            if not cls.OID:
+                raise ValueError('no OID set on class {0}'.format(cls.__name__))
+            LDAP.REGISTER_CONTROL(cls())
+            return cls
+        else:
+            raise TypeError('class {0} must be subclass of Control'.format(cls.__name__))
 
 
 class critical(object):
