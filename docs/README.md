@@ -6,6 +6,7 @@ The following features have not yet been implemented or are incomplete
 * Controls
 * Extensions
 * Extensible filters
+* Referrals
 * Binary data
 * LDIF input
 * Docs

@@ -79,6 +79,7 @@ RESULT_success = ResultCode('success')
 RESULT_noSuchObject = ResultCode('noSuchObject')
 RESULT_compareTrue = ResultCode('compareTrue')
 RESULT_compareFalse = ResultCode('compareFalse')
+RESULT_referral = ResultCode('referral')
 
 def _unpack(op, ldapMessage):
     """Unpack an object from an LDAPMessage envelope"""
@@ -89,6 +90,12 @@ def _unpack(op, ldapMessage):
         return mID, ret
     else:
         raise UnexpectedResponseType()
+
+def _seqToList(seq):
+    ret = []
+    for i in range(len(seq)):
+        ret.append(six.text_type(seq.getComponentByPosition(i)))
+    return ret
 
 class Scope:
     """Scope constants
@@ -162,6 +169,7 @@ class LDAP(Extensible):
 
     # global defaults
     DEFAULT_SERVER = 'ldap://localhost'
+    DEFAULT_BASEDN = None
     DEFAULT_FILTER = '(objectClass=*)'
     DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
     DEFAULT_SEARCH_TIMEOUT = 0
@@ -173,6 +181,7 @@ class LDAP(Extensible):
     DEFAULT_SSL_CAPATH = None
     DEFAULT_SSL_CADATA = None
     DEFAULT_FETCH_RESULT_REFS = True
+    DEFAULT_FOLLOW_REFERRALS = True
     DEFAULT_SASL_MECH = None
     DEFAULT_SASL_FATAL_DOWNGRADE_CHECK = True
     DEFAULT_CRITICALITY = False
@@ -247,11 +256,14 @@ class LDAP(Extensible):
         saslMech=None,
         saslFatalDowngradeCheck=None,
         defaultCriticality=None,
+        followReferrals=None,
         ):
 
         # setup
         if connectTo is None:
             connectTo = LDAP.DEFAULT_SERVER
+        if baseDN is None:
+            baseDN = LDAP.DEFAULT_BASEDN
         if reuseConnection is None:
             reuseConnection = LDAP.DEFAULT_REUSE_CONNECTION
         if connectTimeout is None:
@@ -278,6 +290,8 @@ class LDAP(Extensible):
             saslFatalDowngradeCheck = LDAP.DEFAULT_SASL_FATAL_DOWNGRADE_CHECK
         if defaultCriticality is None:
             defaultCriticality = LDAP.DEFAULT_CRITICALITY
+        if followReferrals is None:
+            followReferrals = LDAP.DEFAULT_FOLLOW_REFERRALS
 
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
@@ -286,6 +300,7 @@ class LDAP(Extensible):
         self.strictModify = strictModify
         self.saslFatalDowngradeCheck = saslFatalDowngradeCheck
         self.defaultCriticality = defaultCriticality
+        self.followReferrals = followReferrals
 
         self._taggedObjects = {}
         self._saslMechs = None
@@ -949,11 +964,8 @@ class SearchResultHandle(ResponseHandle):
                 for i in range(0, len(_attrs)):
                     _attr = _attrs.getComponentByPosition(i)
                     attrType = six.text_type(_attr.getComponentByName('type'))
-                    _vals = _attr.getComponentByName('vals')
-                    vals = []
-                    for j in range(0, len(_vals)):
-                        vals.append(six.text_type(_vals.getComponentByPosition(j)))
-                    attrs[attrType] = vals
+                    vals = _attr.getComponentByName('vals')
+                    attrs[attrType] = _seqToList(vals)
                 logger.debug('Got search result entry (ID {0}) {1}'.format(mID, DN))
                 yield self.ldapConn.obj(DN, attrs, **self.objKwds)
             except UnexpectedResponseType:
@@ -962,19 +974,27 @@ class SearchResultHandle(ResponseHandle):
                     self.done = True
                     res = resobj.getComponentByName('resultCode')
                     if res == RESULT_success or res == RESULT_noSuchObject:
-                        logger.debug('Got all search results for ID {0}, result is {1}'.format(
+                        logger.debug('Got all search results for ID={0}, result is {1}'.format(
                             mID, repr(res)
                         ))
                         raise StopIteration()
+                    elif res == RESULT_referral:
+                        if self.followReferrals:
+                            logger.info('Following referral for ID={0}'.format(mID))
+                            ref = resobj.getComponentByName('referral')
+                            URIs = _seqToList(ref)
+                            for obj in SearchReferenceHandle(URIs, self.objKwds).fetch():
+                                yield obj
+                        else:
+                            logger.debug('Ignoring referral for ID={0}'.format(mID))
+                            raise StopIteration()
                     else:
                         raise LDAPError('Got {0} for search results (ID {1})'.format(
                             repr(res), mID
                         ))
                 except UnexpectedResponseType:
                     mID, resref = _unpack('searchResRef', ldapMessage)
-                    URIs = []
-                    for i in range(0, len(resref)):
-                        URIs.append(six.text_type(resref.getComponentByPosition(i)))
+                    URIs = _seqToList(resref)
                     logger.debug('Got search result reference (ID {0}) to: {1}'.format(
                         mID, ' | '.join(URIs)
                     ))
