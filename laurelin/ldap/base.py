@@ -242,21 +242,10 @@ class LDAP(Extensible):
     def __exit__(self, etype, e, trace):
         self.close()
 
-    def __init__(self, connectTo=None, baseDN=None,
-        reuseConnection=None,
-        connectTimeout=None,
-        searchTimeout=None,
-        derefAliases=None,
-        strictModify=None,
-        sslVerify=None,
-        sslCAFile=None,
-        sslCAPath=None,
-        sslCAData=None,
-        fetchResultRefs=None,
-        saslMech=None,
-        saslFatalDowngradeCheck=None,
-        defaultCriticality=None,
-        followReferrals=None,
+    def __init__(self, connectTo=None, baseDN=None, reuseConnection=None, connectTimeout=None,
+        searchTimeout=None, derefAliases=None, strictModify=None, sslVerify=None, sslCAFile=None,
+        sslCAPath=None, sslCAData=None, fetchResultRefs=None, saslMech=None,
+        saslFatalDowngradeCheck=None, defaultCriticality=None, followReferrals=None,
         ):
 
         # setup
@@ -296,11 +285,12 @@ class LDAP(Extensible):
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
         self.defaultFetchResultRefs = fetchResultRefs
+        self.defaultFollowReferrals = followReferrals
         self.defaultSaslMech = saslMech
+        self.defaultCriticality = defaultCriticality
+
         self.strictModify = strictModify
         self.saslFatalDowngradeCheck = saslFatalDowngradeCheck
-        self.defaultCriticality = defaultCriticality
-        self.followReferrals = followReferrals
 
         self._taggedObjects = {}
         self._saslMechs = None
@@ -581,7 +571,8 @@ class LDAP(Extensible):
             return True
 
     def search(self, baseDN, scope=Scope.SUBTREE, filter=None, attrs=None, searchTimeout=None,
-        limit=0, derefAliases=None, attrsOnly=False, fetchResultRefs=None, **kwds):
+        limit=0, derefAliases=None, attrsOnly=False, fetchResultRefs=None, followReferrals=None,
+        **kwds):
         """Send search and iterate results until we get a SearchResultDone
 
          Yields instances of LDAPObject and possibly SearchReferenceHandle, if any result
@@ -598,6 +589,8 @@ class LDAP(Extensible):
             derefAliases = self.defaultDerefAliases
         if fetchResultRefs is None:
             fetchResultRefs = self.defaultFetchResultRefs
+        if followReferrals is None:
+            followReferrals = self.defaultFollowReferrals
         req = SearchRequest()
         req.setComponentByName('baseObject', LDAPDN(baseDN))
         req.setComponentByName('scope', scope)
@@ -623,7 +616,7 @@ class LDAP(Extensible):
         mID = self.sock.sendMessage('searchRequest', req, controls)
         logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filter={3}'.format(
             mID, baseDN, scope, filter))
-        return SearchResultHandle(self, mID, fetchResultRefs, kwds)
+        return SearchResultHandle(self, mID, fetchResultRefs, followReferrals, kwds)
 
     def compare(self, DN, attr, value, **ctrlKwds):
         """Perform a compare operation, returning boolean"""
@@ -943,10 +936,11 @@ class ResponseHandle(object):
 
 
 class SearchResultHandle(ResponseHandle):
-    def __init__(self, ldapConn, messageID, fetchResultRefs, objKwds):
+    def __init__(self, ldapConn, messageID, fetchResultRefs, followReferrals, objKwds):
         self.ldapConn = ldapConn
         self.messageID = messageID
         self.fetchResultRefs = fetchResultRefs
+        self.followReferrals = followReferrals
         self.objKwds = objKwds
         self.done = False
         self.abandoned = False
@@ -1218,8 +1212,7 @@ class LDAPObject(AttrsDict, Extensible):
     def search(self, filter=None, attrs=None, *args, **kwds):
         self._requireLDAP()
         self._setObjKwdDefaults(kwds)
-        return self.ldapConn.search(self.dn, self.relativeSearchScope, filter, attrs,
-            *args, **kwds)
+        return self.ldapConn.search(self.dn, self.relativeSearchScope, filter, attrs, *args, **kwds)
 
     ## object-specific methods
 
