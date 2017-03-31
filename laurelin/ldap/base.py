@@ -38,7 +38,6 @@ from .rfc4511 import (
     Change,
     Scope as _Scope,
     DerefAliases as _DerefAliases,
-    AbandonRequest,
     Controls,
     Control as _Control,
     LDAPOID,
@@ -194,7 +193,8 @@ class LDAP(Extensible):
     LOG_FORMAT = '[%(asctime)s] %(name)s %(levelname)s : %(message)s'
 
     # OIDs
-    OID_WHOAMI = '1.3.6.1.4.1.4203.1.11.3'
+    OID_WHOAMI   = '1.3.6.1.4.1.4203.1.11.3'
+    OID_STARTTLS = '1.3.6.1.4.1.1466.20037'
 
     @staticmethod
     def enableLogging(level=logging.DEBUG):
@@ -245,8 +245,7 @@ class LDAP(Extensible):
     def __init__(self, connectTo=None, baseDN=None, reuseConnection=None, connectTimeout=None,
         searchTimeout=None, derefAliases=None, strictModify=None, sslVerify=None, sslCAFile=None,
         sslCAPath=None, sslCAData=None, fetchResultRefs=None, saslMech=None,
-        saslFatalDowngradeCheck=None, defaultCriticality=None, followReferrals=None,
-        ):
+        saslFatalDowngradeCheck=None, defaultCriticality=None, followReferrals=None):
 
         # setup
         if connectTo is None:
@@ -296,6 +295,10 @@ class LDAP(Extensible):
         self._saslMechs = None
 
         self.sockParams = (connectTimeout, sslVerify, sslCAFile, sslCAPath, sslCAData)
+        self.sslVerify = sslVerify
+        self.sslCAFile = sslCAFile
+        self.sslCAPath = sslCAPath
+        self.sslCAData = sslCAData
 
         # connect
         if isinstance(connectTo, six.string_types):
@@ -326,8 +329,7 @@ class LDAP(Extensible):
             raise TypeError('Must supply URI string or LDAP instance for connectTo')
         self.sock.refcount += 1
 
-        self.rootDSE = self.get('', ['*', '+'])
-        self._saslMechs = self.rootDSE.getAttr('supportedSASLMechanisms')
+        self.refreshRootDSE()
         if baseDN is None:
             if 'defaultNamingContext' in self.rootDSE:
                 baseDN = self.rootDSE['defaultNamingContext'][0]
@@ -347,6 +349,10 @@ class LDAP(Extensible):
 
         logger.debug('Creating base object for {0}'.format(self.baseDN))
         self.base = self.obj(self.baseDN, relativeSearchScope=Scope.SUBTREE)
+
+    def refreshRootDSE(self):
+        self.rootDSE = self.get('', ['*', '+'])
+        self._saslMechs = self.rootDSE.getAttr('supportedSASLMechanisms')
 
     def _successResult(self, messageID, operation):
         """Receive an object from the socket and raise an LDAPError if its not a success result"""
@@ -376,7 +382,7 @@ class LDAP(Extensible):
                 ctrlValue = kwds.pop(kwd)
                 if isinstance(ctrlValue, critical):
                     criticality = True
-                    crtlValue = ctrlValue.value
+                    ctrlValue = ctrlValue.value
                 elif isinstance(ctrlValue, optional):
                     criticality = False
                     ctrlValue = ctrlValue.value
@@ -483,7 +489,7 @@ class LDAP(Extensible):
             sasl.setComponentByName('mechanism', six.text_type(self.sock.saslMech))
             if challengeResponse is not None:
                 sasl.setComponentByName('credentials', challengeResponse)
-                challengeReponse = None
+                challengeResponse = None
             ac.setComponentByName('sasl', sasl)
             br.setComponentByName('authentication', ac)
 
@@ -866,6 +872,20 @@ class LDAP(Extensible):
         xr = handle.recvResponse()
         return six.text_type(xr.getComponentByName('responseValue'))
 
+    def startTLS(self, verify=None, caFile=None, caPath=None, caData=None):
+        if verify is None:
+            verify = self.sslVerify
+        if caFile is None:
+            caFile = self.sslCAFile
+        if caPath is None:
+            caPath = self.sslCAPath
+        if caData is None:
+            caData = self.sslCAData
+        handle = self.sendExtendedRequest(LDAP.OID_STARTTLS, requireSuccess=True)
+        xr = handle.recvResponse()
+        self.sock._startTLS(verify, caFile, caPath, caData)
+        self.refreshRootDSE()
+
     def processLDIF(self, ldifStr):
         """Process a basic LDIF
 
@@ -1177,12 +1197,17 @@ class LDAPObject(AttrsDict, Extensible):
 
     ## relative methods
 
-    def RDN(self, rdn):
+    def _rdnAttr(self, rdn):
         if '=' not in rdn:
             if self.rdnAttr is not None:
-                rdn = '{0}={1}'.format(self.rdnAttr, rdn)
+                return '{0}={1}'.format(self.rdnAttr, rdn)
             else:
                 raise ValueError('No rdnAttr specified, must supply full RDN attr=val')
+        else:
+            return rdn
+
+    def RDN(self, rdn):
+        rdn = self._rdnAttr(rdn)
         return '{0},{1}'.format(rdn, self.dn)
 
     def _setObjKwdDefaults(self, objKwds):
@@ -1213,6 +1238,26 @@ class LDAPObject(AttrsDict, Extensible):
         self._requireLDAP()
         self._setObjKwdDefaults(kwds)
         return self.ldapConn.search(self.dn, self.relativeSearchScope, filter, attrs, *args, **kwds)
+
+    def find(self, rdn, attrs=None, **kwds):
+        self._requireLDAP()
+        self._setObjKwdDefaults(kwds)
+        if self.relativeSearchScope == Scope.BASE:
+            raise LDAPError('Object has no children')
+        elif self.relativeSearchScope == Scope.ONELEVEL:
+            return self.getChild(rdn, attrs, **kwds)
+        elif self.relativeSearchScope == Scope.SUBTREE:
+            filter = '({0})'.format(self._rdnAttr(rdn))
+            res = list(self.search(filter=filter, attrs=attrs, limit=2, **kwds))
+            n = len(res)
+            if n == 0:
+                raise NoSearchResults()
+            elif n == 1:
+                return res[0]
+            else:
+                raise MultipleSearchResults()
+        else:
+            raise ValueError('Unknown relativeSearchScope')
 
     ## object-specific methods
 

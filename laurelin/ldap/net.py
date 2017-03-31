@@ -25,13 +25,8 @@ class LDAPSocket(object):
     # Globs must match exactly one result
     LDAPI_SOCKET_PATHS = ['/var/run/ldapi', '/var/run/slapd/ldapi', '/var/run/slapd-*.socket']
 
-    def __init__(self, hostURI,
-        connectTimeout=5,
-        sslVerify=True,
-        sslCAFile=None,
-        sslCAPath=None,
-        sslCAData=None,
-        ):
+    def __init__(self, hostURI, connectTimeout=5, sslVerify=True, sslCAFile=None,
+        sslCAPath=None, sslCAData=None):
 
         parsedURI = urlparse(hostURI)
 
@@ -39,19 +34,9 @@ class LDAPSocket(object):
             self._sock = socket()
             self._inetConnect(parsedURI.netloc, 389, connectTimeout)
         elif parsedURI.scheme == 'ldaps':
-            # N.B. this is presently the only thing breaking 2.6 support
-            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
-            if sslVerify:
-                ctx.verify_mode = ssl.CERT_REQUIRED
-                ctx.check_hostname = True
-                ctx.load_default_certs()
-            else:
-                ctx.verify_mode = ssl.CERT_NONE
-            if sslCAFile or sslCAPath or sslCAData:
-                ctx.load_verify_locations(cafile=sslCAFile, capath=sslCAPath, cadata=sslCAData)
-            hostname = parsedURI.netloc.split(':', 1)[0]
-            self._sock = ctx.wrap_socket(socket(), server_hostname=hostname)
+            self._sock = socket()
             self._inetConnect(parsedURI.netloc, 636, connectTimeout)
+            self._startTLS(sslVerify, sslCAFile, sslCAPath, sslCAData)
         elif parsedURI.scheme == 'ldapi':
             # allow a quoted path in netloc, or just use the path component (technically incorrect
             # since the path component contains a DN for a proper LDAP URI)
@@ -121,6 +106,19 @@ class LDAPSocket(object):
             raise LDAPConnectionError('failed connect to {0}:{1} - {2} ({3})'.format(
                 self.host, port, e.strerror, e.errno
             ))
+
+    def _startTLS(self, verify=True, caFile=None, caPath=None, caData=None):
+        # N.B. this is presently the only thing breaking 2.6 support
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
+        if verify:
+            ctx.verify_mode = ssl.CERT_REQUIRED
+            ctx.check_hostname = True
+            ctx.load_default_certs()
+        else:
+            ctx.verify_mode = ssl.CERT_NONE
+        if caFile or caPath or caData:
+            ctx.load_verify_locations(cafile=caFile, capath=caPath, cadata=caData)
+        self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
 
     def saslInit(self, mechs, **props):
         """Initialize a puresasl.client.SASLClient"""
