@@ -60,15 +60,16 @@ class LDAPSocket(object):
         self.unbound = False
         self.abandonedMIDs = []
         self.startedTLS = False
+        self.connectTimeout = connectTimeout
 
         # connect
         logger.info('Connecting to {0} on #{1}'.format(self.URI, self.ID))
         if scheme == 'ldap':
             self._sock = socket()
-            self._inetConnect(netloc, 389, connectTimeout)
+            self._inetConnect(netloc, 389)
         elif scheme == 'ldaps':
             self._sock = socket()
-            self._inetConnect(netloc, 636, connectTimeout)
+            self._inetConnect(netloc, 636)
             self._startTLS(sslVerify, sslCAFile, sslCAPath, sslCAData)
             logger.info('Connected with TLS on #{0}'.format(self.ID))
         elif scheme == 'ldapi':
@@ -84,7 +85,7 @@ class LDAPSocket(object):
                         continue
                     fn = fn[0]
                     try:
-                        self._sock.connect(fn)
+                        self._connect(fn)
                         self.sockPath = fn
                         break
                     except SocketError:
@@ -94,7 +95,7 @@ class LDAPSocket(object):
                         'socket path must be supplied in URI')
             else:
                 try:
-                    self._sock.connect(netloc)
+                    self._connect(netloc)
                     self.sockPath = netloc
                 except SocketError as e:
                     raise LDAPConnectionError('failed connect to unix socket {0} - {1} ({2})'.format(
@@ -105,6 +106,11 @@ class LDAPSocket(object):
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(scheme))
 
+    def _connect(self, addr):
+        self._sock.settimeout(self.connectTimeout)
+        self._sock.connect(addr)
+        self._sock.settimeout(None)
+
     def _inetConnect(self, netloc, defaultPort, timeout):
         ap = netloc.split(':', 1)
         self.host = ap[0]
@@ -113,9 +119,7 @@ class LDAPSocket(object):
         else:
             port = int(ap[1])
         try:
-            self._sock.settimeout(timeout)
-            self._sock.connect((self.host, port))
-            self._sock.settimeout(None)
+            self._connect((self.host, port))
             logger.debug('Connected to {0}:{1} on #{2}'.format(self.host, port, self.ID))
         except SocketError as e:
             raise LDAPConnectionError('failed connect to {0}:{1} - {2} ({3})'.format(
