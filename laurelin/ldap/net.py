@@ -109,7 +109,7 @@ class LDAPSocket(object):
 
     def _startTLS(self, verify=True, caFile=None, caPath=None, caData=None):
         # N.B. this is presently the only thing breaking 2.6 support
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         if verify:
             ctx.verify_mode = ssl.CERT_REQUIRED
             ctx.check_hostname = True

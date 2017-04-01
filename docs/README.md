@@ -2,7 +2,6 @@
 
 The following features have not yet been implemented or are incomplete
 
-* StartTLS
 * Controls
 * Extensions
 * Extensible filters

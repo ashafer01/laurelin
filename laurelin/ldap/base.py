@@ -885,6 +885,7 @@ class LDAP(Extensible):
         xr = handle.recvResponse()
         self.sock._startTLS(verify, caFile, caPath, caData)
         self.refreshRootDSE()
+        logger.info('StartTLS complete')
 
     def processLDIF(self, ldifStr):
         """Process a basic LDIF
