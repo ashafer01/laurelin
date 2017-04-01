@@ -389,7 +389,7 @@ class LDAP(Extensible):
                 else:
                     criticality = self.defaultCriticality
                 if criticality and (ctrl.OID not in self.rootDSE.getAttr('supportedControl')):
-                    raise LDAPError('Control keyword {0} is not supported by the server'.format(kwd))
+                    raise LDAPSupportError('Control keyword {0} is not supported by the server'.format(kwd))
                 ctrls.setComponentByPosition(i, ctrl.prepare(ctrlValue, criticality))
                 i += 1
         if final and (len(kwds) > 0):
@@ -473,7 +473,7 @@ class LDAP(Extensible):
             mech = self.defaultSaslMech
         if mech is not None:
             if mech not in mechs:
-                raise LDAPError('SASL mech "{0}" is not supported by the server'.format(mech))
+                raise LDAPSupportError('SASL mech "{0}" is not supported by the server'.format(mech))
             else:
                 mechs = [mech]
         self.sock.saslInit(mechs, **props)
@@ -855,7 +855,7 @@ class LDAP(Extensible):
          handling of raw pyasn1 protocol objects
         """
         if OID not in self.rootDSE.getAttr('supportedExtension'):
-            raise LDAPError('Extended operation is not supported by the server')
+            raise LDAPSupportError('Extended operation is not supported by the server')
         xr = ExtendedRequest()
         xr.setComponentByName('requestName', RequestName(OID))
         if value is not None:

@@ -10,6 +10,10 @@ class LDAPExtensionError(LDAPError):
     """Error occurred setting up an extension module"""
     pass
 
+class LDAPSupportError(LDAPError):
+    """A feature is not supported by the server"""
+    pass
+
 class LDAPSASLError(LDAPError):
     """Error occurred involving the SASL client"""
     pass
