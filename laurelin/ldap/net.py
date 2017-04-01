@@ -128,21 +128,50 @@ class LDAPSocket(object):
         if self.startedTLS:
             raise LDAPError('TLS layer already installed')
 
-        proto = ssl.PROTOCOL_SSLv23
+        if verify:
+            verifyMode = ssl.CERT_REQUIRED
+        else:
+            verifyMode = ssl.CERT_NONE
+
+        try:
+            proto = ssl.PROTOCOL_TLS
+        except AttributeError:
+            proto = ssl.PROTOCOL_SSLv23
         try:
             ctx = ssl.SSLContext(proto)
+            ctx.verify_mode = verifyMode
+            if verify:
+                ctx.check_hostname = True
+                ctx.load_default_certs()
+            if caFile or caPath or caData:
+                ctx.load_verify_locations(cafile=caFile, capath=caPath, cadata=caData)
+            self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
         except AttributeError:
-            # SSLContext was added in 2.7.9
-            raise RuntimeError('python version >= 2.7.9 required for LDAPS/StartTLS support')
-        if verify:
-            ctx.verify_mode = ssl.CERT_REQUIRED
-            ctx.check_hostname = True
-            ctx.load_default_certs()
-        else:
-            ctx.verify_mode = ssl.CERT_NONE
-        if caFile or caPath or caData:
-            ctx.load_verify_locations(cafile=caFile, capath=caPath, cadata=caData)
-        self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
+            if caPath or caData:
+                raise RuntimeError('python version >= 2.7.9 required for SSL caPath/caData')
+
+            self._sock = ssl.wrap_socket(self._sock, ca_certs=caFile, cert_reqs=verifyMode)
+
+            # implement ctx.check_hostname=True
+            cert = self._sock.getpeercert()
+            certCN = dict([e[0] for e in cert['subject']])['commonName']
+            if self.host == certCN:
+                logger.debug('Matched server identity to cert commonName')
+            else:
+                valid = False
+                tried = [certCN]
+                for altName in cert.get('subjectAltName', []):
+                    type, value = altName
+                    if type == 'DNS' and value.startswith('*.'):
+                        valid = self.host.endswith(value[1:])
+                    else:
+                        valid = (self.host == value)
+                    tried.append(value)
+                    if valid:
+                        logger.debug('Matched server identity to cert {0} subjectAltName'.format(type))
+                        break
+                if not valid:
+                    raise LDAPConnectionError('Server identity "{0}" does not match any cert names: {1}'.format(self.host, ', '.join(tried)))
         self.startedTLS = True
         logger.debug('Installed TLS layer on #{0}'.format(self.ID))
 
