@@ -4,7 +4,7 @@ from __future__ import absolute_import
 import ssl
 import logging
 from glob import glob
-from socket import socket, AF_UNIX, error as SocketError
+from socket import create_connection, socket, AF_UNIX, error as SocketError
 from six.moves.urllib.parse import unquote
 from collections import deque
 from pyasn1.codec.ber.encoder import encode as berEncode
@@ -65,10 +65,8 @@ class LDAPSocket(object):
         # connect
         logger.info('Connecting to {0} on #{1}'.format(self.URI, self.ID))
         if scheme == 'ldap':
-            self._sock = socket()
             self._inetConnect(netloc, 389)
         elif scheme == 'ldaps':
-            self._sock = socket()
             self._inetConnect(netloc, 636)
             self._startTLS(sslVerify, sslCAFile, sslCAPath, sslCAData)
             logger.info('Connected with TLS on #{0}'.format(self.ID))
@@ -111,7 +109,7 @@ class LDAPSocket(object):
         self._sock.connect(addr)
         self._sock.settimeout(None)
 
-    def _inetConnect(self, netloc, defaultPort, timeout):
+    def _inetConnect(self, netloc, defaultPort):
         ap = netloc.split(':', 1)
         self.host = ap[0]
         if len(ap) == 1:
@@ -119,7 +117,7 @@ class LDAPSocket(object):
         else:
             port = int(ap[1])
         try:
-            self._connect((self.host, port))
+            self._sock = create_connection((self.host, port), self.connectTimeout)
             logger.debug('Connected to {0}:{1} on #{2}'.format(self.host, port, self.ID))
         except SocketError as e:
             raise LDAPConnectionError('failed connect to {0}:{1} - {2} ({3})'.format(
