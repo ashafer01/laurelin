@@ -2,9 +2,10 @@
 
 from __future__ import absolute_import
 import ssl
+import logging
 from glob import glob
 from socket import socket, AF_UNIX, error as SocketError
-from six.moves.urllib.parse import urlparse, unquote
+from six.moves.urllib.parse import unquote
 from collections import deque
 from pyasn1.codec.ber.encoder import encode as berEncode
 from pyasn1.codec.ber.decoder import decode as berDecode
@@ -15,6 +16,7 @@ from .rfc4511 import LDAPMessage, MessageID, ProtocolOp
 from .errors import LDAPError, LDAPSASLError, LDAPConnectionError
 
 _nextSockID = 0
+logger = logging.getLogger(__name__)
 
 class LDAPSocket(object):
     """Holds a connection to an LDAP server"""
@@ -28,35 +30,58 @@ class LDAPSocket(object):
     def __init__(self, hostURI, connectTimeout=5, sslVerify=True, sslCAFile=None,
         sslCAPath=None, sslCAData=None):
 
-        parsedURI = urlparse(hostURI)
-
-        if not parsedURI.scheme or parsedURI.scheme == 'ldap':
-            self._sock = socket()
-            self._inetConnect(parsedURI.netloc, 389, connectTimeout)
-        elif parsedURI.scheme == 'ldaps':
-            self._sock = socket()
-            self._inetConnect(parsedURI.netloc, 636, connectTimeout)
-            self._startTLS(sslVerify, sslCAFile, sslCAPath, sslCAData)
-        elif parsedURI.scheme == 'ldapi':
-            # allow a quoted path in netloc, or just use the path component (technically incorrect
-            # since the path component contains a DN for a proper LDAP URI)
-            if parsedURI.netloc != '':
-                path = unquote(parsedURI.netloc)
-            elif parsedURI.path != '':
-                path = parsedURI.path
+        # parse hostURI
+        parts = hostURI.split('://')
+        if len(parts) == 1:
+            netloc = unquote(parts[0])
+            if netloc[0] == '/':
+                scheme == 'ldapi'
             else:
-                raise ValueError('No socket path found in URI')
+                scheme = 'ldap'
+        elif len(parts) == 2:
+            scheme = parts[0]
+            netloc = unquote(parts[1])
+        else:
+            raise LDAPError('Invalid hostURI')
+        self.URI = '{0}://{1}'.format(scheme, netloc)
 
+        # get socket ID number
+        global _nextSockID
+        self.ID = _nextSockID
+        _nextSockID += 1
+
+        # misc init
+        self._messageQueues = {}
+        self._nextMessageID = 1
+        self._saslClient = None
+
+        self.refcount = 0
+        self.bound = False
+        self.unbound = False
+        self.abandonedMIDs = []
+        self.startedTLS = False
+
+        # connect
+        logger.info('Connecting to {0} on #{1}'.format(self.URI, self.ID))
+        if scheme == 'ldap':
+            self._sock = socket()
+            self._inetConnect(netloc, 389, connectTimeout)
+        elif scheme == 'ldaps':
+            self._sock = socket()
+            self._inetConnect(netloc, 636, connectTimeout)
+            self._startTLS(sslVerify, sslCAFile, sslCAPath, sslCAData)
+            logger.info('Connected with TLS on #{0}'.format(self.ID))
+        elif scheme == 'ldapi':
             self.sockPath = None
             self._sock = socket(AF_UNIX)
             self.host = 'localhost'
 
-            if path == '/':
+            if netloc == '/':
                 for sockGlob in LDAPSocket.LDAPI_SOCKET_PATHS:
                     fn = glob(sockGlob)
                     if len(fn) > 1:
-                        raise LDAPError('Multiple results for glob {0} full socket path must be '
-                            'supplied in URI'.format(sockGlob))
+                        logger.debug('Multiple results for glob {0}'.format(sockGlob))
+                        continue
                     fn = fn[0]
                     try:
                         self._sock.connect(fn)
@@ -69,27 +94,16 @@ class LDAPSocket(object):
                         'socket path must be supplied in URI')
             else:
                 try:
-                    self._sock.connect(path)
-                    self.sockPath = path
+                    self._sock.connect(netloc)
+                    self.sockPath = netloc
                 except SocketError as e:
                     raise LDAPConnectionError('failed connect to unix socket {0} - {1} ({2})'.format(
                         path, e.strerror, e.errno
                     ))
+
+            logger.debug('Connected to unix socket {0} on #{1}'.format(self.sockPath, self.ID))
         else:
-            raise LDAPError('Unsupported scheme "{0}"'.format(parsedURI.scheme))
-
-        self._messageQueues = {}
-        self._nextMessageID = 1
-        self._saslClient = None
-
-        global _nextSockID
-        self.ID = _nextSockID
-        _nextSockID += 1
-        self.refcount = 0
-        self.URI = hostURI
-        self.bound = False
-        self.unbound = False
-        self.abandonedMIDs = []
+            raise LDAPError('Unsupported scheme "{0}"'.format(scheme))
 
     def _inetConnect(self, netloc, defaultPort, timeout):
         ap = netloc.split(':', 1)
@@ -102,12 +116,16 @@ class LDAPSocket(object):
             self._sock.settimeout(timeout)
             self._sock.connect((self.host, port))
             self._sock.settimeout(None)
+            logger.debug('Connected to {0}:{1} on #{2}'.format(self.host, port, self.ID))
         except SocketError as e:
             raise LDAPConnectionError('failed connect to {0}:{1} - {2} ({3})'.format(
                 self.host, port, e.strerror, e.errno
             ))
 
     def _startTLS(self, verify=True, caFile=None, caPath=None, caData=None):
+        if self.startedTLS:
+            raise LDAPError('TLS layer already installed')
+
         # N.B. this is presently the only thing breaking 2.6 support
         ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         if verify:
@@ -119,6 +137,8 @@ class LDAPSocket(object):
         if caFile or caPath or caData:
             ctx.load_verify_locations(cafile=caFile, capath=caPath, cadata=caData)
         self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
+        self.startedTLS = True
+        logger.debug('Installed TLS layer on #{0}'.format(self.ID))
 
     def saslInit(self, mechs, **props):
         """Initialize a puresasl.client.SASLClient"""

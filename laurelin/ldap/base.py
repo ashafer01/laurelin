@@ -305,11 +305,9 @@ class LDAP(Extensible):
             self.hostURI = connectTo
             if reuseConnection:
                 if self.hostURI not in _sockets:
-                    logger.info('Opening new socket connection to {0}'.format(self.hostURI))
                     _sockets[self.hostURI] = LDAPSocket(self.hostURI, *self.sockParams)
                 self.sock = _sockets[self.hostURI]
             else:
-                logger.info('Opening exclusive socket connection to {0}'.format(self.hostURI))
                 self.sock = LDAPSocket(self.hostURI, *self.sockParams)
             logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
         elif isinstance(connectTo, LDAP):
@@ -319,7 +317,6 @@ class LDAP(Extensible):
                 logger.info('Connected to {0} (#{1}) from existing object'.format(
                     self.hostURI, self.sock.ID))
             else:
-                logger.info('Opening new exclusive socket connection to {0}'.format(self.hostURI))
                 self.sockParams = connectTo.sockParams
                 self.sock = LDAPSocket(self.hostURI, *self.sockParams)
                 logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
@@ -848,6 +845,8 @@ class LDAP(Extensible):
         """
         return self.modify(DN, Modlist(Mod.REPLACE, attrsDict), **ctrlKwds)
 
+    ## Extension methods
+
     def sendExtendedRequest(self, OID, value=None, **kwds):
         """Send an extended request, returns instance of ExtendedResponseHandle
 
@@ -873,6 +872,8 @@ class LDAP(Extensible):
         return six.text_type(xr.getComponentByName('responseValue'))
 
     def startTLS(self, verify=None, caFile=None, caPath=None, caData=None):
+        if self.sock.startedTLS:
+            raise LDAPError('TLS layer already installed')
         if verify is None:
             verify = self.sslVerify
         if caFile is None:

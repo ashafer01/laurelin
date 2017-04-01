@@ -3,8 +3,6 @@ from laurelin.ldap import LDAP, Scope
 
 LDAP.enableLogging()
 with LDAP('ldapi:///') as l:
-    if l.hostURI.startswith('ldapi:'):
-        print('using ldapi socket = {0}'.format(l.sock.sockPath))
     #l.simpleBind(username='cn=admin,dc=example,dc=org', password=getpass())
     #l.saslBind(mech='DIGEST-MD5', username='admin', password=getpass())
     l.saslBind()
