@@ -128,8 +128,12 @@ class LDAPSocket(object):
         if self.startedTLS:
             raise LDAPError('TLS layer already installed')
 
-        # N.B. this is presently the only thing breaking 2.6 support
-        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        proto = ssl.PROTOCOL_SSLv23
+        try:
+            ctx = ssl.SSLContext(proto)
+        except AttributeError:
+            # SSLContext was added in 2.7.9
+            raise RuntimeError('python version >= 2.7.9 required for LDAPS/StartTLS support')
         if verify:
             ctx.verify_mode = ssl.CERT_REQUIRED
             ctx.check_hostname = True
