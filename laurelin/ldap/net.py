@@ -110,7 +110,7 @@ class LDAPSocket(object):
         self._sock.settimeout(None)
 
     def _inetConnect(self, netloc, defaultPort):
-        ap = netloc.split(':', 1)
+        ap = netloc.rsplit(':', 1)
         self.host = ap[0]
         if len(ap) == 1:
             port = defaultPort
