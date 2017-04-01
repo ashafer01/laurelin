@@ -147,10 +147,11 @@ class LDAPSocket(object):
                 ctx.load_verify_locations(cafile=caFile, capath=caPath, cadata=caData)
             self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
         except AttributeError:
+            # SSLContext wasn't added until 2.7.9
             if caPath or caData:
                 raise RuntimeError('python version >= 2.7.9 required for SSL caPath/caData')
 
-            self._sock = ssl.wrap_socket(self._sock, ca_certs=caFile, cert_reqs=verifyMode)
+            self._sock = ssl.wrap_socket(self._sock, ca_certs=caFile, cert_reqs=verifyMode, ssl_version=proto)
 
             # implement ctx.check_hostname=True
             cert = self._sock.getpeercert()
