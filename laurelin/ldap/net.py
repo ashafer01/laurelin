@@ -153,26 +153,28 @@ class LDAPSocket(object):
 
             self._sock = ssl.wrap_socket(self._sock, ca_certs=caFile, cert_reqs=verifyMode, ssl_version=proto)
 
-            # implement ctx.check_hostname=True
-            cert = self._sock.getpeercert()
-            certCN = dict([e[0] for e in cert['subject']])['commonName']
-            if self.host == certCN:
-                logger.debug('Matched server identity to cert commonName')
+            if verify:
+                # implement ctx.check_hostname=True
+                cert = self._sock.getpeercert()
+                certCN = dict([e[0] for e in cert['subject']])['commonName']
+                if self.host == certCN:
+                    logger.debug('Matched server identity to cert commonName')
+                else:
+                    valid = False
+                    tried = [certCN]
+                    for type, value in cert.get('subjectAltName', []):
+                        if type == 'DNS' and value.startswith('*.'):
+                            valid = self.host.endswith(value[1:])
+                        else:
+                            valid = (self.host == value)
+                        tried.append(value)
+                        if valid:
+                            logger.debug('Matched server identity to cert {0} subjectAltName'.format(type))
+                            break
+                    if not valid:
+                        raise LDAPConnectionError('Server identity "{0}" does not match any cert names: {1}'.format(self.host, ', '.join(tried)))
             else:
-                valid = False
-                tried = [certCN]
-                for altName in cert.get('subjectAltName', []):
-                    type, value = altName
-                    if type == 'DNS' and value.startswith('*.'):
-                        valid = self.host.endswith(value[1:])
-                    else:
-                        valid = (self.host == value)
-                    tried.append(value)
-                    if valid:
-                        logger.debug('Matched server identity to cert {0} subjectAltName'.format(type))
-                        break
-                if not valid:
-                    raise LDAPConnectionError('Server identity "{0}" does not match any cert names: {1}'.format(self.host, ', '.join(tried)))
+                logger.debug('Skipping hostname validation')
         self.startedTLS = True
         logger.debug('Installed TLS layer on #{0}'.format(self.ID))
 
