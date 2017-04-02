@@ -140,12 +140,12 @@ class LDAPSocket(object):
         try:
             ctx = ssl.SSLContext(proto)
             ctx.verify_mode = verifyMode
+            ctx.check_hostname = False # we do this ourselves
             if verify:
-                ctx.check_hostname = True
                 ctx.load_default_certs()
             if caFile or caPath or caData:
                 ctx.load_verify_locations(cafile=caFile, capath=caPath, cadata=caData)
-            self._sock = ctx.wrap_socket(self._sock, server_hostname=self.host)
+            self._sock = ctx.wrap_socket(self._sock)
         except AttributeError:
             # SSLContext wasn't added until 2.7.9
             if caPath or caData:
@@ -153,28 +153,28 @@ class LDAPSocket(object):
 
             self._sock = ssl.wrap_socket(self._sock, ca_certs=caFile, cert_reqs=verifyMode, ssl_version=proto)
 
-            if verify:
-                # implement ctx.check_hostname=True
-                cert = self._sock.getpeercert()
-                certCN = dict([e[0] for e in cert['subject']])['commonName']
-                if self.host == certCN:
-                    logger.debug('Matched server identity to cert commonName')
-                else:
-                    valid = False
-                    tried = [certCN]
-                    for type, value in cert.get('subjectAltName', []):
-                        if type == 'DNS' and value.startswith('*.'):
-                            valid = self.host.endswith(value[1:])
-                        else:
-                            valid = (self.host == value)
-                        tried.append(value)
-                        if valid:
-                            logger.debug('Matched server identity to cert {0} subjectAltName'.format(type))
-                            break
-                    if not valid:
-                        raise LDAPConnectionError('Server identity "{0}" does not match any cert names: {1}'.format(self.host, ', '.join(tried)))
+        if verify:
+            # implement a consistent match_hostname according to RFC 4513 sec 3.1.3
+            cert = self._sock.getpeercert()
+            certCN = dict([e[0] for e in cert['subject']])['commonName']
+            if self.host == certCN:
+                logger.debug('Matched server identity to cert commonName')
             else:
-                logger.debug('Skipping hostname validation')
+                valid = False
+                tried = [certCN]
+                for type, value in cert.get('subjectAltName', []):
+                    if type == 'DNS' and value.startswith('*.'):
+                        valid = self.host.endswith(value[1:])
+                    else:
+                        valid = (self.host == value)
+                    tried.append(value)
+                    if valid:
+                        logger.debug('Matched server identity to cert {0} subjectAltName'.format(type))
+                        break
+                if not valid:
+                    raise LDAPConnectionError('Server identity "{0}" does not match any cert names: {1}'.format(self.host, ', '.join(tried)))
+        else:
+            logger.debug('Skipping hostname validation')
         self.startedTLS = True
         logger.debug('Installed TLS layer on #{0}'.format(self.ID))
 

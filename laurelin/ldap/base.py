@@ -202,6 +202,7 @@ class LDAP(Extensible):
         stderrHandler.setFormatter(logging.Formatter(LDAP.LOG_FORMAT))
         stderrHandler.setLevel(level)
         logger.addHandler(stderrHandler)
+        return stderrHandler
 
     _reservedKwds = set()
     _controls = {}
@@ -314,10 +315,10 @@ class LDAP(Extensible):
             self.hostURI = connectTo.hostURI
             if reuseConnection:
                 self.sock = connectTo.sock
+                self.sockParams = connectTo.sockParams
                 logger.info('Connected to {0} (#{1}) from existing object'.format(
                     self.hostURI, self.sock.ID))
             else:
-                self.sockParams = connectTo.sockParams
                 self.sock = LDAPSocket(self.hostURI, *self.sockParams)
                 logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
             if baseDN is None:
