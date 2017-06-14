@@ -8,7 +8,10 @@ from .modify import (
     dictModReplace,
     dictModDelete,
 )
+import logging
 import six
+
+logger = logging.getLogger(__name__)
 
 class LDAPObject(AttrsDict, Extensible):
     """Represents a single object with optional server affinity

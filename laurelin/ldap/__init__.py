@@ -4,8 +4,9 @@ Imports base objects for user import and defines user utility functions
 """
 
 from __future__ import absolute_import
-from .base import LDAP, LDAPURI, critical, optional
+from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases
+from .controls import critical, optional
 from .errors import LDAPError, NoSearchResults, Abandon
 from .ldapobject import LDAPObject
 
