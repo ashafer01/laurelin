@@ -3,8 +3,11 @@
 Imports base objects for user import and defines user utility functions
 """
 
-from .base import LDAP, LDAPObject, LDAPURI, Scope, DerefAliases, critical, optional
+from __future__ import absolute_import
+from .base import LDAP, LDAPURI, critical, optional
+from .constants import Scope, DerefAliases
 from .errors import LDAPError, NoSearchResults, Abandon
+from .ldapobject import LDAPObject
 
 def dc(domain):
     """Convert a DNS dotted domain name to a DN with domain components"""
