@@ -111,7 +111,7 @@ This common interface is used both for input and output of LDAP attributes. In s
     'mail': ['ashafer01@example.org'],
 }
 ```
-Note that there is an `AttrsDict` class defined in `laurelin.ldap.base`. There is **no requirement** to create instances of this class to pass as arguments, though you are welcome to if you find the additional methods on this class convenient. It provides methods like `getAttr()`, and local versions of all modify methods (used internally by online modify methods after success, e.g. `addAttrs_local()`). Further, it overrides `dict` special methods to enforce type requirements.
+Note that there is an `AttrsDict` class defined - there is **no requirement** to create instances of this class to pass as arguments, though you are welcome to if you find the additional methods on this class convenient. It provides methods like `getAttr()`, and local versions of all modify methods (used internally by online modify methods after success, e.g. `addAttrs_local()`). Further, it overrides `dict` special methods to enforce type requirements.
 
 # Modify Operations
 ## Raw modify methods

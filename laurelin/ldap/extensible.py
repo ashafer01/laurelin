@@ -17,4 +17,3 @@ class Extensible(object):
                         ' already has an attribute by that name'.format(name, cls.__name__))
             return method
         return _extend
-

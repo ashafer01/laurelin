@@ -8,7 +8,6 @@ from .rfc4511 import (
     LDAPDN,
     LDAPString,
     Integer0ToMax as NonNegativeInteger,
-    ResultCode,
     BindRequest,
     UnbindRequest,
     SearchRequest,
@@ -18,7 +17,6 @@ from .rfc4511 import (
     ModifyRequest,
     DelRequest,
     ModifyDNRequest,
-    Version,
     AuthenticationChoice,
     Simple as SimpleCreds,
     SaslCredentials,
@@ -57,6 +55,18 @@ from .modify import (
     DeleteModlist,
 )
 from .net import LDAPSocket
+from .protoutils import (
+    V3,
+    EMPTY_DN,
+    RESULT_saslBindInProgress,
+    RESULT_success,
+    RESULT_noSuchObject,
+    RESULT_compareTrue,
+    RESULT_compareFalse,
+    RESULT_referral,
+    _unpack,
+    _seqToList,
+)
 import six
 from six.moves import range
 from six.moves.urllib.parse import urlparse
@@ -64,35 +74,6 @@ from six.moves.urllib.parse import urlparse
 logger = logging.getLogger('laurelin.ldap')
 logger.addHandler(logging.NullHandler())
 logger.setLevel(logging.DEBUG) # set to DEBUG to allow handler levels full discretion
-
-# this delimits key from value in structured description fields
-DESC_ATTR_DELIM = '='
-
-# Commonly reused protocol objects
-V3 = Version(3)
-EMPTY_DN = LDAPDN('')
-RESULT_saslBindInProgress = ResultCode('saslBindInProgress')
-RESULT_success = ResultCode('success')
-RESULT_noSuchObject = ResultCode('noSuchObject')
-RESULT_compareTrue = ResultCode('compareTrue')
-RESULT_compareFalse = ResultCode('compareFalse')
-RESULT_referral = ResultCode('referral')
-
-def _unpack(op, ldapMessage):
-    """Unpack an object from an LDAPMessage envelope"""
-    mID = ldapMessage.getComponentByName('messageID')
-    po = ldapMessage.getComponentByName('protocolOp')
-    ret = po.getComponentByName(op)
-    if ret is not None:
-        return mID, ret
-    else:
-        raise UnexpectedResponseType()
-
-def _seqToList(seq):
-    ret = []
-    for i in range(len(seq)):
-        ret.append(six.text_type(seq.getComponentByPosition(i)))
-    return ret
 
 # for storing reusable sockets
 _sockets = {}
@@ -121,7 +102,6 @@ class LDAP(Extensible):
 
     # spec constants
     NO_ATTRS = '1.1'
-    ALL_USER_ATTRS = '*'
 
     # logging config
     LOG_FORMAT = '[%(asctime)s] %(name)s %(levelname)s : %(message)s'
@@ -540,7 +520,7 @@ class LDAP(Extensible):
         _attrs = AttributeSelection()
         i = 0
         if attrs is None:
-            attrs = [LDAP.ALL_USER_ATTRS]
+            attrs = ['*']
         if not isinstance(attrs, list):
             attrs = [attrs]
         for desc in attrs:
@@ -1023,7 +1003,7 @@ class LDAPURI(object):
         if (nparams > 0) and (len(params[0]) > 0):
             self.attrs = params[0].split(',')
         else:
-            self.attrs = [LDAP.ALL_USER_ATTRS]
+            self.attrs = ['*']
         if (nparams > 1) and (len(params[1]) > 0):
             self.scope = Scope.string(params[1])
         else:
