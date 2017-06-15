@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from .errors import LDAPExtensionError
+from .errors import LDAPError, LDAPExtensionError, LDAPSupportError
 from .rfc4511 import (
     LDAPOID,
     Criticality,
@@ -18,8 +18,7 @@ def _register(ctrl):
     if ctrl.keyword in _reservedKwds:
         raise LDAPExtensionError('Control keyword "{0}" is reserved'.format(ctrl.keyword))
     if ctrl.keyword in _registeredControls:
-        raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(
-            ctrl.keyword))
+        raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(ctrl.keyword))
     _registeredControls[ctrl.keyword] = ctrl
 
 def _processCtrlKwds(method, kwds, final=False):

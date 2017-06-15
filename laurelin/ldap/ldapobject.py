@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 from .attrsdict import AttrsDict
-from .constants import Scope, DerefAliases
+from .constants import Scope
 from .errors import LDAPError
 from .extensible import Extensible
 from .modify import (

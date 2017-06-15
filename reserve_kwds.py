@@ -8,7 +8,7 @@
 """
 
 from inspect import getargspec, stack
-from os import fdopen, remove, close
+from os import fdopen, remove
 from os.path import dirname, abspath
 from tempfile import mkstemp
 from shutil import move

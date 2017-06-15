@@ -137,6 +137,7 @@ class LDAPSocket(object):
             proto = ssl.PROTOCOL_TLS
         except AttributeError:
             proto = ssl.PROTOCOL_SSLv23
+
         try:
             ctx = ssl.SSLContext(proto)
             ctx.verify_mode = verifyMode
@@ -183,40 +184,30 @@ class LDAPSocket(object):
         self._saslClient = SASLClient(self.host, 'ldap', **props)
         self._saslClient.choose_mechanism(mechs)
 
-    @property
-    def saslOK(self):
-        """Check if SASL has been initialized and bind marked complete"""
-        if self._saslClient is not None:
-            return self.bound
-        else:
-            return False
+    def _requireSaslClient(self):
+        if self._saslClient is None:
+            raise LDAPSASLError('SASL init not complete')
 
     @property
     def saslQoP(self):
         """Obtain the chosen quality of protection"""
-        if self._saslClient is not None:
-            return self._saslClient.qop
-        else:
-            raise LDAPSASLError('SASL init not complete')
+        self._requireSaslClient()
+        return self._saslClient.qop
 
     @property
     def saslMech(self):
         """Obtain the chosen mechanism"""
-        if self._saslClient is not None:
-            mech = self._saslClient.mechanism
-            if mech is None:
-                raise LDAPSASLError('SASL init not complete - no mech chosen')
-            else:
-                return mech
+        self._requireSaslClient()
+        mech = self._saslClient.mechanism
+        if mech is None:
+            raise LDAPSASLError('SASL init not complete - no mech chosen')
         else:
-            raise LDAPSASLError('SASL init not complete')
+            return mech
 
     def saslProcessAuthChallenge(self, challenge):
         """Process an auth challenge and return the correct response"""
-        if self._saslClient is not None:
-            return self._saslClient.process(challenge)
-        else:
-            raise LDAPSASLError('SASL init not complete')
+        self._requireSaslClient()
+        return self._saslClient.process(challenge)
 
     def sendMessage(self, op, obj, controls=None):
         """Create and send an LDAPMessage given an operation name and a corresponding object
