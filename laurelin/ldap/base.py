@@ -1,6 +1,7 @@
 """Contains base classes for laurelin.ldap"""
-
 from __future__ import absolute_import
+
+from . import rfc4511
 from .constants import Scope, DerefAliases
 from .controls import _processCtrlKwds
 from .filter import parse as parseFilter
@@ -26,40 +27,7 @@ from .protoutils import (
     _unpack,
     _seqToList,
 )
-from .rfc4511 import (
-    LDAPDN,
-    LDAPString,
-    Integer0ToMax as NonNegativeInteger,
-    BindRequest,
-    UnbindRequest,
-    SearchRequest,
-    CompareRequest,
-    AbandonRequest,
-    AddRequest,
-    ModifyRequest,
-    DelRequest,
-    ModifyDNRequest,
-    AuthenticationChoice,
-    Simple as SimpleCreds,
-    SaslCredentials,
-    AttributeSelection,
-    AttributeDescription,
-    TypesOnly,
-    AttributeValueAssertion,
-    AssertionValue,
-    AttributeList,
-    Attribute,
-    AttributeValue,
-    PartialAttribute,
-    Vals,
-    RelativeLDAPDN,
-    NewSuperior,
-    Changes,
-    Change,
-    ExtendedRequest,
-    RequestName,
-    RequestValue,
-)
+
 import logging
 import six
 from six.moves import range
@@ -248,11 +216,11 @@ class LDAP(Extensible):
         if self.sock.bound:
             raise ConnectionAlreadyBound()
 
-        br = BindRequest()
+        br = rfc4511.BindRequest()
         br.setComponentByName('version', V3)
-        br.setComponentByName('name', LDAPDN(username))
-        ac = AuthenticationChoice()
-        ac.setComponentByName('simple', SimpleCreds(password))
+        br.setComponentByName('name', rfc4511.LDAPDN(username))
+        ac = rfc4511.AuthenticationChoice()
+        ac.setComponentByName('simple', rfc4511.Simple(password))
         br.setComponentByName('authentication', ac)
 
         controls = _processCtrlKwds('bind', ctrlKwds, final=True)
@@ -320,11 +288,11 @@ class LDAP(Extensible):
 
         challengeResponse = None
         while True:
-            br = BindRequest()
+            br = rfc4511.BindRequest()
             br.setComponentByName('version', V3)
             br.setComponentByName('name', EMPTY_DN)
-            ac = AuthenticationChoice()
-            sasl = SaslCredentials()
+            ac = rfc4511.AuthenticationChoice()
+            sasl = rfc4511.SaslCredentials()
             sasl.setComponentByName('mechanism', six.text_type(self.sock.saslMech))
             if challengeResponse is not None:
                 sasl.setComponentByName('credentials', challengeResponse)
@@ -360,7 +328,7 @@ class LDAP(Extensible):
 
         self.sock.refcount -= 1
         if force or self.sock.refcount == 0:
-            self.sock.sendMessage('unbindRequest', UnbindRequest())
+            self.sock.sendMessage('unbindRequest', rfc4511.UnbindRequest())
             self.sock.close()
             self.sock.unbound = True
             logger.info('Unbound on {0} (#{1})'.format(self.sock.URI, self.sock.ID))
@@ -436,23 +404,23 @@ class LDAP(Extensible):
             fetchResultRefs = self.defaultFetchResultRefs
         if followReferrals is None:
             followReferrals = self.defaultFollowReferrals
-        req = SearchRequest()
-        req.setComponentByName('baseObject', LDAPDN(baseDN))
+        req = rfc4511.SearchRequest()
+        req.setComponentByName('baseObject', rfc4511.LDAPDN(baseDN))
         req.setComponentByName('scope', scope)
         req.setComponentByName('derefAliases', derefAliases)
-        req.setComponentByName('sizeLimit', NonNegativeInteger(limit))
-        req.setComponentByName('timeLimit', NonNegativeInteger(searchTimeout))
-        req.setComponentByName('typesOnly', TypesOnly(attrsOnly))
+        req.setComponentByName('sizeLimit', rfc4511.Integer0ToMax(limit))
+        req.setComponentByName('timeLimit', rfc4511.Integer0ToMax(searchTimeout))
+        req.setComponentByName('typesOnly', rfc4511.TypesOnly(attrsOnly))
         req.setComponentByName('filter', parseFilter(filter))
 
-        _attrs = AttributeSelection()
+        _attrs = rfc4511.AttributeSelection()
         i = 0
         if attrs is None:
             attrs = ['*']
         if not isinstance(attrs, list):
             attrs = [attrs]
         for desc in attrs:
-            _attrs.setComponentByPosition(i, LDAPString(desc))
+            _attrs.setComponentByPosition(i, rfc4511.LDAPString(desc))
             i += 1
         req.setComponentByName('attributes', _attrs)
 
@@ -468,11 +436,11 @@ class LDAP(Extensible):
         if self.sock.unbound:
             raise ConnectionUnbound()
 
-        cr = CompareRequest()
-        cr.setComponentByName('entry', LDAPDN(six.text_type(DN)))
-        ava = AttributeValueAssertion()
-        ava.setComponentByName('attributeDesc', AttributeDescription(six.text_type(attr)))
-        ava.setComponentByName('assertionValue', AssertionValue(six.text_type(value)))
+        cr = rfc4511.CompareRequest()
+        cr.setComponentByName('entry', rfc4511.LDAPDN(six.text_type(DN)))
+        ava = rfc4511.AttributeValueAssertion()
+        ava.setComponentByName('attributeDesc', rfc4511.AttributeDescription(six.text_type(attr)))
+        ava.setComponentByName('assertionValue', rfc4511.AssertionValue(six.text_type(value)))
         cr.setComponentByName('ava', ava)
 
         controls = _processCtrlKwds('compare', ctrlKwds, final=True)
@@ -502,17 +470,17 @@ class LDAP(Extensible):
         if not isinstance(attrsDict, dict):
             raise TypeError('attrsDict must be dict')
 
-        ar = AddRequest()
-        ar.setComponentByName('entry', LDAPDN(DN))
-        al = AttributeList()
+        ar = rfc4511.AddRequest()
+        ar.setComponentByName('entry', rfc4511.LDAPDN(DN))
+        al = rfc4511.AttributeList()
         i = 0
         for attrType, attrVals in six.iteritems(attrsDict):
-            attr = Attribute()
-            attr.setComponentByName('type', AttributeDescription(attrType))
-            vals = Vals()
+            attr = rfc4511.Attribute()
+            attr.setComponentByName('type', rfc4511.AttributeDescription(attrType))
+            vals = rfc4511.Vals()
             j = 0
             for val in attrVals:
-                vals.setComponentByPosition(j, AttributeValue(val))
+                vals.setComponentByPosition(j, rfc4511.AttributeValue(val))
                 j += 1
             attr.setComponentByName('vals', vals)
             al.setComponentByPosition(i, attr)
@@ -581,22 +549,22 @@ class LDAP(Extensible):
         if self.sock.unbound:
             raise ConnectionUnbound()
         controls = _processCtrlKwds('delete', ctrlKwds, final=True)
-        mID = self.sock.sendMessage('delRequest', DelRequest(DN), controls)
+        mID = self.sock.sendMessage('delRequest', rfc4511.DelRequest(DN), controls)
         logger.info('Sent delete request (ID {0}) for DN {1}'.format(mID, DN))
         return self._successResult(mID, 'delResponse')
 
     ## change object DN
 
     def modDN(self, DN, newRDN, cleanAttr=True, newParent=None, **ctrlKwds):
-        """Exposes all options of the protocol-level ModifyDNRequest"""
+        """Exposes all options of the protocol-level rfc4511.ModifyDNRequest"""
         if self.sock.unbound:
             raise ConnectionUnbound()
-        mdr = ModifyDNRequest()
-        mdr.setComponentByName('entry', LDAPDN(DN))
-        mdr.setComponentByName('newrdn', RelativeLDAPDN(newRDN))
+        mdr = rfc4511.ModifyDNRequest()
+        mdr.setComponentByName('entry', rfc4511.LDAPDN(DN))
+        mdr.setComponentByName('newrdn', rfc4511.RelativeLDAPDN(newRDN))
         mdr.setComponentByName('deleteoldrdn', cleanAttr)
         if newParent is not None:
-            mdr.setComponentByName('newSuperior', NewSuperior(newParent))
+            mdr.setComponentByName('newSuperior', rfc4511.NewSuperior(newParent))
         controls = _processCtrlKwds('modDN', ctrlKwds, final=True)
         mID = self.sock.sendMessage('modDNRequest', mdr, controls)
         logger.info('Sent modDN request (ID {0}) for DN {1} newRDN="{2}" newParent="{3}"'.format(
@@ -622,22 +590,22 @@ class LDAP(Extensible):
         if len(modlist) > 0:
             if self.sock.unbound:
                 raise ConnectionUnbound()
-            mr = ModifyRequest()
-            mr.setComponentByName('object', LDAPDN(DN))
-            cl = Changes()
+            mr = rfc4511.ModifyRequest()
+            mr.setComponentByName('object', rfc4511.LDAPDN(DN))
+            cl = rfc4511.Changes()
             i = 0
             logger.debug('Modifying DN {0}'.format(DN))
             for mod in modlist:
                 logger.debug('> {0}'.format(mod))
 
-                c = Change()
+                c = rfc4511.Change()
                 c.setComponentByName('operation', mod.op)
-                pa = PartialAttribute()
-                pa.setComponentByName('type', AttributeDescription(mod.attr))
-                vals = Vals()
+                pa = rfc4511.PartialAttribute()
+                pa.setComponentByName('type', rfc4511.AttributeDescription(mod.attr))
+                vals = rfc4511.Vals()
                 j = 0
                 for v in mod.vals:
-                    vals.setComponentByPosition(j, AttributeValue(v))
+                    vals.setComponentByPosition(j, rfc4511.AttributeValue(v))
                     j += 1
                 pa.setComponentByName('vals', vals)
                 c.setComponentByName('modification', pa)
@@ -697,12 +665,12 @@ class LDAP(Extensible):
         """
         if OID not in self.rootDSE.getAttr('supportedExtension'):
             raise LDAPSupportError('Extended operation is not supported by the server')
-        xr = ExtendedRequest()
-        xr.setComponentByName('requestName', RequestName(OID))
+        xr = rfc4511.ExtendedRequest()
+        xr.setComponentByName('requestName', rfc4511.RequestName(OID))
         if value is not None:
             if not isinstance(value, six.string_types):
                 raise TypeError('extendedRequest value must be string')
-            xr.setComponentByName('requestValue', RequestValue(value))
+            xr.setComponentByName('requestValue', rfc4511.RequestValue(value))
         controls = _processCtrlKwds('ext', kwds)
         mID = self.sock.sendMessage('extendedReq', xr, controls)
         logger.info('Sent extended request ID={0} OID={1}'.format(mID, OID))
@@ -792,7 +760,7 @@ class ResponseHandle(object):
         """Request to abandon an operation in progress"""
         if not self.abandoned:
             logger.info('Abandoning ID={0}'.format(self.messageID))
-            self.ldapConn.sock.sendMessage('abandonRequest', AbandonRequest(self.messageID))
+            self.ldapConn.sock.sendMessage('abandonRequest', rfc4511.AbandonRequest(self.messageID))
             self.abandoned = True
             self.ldapConn.sock.abandonedMIDs.append(self.messageID)
         else:

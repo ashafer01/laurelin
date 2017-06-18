@@ -184,8 +184,11 @@ class LDAPSocket(object):
         self._saslClient = SASLClient(self.host, 'ldap', **props)
         self._saslClient.choose_mechanism(mechs)
 
+    def _hasSaslClient(self):
+        return (self._saslClient is not None)
+
     def _requireSaslClient(self):
-        if self._saslClient is None:
+        if not self._hasSaslClient():
             raise LDAPSASLError('SASL init not complete')
 
     @property
@@ -225,7 +228,7 @@ class LDAPSocket(object):
         if controls:
             lm.setComponentByName('controls', controls)
         raw = berEncode(lm)
-        if self.saslOK:
+        if self._hasSaslClient():
             raw = self._saslClient.wrap(raw)
         self._sock.sendall(raw)
         return mID
@@ -253,7 +256,7 @@ class LDAPSocket(object):
                 raise StopIteration()
             try:
                 newraw = self._sock.recv(LDAPSocket.RECV_BUFFER)
-                if self.saslOK:
+                if self._hasSaslClient():
                     newraw = self._saslClient.unwrap(newraw)
                 raw += newraw
                 while len(raw) > 0:
