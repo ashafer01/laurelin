@@ -89,7 +89,7 @@ class LDAP(Extensible):
 
     def __init__(self, connectTo=None, baseDN=None, reuseConnection=None, connectTimeout=None,
         searchTimeout=None, derefAliases=None, strictModify=None, sslVerify=None, sslCAFile=None,
-        sslCAPath=None, sslCAData=None, fetchResultRefs=None, saslMech=None,
+        sslCAPath=None, sslCAData=None, fetchResultRefs=None, defaultSaslMech=None,
         saslFatalDowngradeCheck=None, defaultCriticality=None, followReferrals=None):
 
         # setup
@@ -117,8 +117,8 @@ class LDAP(Extensible):
             sslCAData = LDAP.DEFAULT_SSL_CADATA
         if fetchResultRefs is None:
             fetchResultRefs = LDAP.DEFAULT_FETCH_RESULT_REFS
-        if saslMech is None:
-            saslMech = LDAP.DEFAULT_SASL_MECH
+        if defaultSaslMech is None:
+            defaultSaslMech = LDAP.DEFAULT_SASL_MECH
         if saslFatalDowngradeCheck is None:
             saslFatalDowngradeCheck = LDAP.DEFAULT_SASL_FATAL_DOWNGRADE_CHECK
         if defaultCriticality is None:
@@ -130,7 +130,7 @@ class LDAP(Extensible):
         self.defaultDerefAliases = derefAliases
         self.defaultFetchResultRefs = fetchResultRefs
         self.defaultFollowReferrals = followReferrals
-        self.defaultSaslMech = saslMech
+        self.defaultSaslMech = defaultSaslMech
         self.defaultCriticality = defaultCriticality
 
         self.strictModify = strictModify
@@ -196,6 +196,11 @@ class LDAP(Extensible):
         self.rootDSE = self.get('', ['*', '+'])
         self._saslMechs = self.rootDSE.getAttr('supportedSASLMechanisms')
 
+    def _processCtrlKwds(self, method, kwds, final=False):
+        supportedCtrls = self.rootDSE.getAttr('supportedControl')
+        defaultCrit = self.defaultCriticality
+        return _processCtrlKwds(method, kwds, supportedCtrls, defaultCrit, final)
+
     def _successResult(self, messageID, operation):
         """Receive an object from the socket and raise an LDAPError if its not a success result"""
         mID, obj = _unpack(operation, self.sock.recvOne(messageID))
@@ -223,7 +228,7 @@ class LDAP(Extensible):
         ac.setComponentByName('simple', rfc4511.Simple(password))
         br.setComponentByName('authentication', ac)
 
-        controls = _processCtrlKwds('bind', ctrlKwds, final=True)
+        controls = self._processCtrlKwds('bind', ctrlKwds, final=True)
 
         mID = self.sock.sendMessage('bindRequest', br, controls)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
@@ -273,7 +278,7 @@ class LDAP(Extensible):
         if self.sock.bound:
             raise ConnectionAlreadyBound()
 
-        controls = _processCtrlKwds('bind', props)
+        controls = self._processCtrlKwds('bind', props)
 
         mechs = self.getSASLMechs()
         if mech is None:
@@ -424,7 +429,7 @@ class LDAP(Extensible):
             i += 1
         req.setComponentByName('attributes', _attrs)
 
-        controls = _processCtrlKwds('search', kwds)
+        controls = self._processCtrlKwds('search', kwds)
 
         mID = self.sock.sendMessage('searchRequest', req, controls)
         logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filter={3}'.format(
@@ -443,7 +448,7 @@ class LDAP(Extensible):
         ava.setComponentByName('assertionValue', rfc4511.AssertionValue(six.text_type(value)))
         cr.setComponentByName('ava', ava)
 
-        controls = _processCtrlKwds('compare', ctrlKwds, final=True)
+        controls = self._processCtrlKwds('compare', ctrlKwds, final=True)
 
         messageID = self.sock.sendMessage('compareRequest', cr, controls)
         logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(
@@ -487,7 +492,7 @@ class LDAP(Extensible):
             i += 1
         ar.setComponentByName('attributes', al)
 
-        controls = _processCtrlKwds('add', kwds)
+        controls = self._processCtrlKwds('add', kwds)
 
         mID = self.sock.sendMessage('addRequest', ar, controls)
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
@@ -548,7 +553,7 @@ class LDAP(Extensible):
         """Delete an object"""
         if self.sock.unbound:
             raise ConnectionUnbound()
-        controls = _processCtrlKwds('delete', ctrlKwds, final=True)
+        controls = self._processCtrlKwds('delete', ctrlKwds, final=True)
         mID = self.sock.sendMessage('delRequest', rfc4511.DelRequest(DN), controls)
         logger.info('Sent delete request (ID {0}) for DN {1}'.format(mID, DN))
         return self._successResult(mID, 'delResponse')
@@ -565,7 +570,7 @@ class LDAP(Extensible):
         mdr.setComponentByName('deleteoldrdn', cleanAttr)
         if newParent is not None:
             mdr.setComponentByName('newSuperior', rfc4511.NewSuperior(newParent))
-        controls = _processCtrlKwds('modDN', ctrlKwds, final=True)
+        controls = self._processCtrlKwds('modDN', ctrlKwds, final=True)
         mID = self.sock.sendMessage('modDNRequest', mdr, controls)
         logger.info('Sent modDN request (ID {0}) for DN {1} newRDN="{2}" newParent="{3}"'.format(
             mID, DN, newRDN, newParent))
@@ -613,7 +618,7 @@ class LDAP(Extensible):
                 cl.setComponentByPosition(i, c)
                 i += 1
             mr.setComponentByName('changes', cl)
-            controls = _processCtrlKwds('modify', ctrlKwds, final=True)
+            controls = self._processCtrlKwds('modify', ctrlKwds, final=True)
             mID = self.sock.sendMessage('modifyRequest', mr, controls)
             logger.info('Sent modify request (ID {0}) for DN {1}'.format(mID, DN))
             return self._successResult(mID, 'modifyResponse')
@@ -671,7 +676,7 @@ class LDAP(Extensible):
             if not isinstance(value, six.string_types):
                 raise TypeError('extendedRequest value must be string')
             xr.setComponentByName('requestValue', rfc4511.RequestValue(value))
-        controls = _processCtrlKwds('ext', kwds)
+        controls = self._processCtrlKwds('ext', kwds)
         mID = self.sock.sendMessage('extendedReq', xr, controls)
         logger.info('Sent extended request ID={0} OID={1}'.format(mID, OID))
         return ExtendedResponseHandle(ldapConn=self, mID=mID, **kwds)

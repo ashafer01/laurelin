@@ -21,7 +21,7 @@ def _register(ctrl):
         raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(ctrl.keyword))
     _registeredControls[ctrl.keyword] = ctrl
 
-def _processCtrlKwds(method, kwds, final=False):
+def _processCtrlKwds(method, kwds, supportedCtrls, defaultCriticality, final=False):
     """Process keyword arguments for registered controls, returning a protocol-level Controls
 
      Removes entries from kwds as they are used, allowing the same dictionary to be passed on
@@ -43,9 +43,9 @@ def _processCtrlKwds(method, kwds, final=False):
                 criticality = False
                 ctrlValue = ctrlValue.value
             else:
-                criticality = self.defaultCriticality
-            if criticality and (ctrl.OID not in self.rootDSE.getAttr('supportedControl')):
-                raise LDAPSupportError('Control keyword {0} is not supported by the server'.format(kwd))
+                criticality = defaultCriticality
+            if criticality and (ctrl.OID not in supportedCtrls):
+                raise LDAPSupportError('Critical control keyword {0} is not supported by the server'.format(kwd))
             ctrls.setComponentByPosition(i, ctrl.prepare(ctrlValue, criticality))
             i += 1
     if final and (len(kwds) > 0):
