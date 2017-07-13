@@ -3,15 +3,24 @@
 The following features have not yet been implemented or are incomplete
 
 * Controls
+  * Framework in place, no actual controls implemented yet
 * Extensions
-* Extensible filters
+  * Framework in place, couple of extension methods implemented
+  * Missing extensible filters
+  * Missing LDAPURI support
 * Referrals
-* Binary data
+  * In place but untested for search
+  * Need to implement for other methods
 * LDIF input
+  * Partial, not full spec
+* Binary data
+  * Entirely missing
 * Docs
-* Possibly others - kindly open a ticket on github if you spot anything
+  * Minimal so far pending some confidence in API stability
+* Testing
+  * Only ad-hoc functional testing
 
-Further, at this stage in development, things like default settings and naming are open for discussion. Please open a ticket if you think anything should change.
+Please feel free to open a github ticket if you spot anything else missing, or have any thoughts regarding naming, default settings, etc.
 
 # Walkthrough
 
