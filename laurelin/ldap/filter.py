@@ -22,6 +22,7 @@ from .rfc4511 import (
     Final,
 )
 from .errors import LDAPError
+from .utils import findClosingParen
 
 escapeMap = [
     ('(', '\\28'),
@@ -46,7 +47,7 @@ def parse(filterStr):
     """Parse a filter string to a protocol-level object"""
 
     fil = Filter()
-    chunk = filterStr[1:_findClosingParen(filterStr)]
+    chunk = filterStr[1:findClosingParen(filterStr)]
     if chunk[0] == '&':
         fil.setComponentByName('and', _parseSet(chunk[1:], And))
     elif chunk[0] == '|':
@@ -118,21 +119,8 @@ def _parseSet(filterStr, cls):
     fset = cls()
     i = 0
     while len(filterStr) > 0:
-        end = _findClosingParen(filterStr)+1
+        end = findClosingParen(filterStr)+1
         fset.setComponentByPosition(i, parse(filterStr[0:end]))
         filterStr = filterStr[end:]
         i += 1
     return fset
-
-def _findClosingParen(text):
-    if text[0] != '(':
-        raise ValueError()
-    parens = 1
-    i = 0
-    while parens > 0:
-        i += 1
-        if text[i] == '(':
-            parens += 1
-        elif text[i] == ')':
-            parens -= 1
-    return i
