@@ -5,6 +5,8 @@ https://tools.ietf.org/html/rfc4512
 
 from __future__ import absolute_import
 
+## Translations from spec ABNF to regex
+
 ALPHA = r'[A-Za-z]'
 DIGIT = r'[0-9]'
 HEX = r'[0-9A-Fa-f]'

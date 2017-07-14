@@ -6,6 +6,7 @@ https://tools.ietf.org/html/rfc4517
 from __future__ import absolute_import
 
 from . import rfc4512
+from . import rfc4514
 from .utils import reAnchor
 import re
 import six
@@ -89,7 +90,10 @@ class DirectoryString(SyntaxRule):
     DESC = 'Directory String'
 
     def validate(self, s):
-        return (len(s) > 0)
+        if isinstance(s, six.string_types):
+            return (len(s) > 0)
+        else:
+            return False
 
 class DITContentRuleDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.16'
@@ -101,3 +105,15 @@ class DITStructureRuleDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.17'
     DESC = 'DIT Structure Rule Description'
     regex = reAnchor(rfc4512.DITStructureRuleDescription)
+
+
+class DistinguishedName(SyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.12'
+    DESC = 'DN'
+
+    def validate(self, s):
+        try:
+            rfc4514.validateDistinguishedName(s)
+            return True
+        except rfc4514.InvalidDN:
+            return False

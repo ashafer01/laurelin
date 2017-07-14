@@ -29,6 +29,7 @@ from .protoutils import (
 )
 
 import logging
+import re
 import six
 from six.moves import range
 from six.moves.urllib.parse import urlparse
@@ -582,7 +583,7 @@ class LDAP(Extensible):
 
     def move(self, DN, newDN, cleanAttr=True, **ctrlKwds):
         """Specify a new absolute DN for an object"""
-        rdn, parent = newDN.split(',', 1)
+        rdn, parent = re.split(r'(?<!\\),', newDN, 1)
         return self.modDN(DN, rdn, cleanAttr, parent, **ctrlKwds)
 
     ## change attributes on an object
