@@ -7,9 +7,10 @@ from __future__ import absolute_import
 
 from . import rfc4512
 from . import rfc4514
-from .utils import reAnchor
+from . import utils
 import re
 import six
+from six.moves import range
 
 PrintableCharacter = r"[A-Za-z0-9'()+,.=/:? -]"
 PrintableString = PrintableCharacter + r'+'
@@ -53,9 +54,10 @@ class RegexSyntaxRule(SyntaxRule):
     """
     def __init__(self):
         self.compiled_re = re.compile(self.regex)
+        SyntaxRule.__init__(self)
 
     def validate(self, s):
-        return bool(self.compiled_re.validate(s))
+        return bool(self.compiled_re.match(s))
 
 
 class BitString(RegexSyntaxRule):
@@ -98,13 +100,13 @@ class DirectoryString(SyntaxRule):
 class DITContentRuleDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.16'
     DESC = 'DIT Content Rule Description'
-    regex = reAnchor(rfc4512.DITContentRuleDescription)
+    regex = utils.reAnchor(rfc4512.DITContentRuleDescription)
 
 
 class DITStructureRuleDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.17'
     DESC = 'DIT Structure Rule Description'
-    regex = reAnchor(rfc4512.DITStructureRuleDescription)
+    regex = utils.reAnchor(rfc4512.DITStructureRuleDescription)
 
 
 class DistinguishedName(SyntaxRule):
@@ -117,3 +119,102 @@ class DistinguishedName(SyntaxRule):
             return True
         except rfc4514.InvalidDN:
             return False
+
+class EnhancedGuide(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.21'
+    DESC = 'Enhanced Guide'
+
+    _object_class = rfc4512.WSP + rfc4512.oid + rfc4512.WSP
+    _subset = r'(base[oO]bject|oneLevel|wholeSubtree)'
+    _match_type = r'(EQ|SUBSTR|GE|LE|APPROX)'
+    _term = (
+        r'!?(' + # TODO (maybe?): circular reference in spec - wants ! _term
+        rfc4512.oid + r'\$' + _match_type +
+        r'|\(' + r'[^)]+' + r'\)' +  # TODO: circular reference in spec - wants _criteria
+        r'|\?true|\?false)'
+    )
+    _and_term = _term + r'(\&' + _term + r')*'
+    _criteria = _and_term + r'(\|' + _and_term + r')*'
+
+    regex = _object_class + r'#' + rfc4512.WSP + _criteria + rfc4512.WSP + r'#' + rfc4512.WSP + _subset
+
+class FacsimilieTelephoneNumber(SyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.22'
+    DESC = 'Facsimile Telephone Number'
+
+    _fax_parameters = (
+        'twoDimensional',
+        'fineResolution',
+        'unlimitedLength',
+        'b4Length',
+        'a3Width',
+        'b4Width',
+        'uncompressed',
+    )
+
+    def validate(self, s):
+        params = s.split('$')
+        if not utils.validatePhoneNumber(params[0]):
+            return False
+        for param in params[1:]:
+            if param not in self._fax_parameters:
+                return False
+        return True
+
+
+class Fax(SyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.23'
+    DESC = 'Fax'
+
+    def validate(self, s):
+        # TODO - binary data - see sec 3.3.12
+        return True
+
+class GeneralizedTime(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.24'
+    DESC = 'Generalized Time'
+
+    regex = r'^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})?([0-9]{2})?(\.[0-9]+)?(Z|[+-]([0-9]{2})([0-9]{2})?)$'
+
+    def validate(self, s):
+        m = self.compiled_re.match(s)
+        if not m:
+            return False
+        else:
+            month = int(m.group(2))
+            if month < 1 or month > 12:
+                return False
+
+            day = int(m.group(3))
+            if day < 1 or day > 31:
+                return False
+
+            hour = int(m.group(4))
+            if hour < 0 or hour > 23:
+                return False
+
+            minute = m.group(5)
+            if minute is not None:
+                minute = int(minute)
+                if minute < 0 or minute > 59:
+                    return False
+
+            second = m.group(6)
+            if second is not None:
+                second = int(second)
+                if second < 0 or second > 60:
+                    return False
+
+            tz = m.group(8)
+            if tz != 'Z':
+                tzhour = int(m.group(9))
+                if tzhour < 0 or tzhour > 23:
+                    return False
+
+                tzminute = m.group(10)
+                if tzminute is not None:
+                    tzminute = int(tzminute)
+                    if tzminute < 0 or tzminute > 59:
+                        return False
+
+            return True
