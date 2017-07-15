@@ -37,6 +37,33 @@ qdstrings = r'(' + qdstring + r'|\(' + WSP + qdstringlist + WSP + r'\))'
 oidlist = oid + r'(' + WSP + r'\$' + WSP + oid + r')*'
 oids = r'(' + oid + r'|\(' + WSP + oidlist + WSP + r'\))'
 
+MatchingRuleDescription = (
+    r'\(' + WSP +
+    numericoid +
+    r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
+    r'(' + SP + r'DESC' + SP + qdstring + r')?' +
+    r'(' + SP + r'OBSOLETE)?' +
+    SP + r'SYNTAX' + SP + oids +
+    WSP + r'\)' # TODO extensions
+)
+
+MatchingRuleUseDescription = (
+    r'\(' + WSP +
+    numericoid +
+    r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
+    r'(' + SP + r'DESC' + SP + qdstring + r')?' +
+    r'(' + SP + r'OBSOLETE)?' +
+    SP + r'APPLIES' + SP + oids +
+    WSP + r'\)' # TODO extensions
+)
+
+SyntaxDescription = (
+    r'\(' + WSP +
+    numericoid +
+    r'(' + SP + r'DESC' + SP + qdstring + r')?' +
+    WSP + r'\)' # TODO extensions
+)
+
 DITContentRuleDescription = (
     r'\(' + WSP +
     numericoid +

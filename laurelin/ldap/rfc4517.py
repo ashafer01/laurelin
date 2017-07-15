@@ -14,7 +14,7 @@ from six.moves import range
 
 PrintableCharacter = r"[A-Za-z0-9'()+,.=/:? -]"
 PrintableString = PrintableCharacter + r'+'
-IA5String = r"[\x00-\x7f]*"
+_IA5String = r"[\x00-\x7f]*"
 
 _oidSyntaxRules = {}
 _oidSyntaxRuleObjects = {}
@@ -167,14 +167,14 @@ class Fax(SyntaxRule):
     DESC = 'Fax'
 
     def validate(self, s):
-        # TODO - binary data - see sec 3.3.12
+        # The LDAP-specific encoding of a value of this syntax is the
+        # string of octets for a Group 3 Fax image
         return True
 
 class GeneralizedTime(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.24'
     DESC = 'Generalized Time'
-
-    regex = r'^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})?([0-9]{2})?(\.[0-9]+)?(Z|[+-]([0-9]{2})([0-9]{2})?)$'
+    regex = r'^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})?([0-9]{2})?([.,][0-9]+)?(Z|[+-]([0-9]{2})([0-9]{2})?)$'
 
     def validate(self, s):
         m = self.compiled_re.match(s)
@@ -218,3 +218,43 @@ class GeneralizedTime(RegexSyntaxRule):
                         return False
 
             return True
+
+
+class IA5String(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.26'
+    DESC = 'IA5 String'
+    regex = utils.reAnchor(_IA5String)
+
+
+class Integer(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.27'
+    DESC = 'INTEGER'
+    regex = r'^-?[1-9][0-9]*$'
+
+
+class JPEG(SyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.28'
+    DESC = 'JPEG'
+
+    def validate(self, s):
+        # The LDAP-specific encoding of a value of this syntax is the sequence
+        # of octets of the JFIF encoding of the image.
+        return True
+
+
+class LDAPSytnaxDescription(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.54'
+    DESC = 'LDAP Syntax Description'
+    regex = utils.reAnchor(rfc4512.SyntaxDescription)
+
+
+class MatchingRuleDescription(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.30'
+    DESC = 'Matching Rule Description'
+    regex = utils.reAnchor(rfc4512.MatchingRuleDescription)
+
+
+class MatchingRuleUseDescription(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.31'
+    DESC = 'Matching Rule Use Description'
+    regex = utils.reAnchor(rfc4512.MatchingRuleUseDescription)
