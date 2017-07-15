@@ -13,12 +13,14 @@ import six
 from six.moves import range
 
 PrintableCharacter = r"[A-Za-z0-9'()+,.=/:? -]"
-PrintableString = PrintableCharacter + r'+'
+_PrintableString = PrintableCharacter + r'+'
 
 _IA5String = r"[\x00-\x7f]*"
 _BitString = r"'[01]*'B"
 
+
 ## Syntax Rules
+
 
 _oidSyntaxRules = {}
 _oidSyntaxRuleObjects = {}
@@ -300,7 +302,7 @@ class OID(RegexSyntaxRule):
 class OtherMailbox(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.39'
     DESC = 'Other Mailbox'
-    regex = r'^' + PrintableString + r'\$' + _IA5String + r'$'
+    regex = r'^' + _PrintableString + r'\$' + _IA5String + r'$'
 
 
 class PostalAddress(RegexSyntaxRule):
@@ -310,3 +312,83 @@ class PostalAddress(RegexSyntaxRule):
     _line_char = utils.escapedRegex('\\$')
     _line = _line_char + r'+'
     regex = r'^' + _line + r'(\$' + _line + r')*$'
+
+
+class PrintableString(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.44'
+    DESC = 'Printable String'
+    regex = utils.reAnchor(_PrintableString)
+
+
+class SubstringAssertion(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.58'
+    DESC = 'Substring Assertion'
+
+    _substring_character = utils.escapedRegex('\\*')
+    _substring = _substring_character + r'+'
+    regex = r'(' + _substring + r')?\*(' + _substring + r'\*)*(' + _substring + r')?'
+
+
+class TelephoneNumber(SyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.50'
+    DESC = 'Telephone Number'
+
+    def validate(self, s):
+        return utils.validatePhoneNumber(s)
+
+
+class TelexNumber(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.52'
+    DESC = 'Telex Number'
+    regex = r'^' + _PrintableString + r'\$' + _PrintableString + r'\$' + _PrintableString + r'$'
+
+
+## Matching Rules
+
+
+_oidMatchingRules = {}
+_nameMatchingRules = {}
+_oidMatchingRuleObjects = {}
+_nameMatchingRuleObjects = {}
+
+def getMatchingRule(ident):
+    """Obtains matching rule instance for name or OID"""
+    if ident[0].isdigit():
+        clsDict = _oidMatchingRules
+        objDict = _oidMatchingRuleObjects
+    else:
+        clsDict = _nameMatchingRules
+        objDict = _nameMatchingRuleObjects
+    obj = objDict.get(ident)
+    if not obj:
+        obj = clsDict[ident]()
+    return obj
+
+class MetaMatchingRule(type):
+    """Metaclass registering OIDs and NAMEs on subclasses"""
+    def __new__(meta, clsname, bases, dct):
+        oid = dct.get('OID')
+        names = dct.get('NAME', ())
+        if isinstance(names, six.string_types):
+            names = (names,)
+            dct['NAME'] = names
+        cls = type.__new__(meta, clsname, bases, dct)
+        if oid:
+            _oidMatchingRules[oid] = cls
+        for name in names:
+            _nameMatchingRules[name] = cls
+        return cls
+
+
+@six.add_metaclass(MetaMatchingRule)
+class MatchingRule(object):
+    """Base class for all matching rules"""
+    def __init__(self):
+        oid = getattr(self, 'OID', None)
+        if oid:
+            _oidMatchingRuleObjects[oid] = self
+        names = getattr(self, 'NAME', ())
+        if isinstance(names, six.string_types):
+            names = (names,)
+        for name in names:
+            _nameMatchingRuleObjects[name] = self
