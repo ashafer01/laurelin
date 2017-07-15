@@ -4,12 +4,13 @@ The following features have not yet been implemented or are incomplete
 
 * Controls
   * Framework in place, no actual controls implemented yet
+  * Response controls not yet handled
 * Extensions
   * Framework in place, couple of extension methods implemented
   * Missing extensible filters
   * Missing LDAPURI support
 * Referrals
-  * In place but untested for search
+  * In place for search but untested
   * Need to implement for other methods
 * LDIF input
   * Partial, not full spec
