@@ -113,16 +113,10 @@ class DITStructureRuleDescription(RegexSyntaxRule):
     regex = utils.reAnchor(rfc4512.DITStructureRuleDescription)
 
 
-class DistinguishedName(SyntaxRule):
+class DistinguishedName(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.12'
     DESC = 'DN'
-
-    def validate(self, s):
-        try:
-            rfc4514.validateDistinguishedName(s)
-            return True
-        except rfc4514.InvalidDN:
-            return False
+    regex = utils.reAnchor(rfc4514.distinguishedName)
 
 class EnhancedGuide(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.21'
@@ -267,18 +261,7 @@ class MatchingRuleUseDescription(RegexSyntaxRule):
 class NameAndOptionalUID(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.34'
     DESC = 'Name And Optional UID'
-    regex = utils.reAnchor(_BitString)
-
-    def validate(self, s):
-        dnbs = s.split('#')
-        try:
-            rfc4514.validateDistinguishedName(dnbs[0])
-            if len(dnbs) == 2:
-                return RegexSyntaxRule.validate(self, dnbs[1])
-            else:
-                return False
-        except rfc4514.InvalidDN:
-            return False
+    regex = r'^' + rfc4514.distinguishedName + r'(#' + _BitString + r')?'
 
 
 class NameFormDescription(RegexSyntaxRule):
@@ -318,3 +301,12 @@ class OtherMailbox(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.39'
     DESC = 'Other Mailbox'
     regex = r'^' + PrintableString + r'\$' + _IA5String + r'$'
+
+
+class PostalAddress(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.41'
+    DESC = 'Postal Address'
+
+    _line_char = utils.escapedRegex('\\$')
+    _line = _line_char + r'+'
+    regex = r'^' + _line + r'(\$' + _line + r')*$'
