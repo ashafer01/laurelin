@@ -90,3 +90,28 @@ DITStructureRuleDescription = (
     r'(' + SP + r'SUP' + SP + ruleids + r')?' +
     WSP + r'\)' # TODO extensions
 )
+
+NameFormDescription = (
+    r'\(' +  WSP +
+    numericoid +
+    r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
+    r'(' + SP + r'DESC' + SP + qdstring + r')?' +
+    r'(' + SP + r'OBSOLETE)?' +
+    SP + r'OC' + SP + oid +
+    SP + r'MUST' + SP + oids +
+    r'(' + SP + 'MAY' + SP + oids + r')?' +
+    WSP + r'\)' # TODO extensions
+)
+
+ObjectClassDescription = (
+    r'\(' + WSP +
+    numericoid +
+    r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
+    r'(' + SP + r'DESC' + SP + qdstring + r')?' +
+    r'(' + SP + r'OBSOLETE)?' +
+    r'(' + SP + r'SUP' + SP + oids + r')?' +
+    r'(' + SP + r'(ABSTRACT|STRUCTURAL|AUXILIARY))?' +
+    r'(' + SP + r'MUST' + SP + oids + r')?' +
+    r'(' + SP + r'MAY' + SP + oids + r')?' +
+    WSP + r'\)' # TODO extensions
+)

@@ -20,7 +20,7 @@ def validatePhoneNumber(s):
     """Perform simplistic phone number validation"""
 
     # strip out non-digit and non-plus characters
-    s = re.sub('[^0-9+]', s)
+    s = re.sub('[^0-9+]', '', s)
 
     # remove leading +
     if s.startswith('+'):
@@ -33,3 +33,7 @@ def validatePhoneNumber(s):
     # Check length
     l = len(s)
     return (l >= 7 and l <= 15)
+
+def collapseWhitespace(s):
+    """Collapse all whitespace sequences down to a single space"""
+    return re.sub('\s+', ' ', s).strip()

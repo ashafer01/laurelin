@@ -14,7 +14,11 @@ from six.moves import range
 
 PrintableCharacter = r"[A-Za-z0-9'()+,.=/:? -]"
 PrintableString = PrintableCharacter + r'+'
+
 _IA5String = r"[\x00-\x7f]*"
+_BitString = r"'[01]*'B"
+
+## Syntax Rules
 
 _oidSyntaxRules = {}
 _oidSyntaxRuleObjects = {}
@@ -63,7 +67,7 @@ class RegexSyntaxRule(SyntaxRule):
 class BitString(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.6'
     DESC = 'Bit String'
-    regex = r"^'[01]*'B$"
+    regex = utils.reAnchor(_BitString)
 
 
 class Boolean(SyntaxRule):
@@ -258,3 +262,59 @@ class MatchingRuleUseDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.31'
     DESC = 'Matching Rule Use Description'
     regex = utils.reAnchor(rfc4512.MatchingRuleUseDescription)
+
+
+class NameAndOptionalUID(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.34'
+    DESC = 'Name And Optional UID'
+    regex = utils.reAnchor(_BitString)
+
+    def validate(self, s):
+        dnbs = s.split('#')
+        try:
+            rfc4514.validateDistinguishedName(dnbs[0])
+            if len(dnbs) == 2:
+                return RegexSyntaxRule.validate(self, dnbs[1])
+            else:
+                return False
+        except rfc4514.InvalidDN:
+            return False
+
+
+class NameFormDescription(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.35'
+    DESC = 'Name Form Description'
+    regex = utils.reAnchor(rfc4512.NameFormDescription)
+
+
+class NumericString(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.36'
+    DESC = 'Numeric String'
+    regex = r'^[0-9 ]+$'
+
+
+class ObjectClassDescription(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.37'
+    DESC = 'Object Class Description'
+    regex = utils.reAnchor(rfc4512.ObjectClassDescription)
+
+
+class OctetString(SyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.40'
+    DESC = 'Octet String'
+
+    def validate(self, s):
+        # Any arbitrary sequence of octets
+        return True
+
+
+class OID(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.38'
+    DESC = 'OID'
+    regex = utils.reAnchor(rfc4512.oid)
+
+
+class OtherMailbox(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.39'
+    DESC = 'Other Mailbox'
+    regex = r'^' + PrintableString + r'\$' + _IA5String + r'$'
