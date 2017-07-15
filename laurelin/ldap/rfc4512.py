@@ -37,36 +37,56 @@ qdstrings = r'(' + qdstring + r'|\(' + WSP + qdstringlist + WSP + r'\))'
 oidlist = oid + r'(' + WSP + r'\$' + WSP + oid + r')*'
 oids = r'(' + oid + r'|\(' + WSP + oidlist + WSP + r'\))'
 
-MatchingRuleDescription = (
+noidlen = numericoid + r'(\{[0-9]+\})?'
+
+AttributeTypeDescription = (
     r'\(' + WSP +
-    numericoid +
+    r'(' + numericoid + r')' +
     r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
     r'(' + SP + r'DESC' + SP + qdstring + r')?' +
     r'(' + SP + r'OBSOLETE)?' +
-    SP + r'SYNTAX' + SP + oids +
+    r'(' + SP + r'SUP' + SP + oid + r')?' +
+    r'(' + SP + r'EQUALITY' + SP + oid + r')?' +
+    r'(' + SP + r'ORDERING' + SP + oid + r')?' +
+    r'(' + SP + r'SUBSTR' + SP + oid + r')?' +
+    r'(' + SP + r'SYNTAX' + SP + noidlen + r')?' +
+    r'(' + SP + r'SINGLE-VALUE)?' +
+    r'(' + SP + r'COLLECTIVE)?' +
+    r'(' + SP + r'NO-USER-MODIFICATION)?' +
+    r'(' + SP + r'USAGE' + SP + r'(userApplications|directoryOperation|distributedOperation|dSAOperation))?' +
+    WSP + r'\)' # TODO extensions
+)
+
+MatchingRuleDescription = (
+    r'\(' + WSP +
+    r'(' + numericoid + r')' +
+    r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
+    r'(' + SP + r'DESC' + SP + qdstring + r')?' +
+    r'(' + SP + r'OBSOLETE)?' +
+    r'(' + SP + r'SYNTAX' + SP + oids + r')' +
     WSP + r'\)' # TODO extensions
 )
 
 MatchingRuleUseDescription = (
     r'\(' + WSP +
-    numericoid +
+    r'(' + numericoid + r')' +
     r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
     r'(' + SP + r'DESC' + SP + qdstring + r')?' +
     r'(' + SP + r'OBSOLETE)?' +
-    SP + r'APPLIES' + SP + oids +
+    r'(' + SP + r'APPLIES' + SP + oids + r')' +
     WSP + r'\)' # TODO extensions
 )
 
 SyntaxDescription = (
     r'\(' + WSP +
-    numericoid +
+    r'(' + numericoid + r')' +
     r'(' + SP + r'DESC' + SP + qdstring + r')?' +
     WSP + r'\)' # TODO extensions
 )
 
 DITContentRuleDescription = (
     r'\(' + WSP +
-    numericoid +
+    r'(' + numericoid + r')' +
     r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
     r'(' + SP + r'DESC' + SP + qdstring + r')?' +
     r'(' + SP + r'OBSOLETE' + SP + r')?' +
@@ -82,30 +102,30 @@ ruleids = r'(' + ruleid + r'|\(' + WSP + ruleidlist + WSP + r'\))'
 
 DITStructureRuleDescription = (
     r'\(' + WSP +
-    ruleid + 
+    r'(' + ruleid +  r')' +
     r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
     r'(' + SP + r'DESC' + SP + qdstring + r')?' +
     r'(' + SP + r'OBSOLETE' + SP + r')?' +
-    SP + r'FORM' + SP + oid +
+    r'(' + SP + r'FORM' + SP + oid + r')' +
     r'(' + SP + r'SUP' + SP + ruleids + r')?' +
     WSP + r'\)' # TODO extensions
 )
 
 NameFormDescription = (
     r'\(' +  WSP +
-    numericoid +
+    r'(' + numericoid + r')' +
     r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
     r'(' + SP + r'DESC' + SP + qdstring + r')?' +
     r'(' + SP + r'OBSOLETE)?' +
-    SP + r'OC' + SP + oid +
-    SP + r'MUST' + SP + oids +
+    r'(' + SP + r'OC' + SP + oid + r')' +
+    r'(' + SP + r'MUST' + SP + oids + r')' +
     r'(' + SP + 'MAY' + SP + oids + r')?' +
     WSP + r'\)' # TODO extensions
 )
 
 ObjectClassDescription = (
     r'\(' + WSP +
-    numericoid +
+    r'(' + numericoid + r')' +
     r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
     r'(' + SP + r'DESC' + SP + qdstring + r')?' +
     r'(' + SP + r'OBSOLETE)?' +
