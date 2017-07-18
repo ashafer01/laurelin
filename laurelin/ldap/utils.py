@@ -1,5 +1,12 @@
 import re
 
+try:
+    str.casefold
+    def casefold(value):
+        return value.casefold()
+except AttributeError:
+    from py2casefold import casefold
+
 def reAnchor(r):
     return r'^' + r + r'$'
 

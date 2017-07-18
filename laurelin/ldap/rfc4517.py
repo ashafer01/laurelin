@@ -7,7 +7,9 @@ from __future__ import absolute_import
 
 from . import rfc4512
 from . import rfc4514
+from . import rfc4518
 from . import utils
+from .errors import LDAPError
 import re
 import six
 from six.moves import range
@@ -20,6 +22,10 @@ _BitString = r"'[01]*'B"
 
 
 ## Syntax Rules
+
+
+class InvalidSyntaxError(LDAPError):
+    pass
 
 
 _oidSyntaxRules = {}
@@ -63,7 +69,11 @@ class RegexSyntaxRule(SyntaxRule):
         SyntaxRule.__init__(self)
 
     def validate(self, s):
-        return bool(self.compiled_re.match(s))
+        m = self.compiled_re.match(s)
+        if m:
+            return m
+        else:
+            raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
 
 
 class BitString(RegexSyntaxRule):
@@ -77,7 +87,8 @@ class Boolean(SyntaxRule):
     DESC = 'Boolean'
 
     def validate(self, s):
-        return (s == 'TRUE' or s == 'FALSE')
+        if (s != 'TRUE' and s != 'FALSE'):
+            raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
 
 
 class CountryString(RegexSyntaxRule):
@@ -98,10 +109,8 @@ class DirectoryString(SyntaxRule):
     DESC = 'Directory String'
 
     def validate(self, s):
-        if isinstance(s, six.string_types):
-            return (len(s) > 0)
-        else:
-            return False
+        if not isinstance(s, six.string_types) or (len(s) == 0):
+            raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
 
 class DITContentRuleDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.16'
@@ -119,6 +128,7 @@ class DistinguishedName(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.12'
     DESC = 'DN'
     regex = utils.reAnchor(rfc4514.distinguishedName)
+
 
 class EnhancedGuide(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.21'
@@ -138,6 +148,7 @@ class EnhancedGuide(RegexSyntaxRule):
 
     regex = _object_class + r'#' + rfc4512.WSP + _criteria + rfc4512.WSP + r'#' + rfc4512.WSP + _subset
 
+
 class FacsimilieTelephoneNumber(SyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.22'
     DESC = 'Facsimile Telephone Number'
@@ -155,11 +166,10 @@ class FacsimilieTelephoneNumber(SyntaxRule):
     def validate(self, s):
         params = s.split('$')
         if not utils.validatePhoneNumber(params[0]):
-            return False
+            raise InvalidSyntaxError('Not a valid {0} - invalid phone number'.format(self.DESC))
         for param in params[1:]:
             if param not in self._fax_parameters:
-                return False
-        return True
+                raise InvalidSyntaxError('Not a valid {0} - invalid parameter'.format(self.DESC))
 
 
 class Fax(SyntaxRule):
@@ -169,7 +179,8 @@ class Fax(SyntaxRule):
     def validate(self, s):
         # The LDAP-specific encoding of a value of this syntax is the
         # string of octets for a Group 3 Fax image
-        return True
+        return
+
 
 class GeneralizedTime(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.24'
@@ -179,45 +190,45 @@ class GeneralizedTime(RegexSyntaxRule):
     def validate(self, s):
         m = self.compiled_re.match(s)
         if not m:
-            return False
+            raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
         else:
             month = int(m.group(2))
             if month < 1 or month > 12:
-                return False
+                raise InvalidSyntaxError('Not a valid {0} - invalid month'.format(self.DESC))
 
             day = int(m.group(3))
             if day < 1 or day > 31:
-                return False
+                raise InvalidSyntaxError('Not a valid {0} - invalid day'.format(self.DESC))
 
             hour = int(m.group(4))
             if hour < 0 or hour > 23:
-                return False
+                raise InvalidSyntaxError('Not a valid {0} - invalid hour'.format(self.DESC))
 
             minute = m.group(5)
             if minute is not None:
                 minute = int(minute)
                 if minute < 0 or minute > 59:
-                    return False
+                    raise InvalidSyntaxError('Not a valid {0} - invalid minute'.format(self.DESC))
 
             second = m.group(6)
             if second is not None:
                 second = int(second)
                 if second < 0 or second > 60:
-                    return False
+                    raise InvalidSyntaxError('Not a valid {0} - invalid second'.format(self.DESC))
 
             tz = m.group(8)
             if tz != 'Z':
                 tzhour = int(m.group(9))
                 if tzhour < 0 or tzhour > 23:
-                    return False
+                    raise InvalidSyntaxError('Not a valid {0} - invalid timezone hour offset'.format(self.DESC))
 
                 tzminute = m.group(10)
                 if tzminute is not None:
                     tzminute = int(tzminute)
                     if tzminute < 0 or tzminute > 59:
-                        return False
+                        raise InvalidSyntaxError('Not a valid {0} - invalid timezone minute offset'.format(self.DESC))
 
-            return True
+            return m
 
 
 class IA5String(RegexSyntaxRule):
@@ -239,7 +250,7 @@ class JPEG(SyntaxRule):
     def validate(self, s):
         # The LDAP-specific encoding of a value of this syntax is the sequence
         # of octets of the JFIF encoding of the image.
-        return True
+        return
 
 
 class LDAPSytnaxDescription(RegexSyntaxRule):
@@ -290,7 +301,7 @@ class OctetString(SyntaxRule):
 
     def validate(self, s):
         # Any arbitrary sequence of octets
-        return True
+        return
 
 
 class OID(RegexSyntaxRule):
@@ -334,7 +345,8 @@ class TelephoneNumber(SyntaxRule):
     DESC = 'Telephone Number'
 
     def validate(self, s):
-        return utils.validatePhoneNumber(s)
+        if not utils.validatePhoneNumber(s):
+            raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
 
 
 class TelexNumber(RegexSyntaxRule):
@@ -364,6 +376,7 @@ def getMatchingRule(ident):
         obj = clsDict[ident]()
     return obj
 
+
 class MetaMatchingRule(type):
     """Metaclass registering OIDs and NAMEs on subclasses"""
     def __new__(meta, clsname, bases, dct):
@@ -388,7 +401,179 @@ class MatchingRule(object):
         if oid:
             _oidMatchingRuleObjects[oid] = self
         names = getattr(self, 'NAME', ())
-        if isinstance(names, six.string_types):
-            names = (names,)
         for name in names:
             _nameMatchingRuleObjects[name] = self
+
+    def validate(self, value):
+        return getSyntaxRule(self.SYNTAX).validate(value)
+
+    def prepare(self, value):
+        for method in getattr(self, 'prepMethods', ()):
+            value = method(value)
+        return value
+
+
+# Note: currently only implementing equality matching rules since there is no
+# use for ordering or substring matching rules for correct functioning of the
+# current codebase. Any forseeable use for other types of rules would be in
+# support of new features not currently planned.
+
+class EqualityMatchingRule(MatchingRule):
+    def match(self, attributeValue, assertionValue):
+        self.validate(assertionValue)
+        attributeValue = self.prepare(attributeValue)
+        assertionValue = self.prepare(assertionValue)
+        return (attributeValue == assertionValue)
+
+
+caseExactPrepMethods = (
+    rfc4518.Transcode,
+    rfc4518.Map.characters,
+    rfc4518.Normalize,
+    rfc4518.Prohibit,
+    rfc4518.Insignificant.space,
+)
+
+caseIgnorePrepMethods = (
+    rfc4518.Transcode,
+    rfc4518.Map.all,
+    rfc4518.Normalize,
+    rfc4518.Prohibit,
+    rfc4518.Insignificant.space,
+)
+
+class bitStringMatch(EqualityMatchingRule):
+    OID = '2.5.13.16'
+    NAME = 'bitStringMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.6'
+
+
+class booleanMatch(EqualityMatchingRule):
+    OID = '2.5.13.13'
+    NAME = 'booleanMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.7'
+
+
+class caseExactIA5Match(EqualityMatchingRule):
+    OID = '1.3.6.1.4.1.1466.109.114.1'
+    NAME = 'caseExactIA5Match'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.26'
+    prepMethods = caseExactPrepMethods
+
+
+class caseExactMatch(EqualityMatchingRule):
+    OID = '1.3.6.1.4.1.1466.109.114.1'
+    NAME = 'caseExactIA5Match'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.26'
+    prepMethods = caseExactPrepMethods
+
+
+class caseIgnoreIA5Match(EqualityMatchingRule):
+    OID = '1.3.6.1.4.1.1466.109.114.2'
+    NAME = 'caseIgnoreIA5Match'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.26'
+    prepMethods = caseIgnorePrepMethods
+
+
+class caseIgnoreListMatch(EqualityMatchingRule):
+    OID = '2.5.13.11'
+    NAME = 'caseIgnoreListMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.4'
+    prepMethods = caseIgnorePrepMethods
+
+
+class caseIgnoreMatch(EqualityMatchingRule):
+    OID = '2.5.13.2'
+    NAME = 'caseIgnoreMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.15'
+    prepMethods = caseIgnorePrepMethods
+
+
+class directoryStringFirstComponentMatch(EqualityMatchingRule):
+    OID = '2.5.13.31'
+    NAME = 'directoryStringFirstComponentMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.15'
+
+
+class distinguishedNameMatch(EqualityMatchingRule):
+    OID = '2.5.13.1'
+    NAME = 'distinguishedNameMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.12'
+
+    def match(self, attributeValue, assertionValue):
+        self.validate(assertionValue)
+        # TODO
+        return True
+
+
+class generalizedTimeMatch(EqualityMatchingRule):
+    OID = '2.5.13.27'
+    NAME = 'generalizedTimeMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.24'
+
+    def match(self, attributeValue, assertionValue):
+        m = self.validate(assertionValue)
+        # TODO
+        return True
+
+
+class integerFirstComponentMatch(EqualityMatchingRule):
+    OID = '2.5.13.29'
+    NAME = 'integerFirstComponentMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.27'
+
+
+class integerMatch(EqualityMatchingRule):
+    OID = '2.5.13.14'
+    NAME = 'integerMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.27'
+
+
+class numericStringMatch(EqualityMatchingRule):
+    OID = '2.5.13.8'
+    NAME = 'numericStringMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.36'
+    prepMethods = (
+        rfc4518.Transcode,
+        rfc4518.Map.characters,
+        rfc4518.Normalize,
+        rfc4518.Prohibit,
+        rfc4518.Insignificant.numericString,
+    )
+
+
+class objectIdentifierFirstComponentMatch(EqualityMatchingRule):
+    OID = '2.5.13.30'
+    NAME = 'objectIdentifierFirstComponentMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.38'
+
+
+class objectIdentifierMatch(EqualityMatchingRule):
+    OID = '2.5.13.0'
+    NAME = 'objectIdentifierMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.38'
+
+
+class octetStringMatch(EqualityMatchingRule):
+    OID = '2.5.13.17'
+    NAME = 'octetStringMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.40'
+
+
+class telephoneNumberMatch(EqualityMatchingRule):
+    OID = '2.5.13.20'
+    NAME = 'telephoneNumberMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.50'
+    prepMethods = (
+        rfc4518.Transcode,
+        rfc4518.Map.all,
+        rfc4518.Normalize,
+        rfc4518.Prohibit,
+        rfc4518.Insignificant.telephoneNumber,
+    )
+
+
+class uniqueMemberMatch(EqualityMatchingRule):
+    OID = '2.5.13.23'
+    NAME = 'uniqueMemberMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.34'

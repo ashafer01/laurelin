@@ -12,5 +12,6 @@ setup(
         'pyasn1',
         'pure-sasl',
         'six',
+        'py2casefold',
     ],
 )
