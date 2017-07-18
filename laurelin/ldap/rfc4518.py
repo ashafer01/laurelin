@@ -6,7 +6,7 @@ https://tools.ietf.org/html/rfc4518
 from __future__ import absolute_import
 
 from . import utils
-from .errors import LDAPError
+from .errors import ProhibitedCharacterError
 
 import re
 import sys
@@ -71,10 +71,6 @@ class Map:
 
 def Normalize(value):
     return normalize('NFKC', value)
-
-
-class ProhibitedCharacterError(LDAPError):
-    pass
 
 
 # prohibited code points per RFC 4518 from various tables in RFC 3454

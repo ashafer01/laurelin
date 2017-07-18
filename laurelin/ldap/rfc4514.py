@@ -4,18 +4,10 @@ https://tools.ietf.org/html/rfc4514
 """
 
 from __future__ import absolute_import
-
 from . import rfc4512
-from . import utils
-from .errors import LDAPError
-
-import re
-from six.moves import range
-
-class InvalidDN(LDAPError):
-    pass
 
 ## Section 3
+
 
 hexpair = rfc4512.HEX + r'{2}'
 hexstring = r'#(' + hexpair + r')+'

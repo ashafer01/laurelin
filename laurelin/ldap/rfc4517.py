@@ -9,7 +9,7 @@ from . import rfc4512
 from . import rfc4514
 from . import rfc4518
 from . import utils
-from .errors import LDAPError
+from .errors import InvalidSyntaxError
 import re
 import six
 from six.moves import range
@@ -22,10 +22,6 @@ _BitString = r"'[01]*'B"
 
 
 ## Syntax Rules
-
-
-class InvalidSyntaxError(LDAPError):
-    pass
 
 
 _oidSyntaxRules = {}
