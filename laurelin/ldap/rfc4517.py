@@ -458,9 +458,9 @@ class caseExactIA5Match(EqualityMatchingRule):
 
 
 class caseExactMatch(EqualityMatchingRule):
-    OID = '1.3.6.1.4.1.1466.109.114.1'
-    NAME = 'caseExactIA5Match'
-    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.26'
+    OID = '2.5.13.5'
+    NAME = 'caseExactMatch'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.15'
     prepMethods = caseExactPrepMethods
 
 
