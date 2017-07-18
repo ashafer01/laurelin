@@ -263,7 +263,7 @@ class LDAP(Extensible):
                 if self.saslFatalDowngradeCheck:
                     raise LDAPError(msg)
                 else:
-                    warn(msg)
+                    warn(msg, LDAPWarning)
             else:
                 logger.debug('No evidence of downgrade attack')
 
@@ -952,5 +952,5 @@ class SearchReferenceHandle(object):
             try:
                 return uri.search(**self.objKwds)
             except LDAPConnectionError as e:
-                warn('Error connecting to URI {0} ({1})'.format(uri, e.message))
+                warn('Error connecting to URI {0} ({1})'.format(uri, e.message), LDAPWarning)
         raise LDAPError('Could not complete reference URI search with any supplied URIs')

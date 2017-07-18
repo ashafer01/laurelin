@@ -8,6 +8,11 @@ class Abandon(Exception):
     pass
 
 
+class LDAPWarning(Warning):
+    """Generic LDAP warning category"""
+    pass
+
+
 class LDAPExtensionError(LDAPError):
     """Error occurred setting up an extension module"""
     pass
@@ -44,7 +49,7 @@ class UnexpectedSearchResults(LDAPError):
 
 
 class NoSearchResults(UnexpectedSearchResults):
-    """Got no search results when one ore more was required"""
+    """Got no search results when one or more was required"""
     pass
 
 
