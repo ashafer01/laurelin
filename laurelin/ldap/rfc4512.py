@@ -41,19 +41,19 @@ noidlen = numericoid + r'(\{[0-9]+\})?'
 
 AttributeTypeDescription = (
     r'\(' + WSP +
-    r'(' + numericoid + r')' +
-    r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
-    r'(' + SP + r'DESC' + SP + qdstring + r')?' +
-    r'(' + SP + r'OBSOLETE)?' +
-    r'(' + SP + r'SUP' + SP + oid + r')?' +
-    r'(' + SP + r'EQUALITY' + SP + oid + r')?' +
-    r'(' + SP + r'ORDERING' + SP + oid + r')?' +
-    r'(' + SP + r'SUBSTR' + SP + oid + r')?' +
-    r'(' + SP + r'SYNTAX' + SP + noidlen + r')?' +
-    r'(' + SP + r'SINGLE-VALUE)?' +
-    r'(' + SP + r'COLLECTIVE)?' +
-    r'(' + SP + r'NO-USER-MODIFICATION)?' +
-    r'(' + SP + r'USAGE' + SP + r'(userApplications|directoryOperation|distributedOperation|dSAOperation))?' +
+    r'(?P<oid>' + numericoid + r')' +
+    r'(' + SP + r'NAME' + SP + r'(?P<name>' + qdescrs + r'))?' +
+    r'(' + SP + r'DESC' + SP + r'(?P<desc>' + qdstring + r'))?' +
+    r'(?P<obsolete>' + SP + r'OBSOLETE)?' +
+    r'(' + SP + r'SUP' + SP + r'(?P<supertype>' + oid + r'))?' +
+    r'(' + SP + r'EQUALITY' + SP + r'(?P<equality>' + oid + r'))?' +
+    r'(' + SP + r'ORDERING' + SP + r'(?P<ordering>' + oid + r'))?' +
+    r'(' + SP + r'SUBSTR' + SP + r'(?P<substr>' + oid + r'))?' +
+    r'(' + SP + r'SYNTAX' + SP + r'(?P<syntax>' + noidlen + r'))?' +
+    r'(?P<single_value>' + SP + r'SINGLE-VALUE)?' +
+    r'(?P<collective>' + SP + r'COLLECTIVE)?' +
+    r'(?P<no_user_mod>' + SP + r'NO-USER-MODIFICATION)?' +
+    r'(' + SP + r'USAGE' + SP + r'(?P<usage>userApplications|directoryOperation|distributedOperation|dSAOperation))?' +
     WSP + r'\)' # TODO extensions
 )
 
