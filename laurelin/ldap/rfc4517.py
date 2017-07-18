@@ -496,10 +496,35 @@ class distinguishedNameMatch(EqualityMatchingRule):
     NAME = 'distinguishedNameMatch'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.12'
 
+    def _parseDN(self, value):
+        rdns = re.split(r'(?<!\\),', value)
+        rdnDicts = []
+        for rdn in rdns:
+            rdnAVAs = re.split(r'(?<!\\)\+', rdn)
+            rdnDict = {}
+            for rdnAVA in rdnAVAs:
+                attr, val = re.split(r'(?<!\\)=', rdnAVA)
+                rdnDict[attr] = val
+            rdnDicts.append(rdnDict)
+        return rdnDicts
+
     def match(self, attributeValue, assertionValue):
         self.validate(assertionValue)
-        # TODO
-        return True
+        attributeValue = self._parseDN(attributeValue)
+        assertionValue = self._parseDN(assertionValue)
+        if len(attributeValue) != len(assertionValue):
+            return False
+        try:
+            for i in range(len(attributeValue)):
+                attributeRDN = attributeValue[i]
+                assertionRDN = assertionValue[i]
+                for attr in attributeRDN:
+                    # TODO compare using matching rules for attribute
+                    if attributeRDN[attr] != assertionRDN[attr]:
+                        return False
+            return True
+        except Exception:
+            return False
 
 
 class generalizedTimeMatch(EqualityMatchingRule):
