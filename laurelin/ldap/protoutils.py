@@ -4,7 +4,7 @@ from .rfc4511 import (
     ResultCode,
     Version,
 )
-from .errors import UnexpectedResponseType
+from .exceptions import UnexpectedResponseType
 import six
 from six.moves import range
 

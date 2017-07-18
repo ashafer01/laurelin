@@ -5,7 +5,7 @@ from . import rfc4511
 from .constants import Scope, DerefAliases
 from .controls import _processCtrlKwds
 from .filter import parse as parseFilter
-from .errors import *
+from .exceptions import *
 from .extensible import Extensible
 from .ldapobject import LDAPObject
 from .modify import (

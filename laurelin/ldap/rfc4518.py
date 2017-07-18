@@ -6,7 +6,7 @@ https://tools.ietf.org/html/rfc4518
 from __future__ import absolute_import
 
 from . import utils
-from .errors import ProhibitedCharacterError
+from .exceptions import ProhibitedCharacterError
 
 import re
 import sys

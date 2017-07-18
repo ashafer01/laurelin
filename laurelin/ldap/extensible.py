@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from .errors import LDAPExtensionError
+from .exceptions import LDAPExtensionError
 
 class Extensible(object):
     @classmethod

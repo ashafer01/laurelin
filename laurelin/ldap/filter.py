@@ -21,7 +21,7 @@ from .rfc4511 import (
     Any,
     Final,
 )
-from .errors import LDAPError
+from .exceptions import LDAPError
 from .utils import findClosingParen
 
 escapeMap = [

@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from .errors import LDAPError, LDAPExtensionError, LDAPSupportError
+from .exceptions import LDAPError, LDAPExtensionError, LDAPSupportError
 from .rfc4511 import (
     LDAPOID,
     Criticality,

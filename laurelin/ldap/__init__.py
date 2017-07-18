@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases
 from .controls import critical, optional
-from .errors import LDAPError, NoSearchResults, Abandon
+from .exceptions import LDAPError, NoSearchResults, Abandon
 from .ldapobject import LDAPObject
 
 def dc(domain):

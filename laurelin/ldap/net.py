@@ -13,7 +13,7 @@ from pyasn1.error import SubstrateUnderrunError
 from puresasl.client import SASLClient
 
 from .rfc4511 import LDAPMessage, MessageID, ProtocolOp
-from .errors import LDAPError, LDAPSASLError, LDAPConnectionError
+from .exceptions import LDAPError, LDAPSASLError, LDAPConnectionError
 
 _nextSockID = 0
 logger = logging.getLogger(__name__)
