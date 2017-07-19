@@ -4,108 +4,10 @@ https://tools.ietf.org/html/rfc4519
 """
 
 from __future__ import absolute_import
+from .attributetype import AttributeType
+from .objectclass import ObjectClass
 
-from . import rfc4512
-from . import rfc4517
-from . import utils
-from .exceptions import LDAPError
-
-import re
-
-_reAttrType = re.compile(utils.reAnchor(rfc4512.AttributeTypeDescription))
-
-_oidAttributeTypes = {}
-_nameAttributeTypes = {}
-
-def getAttributeType(ident):
-    if ident[0].isdigit():
-        return _oidAttributeTypes[ident]
-    else:
-        try:
-            return _nameAttributeTypes[ident]
-        except KeyError:
-            return _nameAttributeTypes.setdefault(ident, DefaultAttributeType(ident))
-
-class AttributeType(object):
-    def __init__(self, spec):
-        spec = utils.collapseWhitespace(spec).strip()
-        m = _reAttrType.match(spec)
-        if not m:
-            raise LDAPError('Invalid attribute type specification')
-
-        # register OID
-        self.oid = m.group('oid')
-        _oidAttributeTypes[self.oid] = self
-
-        # register name(s)
-        self.names = tuple(name.strip("'") for name in m.group('name').split(' '))
-        for name in self.names:
-            _nameAttributeTypes[name] = self
-
-        equality = m.group('equality')
-        if equality is not None:
-            self.equality = rfc4517.getMatchingRule(equality)
-
-        # Note: ordering and substring matching not currently implemented
-        # specs stored in m.group('ordering') and m.group('substr')
-
-        syntax = m.group('syntax')
-        if syntax is not None:
-            syntax_noidlen = syntax.split('{')
-            self.syntax = rfc4517.getSyntaxRule(syntax_noidlen[0])
-            if len(syntax_noidlen) > 1:
-                self.syntaxLength = int(syntax_noidlen[1].strip('}'))
-
-        obsolete = m.group('obsolete')
-        if obsolete is not None:
-            self.obsolete = bool(obsolete)
-        singleValue = m.group('single_value')
-        if singleValue is not None:
-            self.singleValue = bool(singleValue)
-        collective = m.group('collective')
-        if collective is not None:
-            self.collective = bool(collective)
-        noUserMod = m.group('no_user_mod')
-        if noUserMod is not None:
-            self.noUserMod = bool(noUserMod)
-
-        usage = m.group('usage')
-        if usage:
-            self.usage = usage
-
-        self.supertype = m.group('supertype')
-
-    def __getattr__(self, name):
-        if self.supertype:
-            return getattr(getAttributeType(self.supertype), name)
-        else:
-            raise AttributeError("No attribute named '{0}' and no supertype specified".format(name))
-
-
-## Defaults used when an attribute type is undefined
-
-class DefaultSyntaxRule(object):
-    def validate(self, s):
-        pass
-
-
-class DefaultMatchingRule(object):
-    def match(self, a, b):
-        return True
-
-
-class DefaultAttributeType(AttributeType):
-    def __init__(self, oid=None, name=None):
-        self.oid = None
-        self.names = (name,)
-        self.equality = DefaultMatchingRule()
-        self.syntax = DefaultSyntaxRule()
-        self.obsolete = False
-        self.singleValue = False
-        self.collective = False
-        self.noUserMod = False
-        self.usage = 'userApplications'
-        self.supertype = None
+## Attribute Types
 
 AttributeType("""
       ( 2.5.4.15 NAME 'businessCategory'
@@ -354,4 +256,178 @@ AttributeType("""
       ( 2.5.4.45 NAME 'x500UniqueIdentifier'
          EQUALITY bitStringMatch
          SYNTAX 1.3.6.1.4.1.1466.115.121.1.6 )
+""")
+
+
+## Object Classes
+
+
+ObjectClass("""
+      ( 2.5.6.11 NAME 'applicationProcess'
+         SUP top
+         STRUCTURAL
+         MUST cn
+         MAY ( seeAlso $
+               ou $
+               l $
+               description ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.2 NAME 'country'
+         SUP top
+         STRUCTURAL
+         MUST c
+         MAY ( searchGuide $
+               description ) )
+""")
+
+ObjectClass("""
+      ( 1.3.6.1.4.1.1466.344 NAME 'dcObject'
+         SUP top
+         AUXILIARY
+         MUST dc )
+""")
+
+ObjectClass("""
+      ( 2.5.6.14 NAME 'device'
+         SUP top
+         STRUCTURAL
+         MUST cn
+         MAY ( serialNumber $
+               seeAlso $
+               owner $
+               ou $
+               o $
+               l $
+               description ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.9 NAME 'groupOfNames'
+         SUP top
+         STRUCTURAL
+         MUST ( member $
+               cn )
+         MAY ( businessCategory $
+               seeAlso $
+               owner $
+               ou $
+               o $
+               description ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.17 NAME 'groupOfUniqueNames'
+         SUP top
+         STRUCTURAL
+         MUST ( uniqueMember $
+               cn )
+         MAY ( businessCategory $
+               seeAlso $
+               owner $
+               ou $
+               o $
+               description ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.3 NAME 'locality'
+         SUP top
+         STRUCTURAL
+         MAY ( street $
+               seeAlso $
+               searchGuide $
+               st $
+               l $
+               description ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.4 NAME 'organization'
+         SUP top
+         STRUCTURAL
+         MUST o
+         MAY ( userPassword $ searchGuide $ seeAlso $
+               businessCategory $ x121Address $ registeredAddress $
+               destinationIndicator $ preferredDeliveryMethod $
+               telexNumber $ teletexTerminalIdentifier $
+               telephoneNumber $ internationalISDNNumber $
+               facsimileTelephoneNumber $ street $ postOfficeBox $
+               postalCode $ postalAddress $ physicalDeliveryOfficeName $
+               st $ l $ description ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.7 NAME 'organizationalPerson'
+         SUP person
+         STRUCTURAL
+         MAY ( title $ x121Address $ registeredAddress $
+               destinationIndicator $ preferredDeliveryMethod $
+               telexNumber $ teletexTerminalIdentifier $
+               telephoneNumber $ internationalISDNNumber $
+               facsimileTelephoneNumber $ street $ postOfficeBox $
+               postalCode $ postalAddress $ physicalDeliveryOfficeName $
+               ou $ st $ l ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.8 NAME 'organizationalRole'
+         SUP top
+         STRUCTURAL
+         MUST cn
+         MAY ( x121Address $ registeredAddress $ destinationIndicator $
+               preferredDeliveryMethod $ telexNumber $
+               teletexTerminalIdentifier $ telephoneNumber $
+               internationalISDNNumber $ facsimileTelephoneNumber $
+               seeAlso $ roleOccupant $ preferredDeliveryMethod $
+               street $ postOfficeBox $ postalCode $ postalAddress $
+               physicalDeliveryOfficeName $ ou $ st $ l $
+               description ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.5 NAME 'organizationalUnit'
+         SUP top
+         STRUCTURAL
+         MUST ou
+         MAY ( businessCategory $ description $ destinationIndicator $
+               facsimileTelephoneNumber $ internationalISDNNumber $ l $
+               physicalDeliveryOfficeName $ postalAddress $ postalCode $
+               postOfficeBox $ preferredDeliveryMethod $
+               registeredAddress $ searchGuide $ seeAlso $ st $ street $
+               telephoneNumber $ teletexTerminalIdentifier $
+               telexNumber $ userPassword $ x121Address ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.6 NAME 'person'
+         SUP top
+         STRUCTURAL
+         MUST ( sn $
+               cn )
+         MAY ( userPassword $
+               telephoneNumber $
+               seeAlso $ description ) )
+""")
+
+ObjectClass("""
+      ( 2.5.6.10 NAME 'residentialPerson'
+         SUP person
+         STRUCTURAL
+         MUST l
+         MAY ( businessCategory $ x121Address $ registeredAddress $
+               destinationIndicator $ preferredDeliveryMethod $
+               telexNumber $ teletexTerminalIdentifier $
+               telephoneNumber $ internationalISDNNumber $
+               facsimileTelephoneNumber $ preferredDeliveryMethod $
+               street $ postOfficeBox $ postalCode $ postalAddress $
+               physicalDeliveryOfficeName $ st $ l ) )
+""")
+
+ObjectClass("""
+      ( 1.3.6.1.1.3.1 NAME 'uidObject'
+         SUP top
+         AUXILIARY
+         MUST uid )
 """)

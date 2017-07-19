@@ -1,11 +1,9 @@
-"""Implementations of various constructs defined on RFC 4512
+"""Translations of ABNF specs to regex from RFC 4512
 
 https://tools.ietf.org/html/rfc4512
 """
 
 from __future__ import absolute_import
-
-## Translations from spec ABNF to regex
 
 ALPHA = r'[A-Za-z]'
 DIGIT = r'[0-9]'
@@ -38,6 +36,19 @@ oidlist = oid + r'(' + WSP + r'\$' + WSP + oid + r')*'
 oids = r'(' + oid + r'|\(' + WSP + oidlist + WSP + r'\))'
 
 noidlen = numericoid + r'(\{[0-9]+\})?'
+
+ObjectClassDescription = (
+    r'\(' + WSP +
+    r'(?P<oid>' + numericoid + r')' +
+    r'(' + SP + r'NAME' + SP + r'(?P<name>' + qdescrs + r'))?' +
+    r'(' + SP + r'DESC' + SP + r'(?P<desc>' + qdstring + r'))?' +
+    r'(?P<obsolete>' + SP + r'OBSOLETE)?' +
+    r'(' + SP + r'SUP' + SP + r'(?P<supertype>' + oids + r'))?' +
+    r'(' + SP + r'(?P<kind>ABSTRACT|STRUCTURAL|AUXILIARY))?' +
+    r'(' + SP + r'MUST' + SP + r'(?P<must>' + oids + r'))?' +
+    r'(' + SP + r'MAY' + SP + r'(?P<may>' + oids + r'))?' +
+    WSP + r'\)' # TODO extensions
+)
 
 AttributeTypeDescription = (
     r'\(' + WSP +
@@ -119,19 +130,6 @@ NameFormDescription = (
     r'(' + SP + r'OBSOLETE)?' +
     r'(' + SP + r'OC' + SP + oid + r')' +
     r'(' + SP + r'MUST' + SP + oids + r')' +
-    r'(' + SP + 'MAY' + SP + oids + r')?' +
-    WSP + r'\)' # TODO extensions
-)
-
-ObjectClassDescription = (
-    r'\(' + WSP +
-    r'(' + numericoid + r')' +
-    r'(' + SP + r'NAME' + SP + qdescrs + r')?' +
-    r'(' + SP + r'DESC' + SP + qdstring + r')?' +
-    r'(' + SP + r'OBSOLETE)?' +
-    r'(' + SP + r'SUP' + SP + oids + r')?' +
-    r'(' + SP + r'(ABSTRACT|STRUCTURAL|AUXILIARY))?' +
-    r'(' + SP + r'MUST' + SP + oids + r')?' +
     r'(' + SP + r'MAY' + SP + oids + r')?' +
     WSP + r'\)' # TODO extensions
 )
