@@ -21,12 +21,17 @@ def getObjectClass(ident):
             return _nameObjectClasses.setdefault(ident, DefaultObjectClass(ident))
 
 
-def _parseAttrList(spec):
+def _parseOIDs(spec):
+    if not spec:
+        return []
     spec = spec.strip('() ')
     spec = spec.split('$')
+    return [oid.strip() for oid in spec]
+
+
+def _parseAttrList(spec):
     ret = []
-    for attr in spec:
-        attr = attr.strip()
+    for attr in _parseOIDs(spec):
         if attr[0].isdigit():
             try:
                 for name in getAttributeType(attr).names:
@@ -53,11 +58,11 @@ class ObjectClass(object):
         _oidObjectClasses[self.oid] = self
 
         # register names
-        self.names = tuple(name.strip("'") for name in m.group('name').strip('()').split(' '))
+        self.names = utils.parseQdescrs(m.group('name'))
         for name in self.names:
             _nameObjectClasses[name] = self
 
-        self.supertype = m.group('supertype')
+        self.superclasses = _parseOIDs(m.group('superclass'))
 
         kind = m.group('kind')
         if kind is not None:
@@ -68,27 +73,47 @@ class ObjectClass(object):
         obsolete = m.group('obsolete')
         if obsolete is not None:
             self.obsolete = bool(obsolete)
-        elif not self.supertype:
+        else:
             self.obsolete = False
 
-        must = m.group('must')
-        if must is not None:
-            self.must = _parseAttrList(must)
-        elif not self.supertype:
-           self.must = []
+        self.myMust = _parseAttrList(m.group('must'))
+        self.myMay = _parseAttrList(m.group('may'))
 
-        may = m.group('may')
-        if may is not None:
-            self.may = _parseAttrList(may)
-        elif not self.supertype:
-            self.may = []
+        self._must = None
+        self._may = None
 
-    def __getattr__(self, name):
-        if self.supertype:
-            return getattr(getObjectClass(self.supertype), name)
+    @property
+    def must(self):
+        if self._must is not None:
+            return self._must
+        elif self.superclasses:
+            self._must = self.myMust
+            for oc in self.superclasses:
+                self._must += getObjectClass(oc).must
+            return self._must
         else:
-            raise AttributeError("No attribute named '{0}' and no supertype specified".format(name))
+            self._must = self.myMust
+            return self._must
 
+    @property
+    def may(self):
+        if self._may is not None:
+            return self._may
+        elif self.superclasses:
+            self._may = self.myMay
+            for oc in self.superclasses:
+                self._may += getObjectClass(oc).may
+            return self._may
+        else:
+            self._may = self.myMay
+            return self._may
+
+
+    def allowedAttr(self, name):
+        return (name in self.must or name in self.may)
+
+    def requiredAttr(self, name):
+        return (name in self.must)
 
 
 class DefaultObjectClass(ObjectClass):
@@ -98,5 +123,17 @@ class DefaultObjectClass(ObjectClass):
         self.supertype = None
         self.kind = 'STRUCTURAL'
         self.obsolete = False
-        self.must = []
-        self.may = []
+        self.myMust = []
+        self.myMay = []
+        self._must = None
+        self._may = None
+
+
+## RFC 4512 4.3 extensibleObject
+
+# The 'extensibleObject' auxiliary object class allows entries that
+# belong to it to hold any user attribute.
+
+class ExtensibleObjectClass(ObjectClass):
+    def allowedAttr(self, name):
+        return True

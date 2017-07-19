@@ -1,13 +1,181 @@
-"""RFC 4519: Schema for User Applications
-
-https://tools.ietf.org/html/rfc4519
-"""
+"""Schema specifications from various RFCs"""
 
 from __future__ import absolute_import
 from .attributetype import AttributeType
-from .objectclass import ObjectClass
+from .objectclass import ObjectClass, ExtensibleObjectClass
 
-## Attribute Types
+
+## RFC 4512 2.4.1 Abstract Object Classes
+
+
+ObjectClass("""( 2.5.6.0 NAME 'top' ABSTRACT MUST objectClass )""")
+
+
+## RFC 4512 2.6 Alias Entries
+
+
+ObjectClass("""
+      ( 2.5.6.1 NAME 'alias'
+        SUP top STRUCTURAL
+        MUST aliasedObjectName )
+""")
+
+AttributeType("""
+      ( 2.5.4.1 NAME 'aliasedObjectName'
+        EQUALITY distinguishedNameMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
+        SINGLE-VALUE )
+""")
+
+
+## RFC 4512 Section 3 - Administrative/Operational
+
+
+AttributeType("""
+      ( 2.5.4.0 NAME 'objectClass'
+        EQUALITY objectIdentifierMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )
+""")
+
+
+AttributeType("""
+      ( 2.5.18.3 NAME 'creatorsName'
+        EQUALITY distinguishedNameMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
+        SINGLE-VALUE NO-USER-MODIFICATION
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.18.1 NAME 'createTimestamp'
+        EQUALITY generalizedTimeMatch
+        ORDERING generalizedTimeOrderingMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.24
+        SINGLE-VALUE NO-USER-MODIFICATION
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.18.4 NAME 'modifiersName'
+        EQUALITY distinguishedNameMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
+        SINGLE-VALUE NO-USER-MODIFICATION
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.18.2 NAME 'modifyTimestamp'
+        EQUALITY generalizedTimeMatch
+        ORDERING generalizedTimeOrderingMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.24
+        SINGLE-VALUE NO-USER-MODIFICATION
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.21.9 NAME 'structuralObjectClass'
+        EQUALITY objectIdentifierMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.38
+        SINGLE-VALUE NO-USER-MODIFICATION
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.21.10 NAME 'governingStructureRule'
+        EQUALITY integerMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
+        SINGLE-VALUE NO-USER-MODIFICATION
+        USAGE directoryOperation )
+""")
+
+
+## RFC 4512 4.2 Subschema Subentries
+
+
+AttributeType("""
+      ( 2.5.18.10 NAME 'subschemaSubentry'
+        EQUALITY distinguishedNameMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
+        SINGLE-VALUE NO-USER-MODIFICATION
+        USAGE directoryOperation )
+""")
+
+ObjectClass("""
+      ( 2.5.20.1 NAME 'subschema' AUXILIARY
+        MAY ( dITStructureRules $ nameForms $ ditContentRules $
+          objectClasses $ attributeTypes $ matchingRules $
+          matchingRuleUse ) )
+
+""")
+
+AttributeType("""
+      ( 2.5.21.6 NAME 'objectClasses'
+        EQUALITY objectIdentifierFirstComponentMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.37
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.21.5 NAME 'attributeTypes'
+        EQUALITY objectIdentifierFirstComponentMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.3
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.21.4 NAME 'matchingRules'
+        EQUALITY objectIdentifierFirstComponentMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.30
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.21.8 NAME 'matchingRuleUse'
+        EQUALITY objectIdentifierFirstComponentMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.31
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 1.3.6.1.4.1.1466.101.120.16 NAME 'ldapSyntaxes'
+        EQUALITY objectIdentifierFirstComponentMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.54
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.21.2 NAME 'dITContentRules'
+        EQUALITY objectIdentifierFirstComponentMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.16
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.21.1 NAME 'dITStructureRules'
+        EQUALITY integerFirstComponentMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.17
+        USAGE directoryOperation )
+""")
+
+AttributeType("""
+      ( 2.5.21.7 NAME 'nameForms'
+        EQUALITY objectIdentifierFirstComponentMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.35
+        USAGE directoryOperation )
+""")
+
+
+## RFC 4512 4.3 extensibleObject
+
+
+ExtensibleObjectClass("""
+      ( 1.3.6.1.4.1.1466.101.120.111 NAME 'extensibleObject'
+              SUP top AUXILIARY )
+""")
+
+
+## RFC 4519 Attribute Types
+
 
 AttributeType("""
       ( 2.5.4.15 NAME 'businessCategory'
@@ -259,7 +427,7 @@ AttributeType("""
 """)
 
 
-## Object Classes
+## RFC 4519 Object Classes
 
 
 ObjectClass("""
@@ -431,3 +599,4 @@ ObjectClass("""
          AUXILIARY
          MUST uid )
 """)
+

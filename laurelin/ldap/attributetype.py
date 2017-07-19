@@ -32,7 +32,7 @@ class AttributeType(object):
         _oidAttributeTypes[self.oid] = self
 
         # register name(s)
-        self.names = tuple(name.strip("'") for name in m.group('name').strip('()').split(' '))
+        self.names = utils.parseQdescrs(m.group('name'))
         for name in self.names:
             _nameAttributeTypes[name] = self
 

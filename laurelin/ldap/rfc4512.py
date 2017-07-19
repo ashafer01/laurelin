@@ -43,7 +43,7 @@ ObjectClassDescription = (
     r'(' + SP + r'NAME' + SP + r'(?P<name>' + qdescrs + r'))?' +
     r'(' + SP + r'DESC' + SP + r'(?P<desc>' + qdstring + r'))?' +
     r'(?P<obsolete>' + SP + r'OBSOLETE)?' +
-    r'(' + SP + r'SUP' + SP + r'(?P<supertype>' + oids + r'))?' +
+    r'(' + SP + r'SUP' + SP + r'(?P<superclass>' + oids + r'))?' +
     r'(' + SP + r'(?P<kind>ABSTRACT|STRUCTURAL|AUXILIARY))?' +
     r'(' + SP + r'MUST' + SP + r'(?P<must>' + oids + r'))?' +
     r'(' + SP + r'MAY' + SP + r'(?P<may>' + oids + r'))?' +
