@@ -33,7 +33,6 @@ class LDAPObject(AttrsDict, Extensible):
         self.ldapConn = ldapConn
         self.relativeSearchScope = relativeSearchScope
         self.rdnAttr = rdnAttr
-        self._unstructuredDesc = set()
         AttrsDict.__init__(self, attrsDict)
 
     def __repr__(self):
@@ -137,6 +136,10 @@ class LDAPObject(AttrsDict, Extensible):
     def refresh(self, attrs=None):
         self._requireLDAP()
         self.update(self.ldapConn.get(self.dn, attrs))
+
+    def refreshAll(self):
+        self._requiredLDAP()
+        self.refresh(['*', '+'])
 
     def refreshMissing(self, attrs):
         missingAttrs = []
