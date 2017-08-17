@@ -119,19 +119,30 @@ class DefaultSyntaxRule(object):
 
 
 class DefaultMatchingRule(object):
-    def match(self, a, b):
+    def validate(self, value):
         return True
+
+    def match(self, a, b):
+        return (a == b)
 
 
 class DefaultAttributeType(AttributeType):
     def __init__(self, oid=None, name=None):
         self.oid = None
         self.names = (name,)
-        self.equality = DefaultMatchingRule()
-        self.syntax = DefaultSyntaxRule()
+        self._equality = DefaultMatchingRule()
+        self._syntax = DefaultSyntaxRule()
         self.obsolete = False
         self.singleValue = False
         self.collective = False
         self.noUserMod = False
         self.usage = 'userApplications'
         self.supertype = None
+
+    @property
+    def syntax(self):
+        return self._syntax
+
+    @property
+    def equality(self):
+        return self._equality

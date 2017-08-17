@@ -1,6 +1,7 @@
 """Base classes for syntax rules and matching rules"""
 
 from __future__ import absolute_import
+from .exceptions import InvalidSyntaxError
 import re
 import six
 
