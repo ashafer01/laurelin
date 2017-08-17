@@ -13,6 +13,11 @@ class LDAPWarning(Warning):
     pass
 
 
+class LDAPUnicodeWarning(LDAPWarning, UnicodeWarning):
+    """Warning category for unicode issues relating to LDAP"""
+    pass
+
+
 class LDAPExtensionError(LDAPError):
     """Error occurred setting up an extension module"""
     pass

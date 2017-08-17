@@ -6,7 +6,7 @@ https://tools.ietf.org/html/rfc4518
 from __future__ import absolute_import
 
 from . import utils
-from .exceptions import ProhibitedCharacterError
+from .exceptions import ProhibitedCharacterError, LDAPUnicodeWarning
 
 import re
 import sys
@@ -18,7 +18,7 @@ if sys.maxunicode >= 1114111:
 else:
     warn('This python build only supports unicode code points up to {0} - string '
        'preparation will not be fully compliant with RFC4518'.format(sys.maxunicode),
-       UnicodeWarning,
+       LDAPUnicodeWarning,
     )
     UCS = 2
 

@@ -31,6 +31,7 @@ from .protoutils import (
 import logging
 import re
 import six
+import warnings
 from six.moves import range
 from six.moves.urllib.parse import urlparse
 from warnings import warn
@@ -38,6 +39,18 @@ from warnings import warn
 logger = logging.getLogger('laurelin.ldap')
 logger.addHandler(logging.NullHandler())
 logger.setLevel(logging.DEBUG) # set to DEBUG to allow handler levels full discretion
+
+_showwarning_default = warnings.showwarning
+
+def _showwarning_disabled(message, category, filename, lineno, file=None, line=None):
+    if not issubclass(category, LDAPWarning):
+        _showwarning_default(message, category, filename, lineno, file, line)
+
+def _showwarning_log(message, category, filename, lineno, file=None, line=None):
+    if issubclass(category, LDAPWarning):
+        logger.warning('{0}: {1}'.format(category.__name__, message))
+    else:
+        _showwarning_default(message, category, filename, lineno, file, line)
 
 # for storing reusable sockets
 _sockets = {}
@@ -74,6 +87,8 @@ class LDAP(Extensible):
     OID_WHOAMI   = '1.3.6.1.4.1.4203.1.11.3'
     OID_STARTTLS = '1.3.6.1.4.1.1466.20037'
 
+    ## logging and warning controls
+
     @staticmethod
     def enableLogging(level=logging.DEBUG):
         stderrHandler = logging.StreamHandler()
@@ -81,6 +96,20 @@ class LDAP(Extensible):
         stderrHandler.setLevel(level)
         logger.addHandler(stderrHandler)
         return stderrHandler
+
+    @staticmethod
+    def disableWarnings():
+        warnings.showwarning = _showwarning_disabled
+
+    @staticmethod
+    def logWarnings():
+        warnings.showwarning = _showwarning_log
+
+    @staticmethod
+    def defaultWarnings():
+        warnings.showwarning = _showwarning_default
+
+    ## basic methods
 
     def __enter__(self):
         return self
