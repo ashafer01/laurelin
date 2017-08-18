@@ -1,7 +1,7 @@
 """Base classes for syntax rules and matching rules"""
 
 from __future__ import absolute_import
-from .exceptions import InvalidSyntaxError
+from .exceptions import InvalidSyntaxError, LDAPSchemaError
 import re
 import six
 
@@ -24,6 +24,8 @@ class MetaSyntaxRule(type):
         oid = dct.get('OID')
         cls = type.__new__(meta, name, bases, dct)
         if oid:
+            if oid in _oidSyntaxRules:
+                raise LDAPSchemaError('Duplicate OID in syntax rule declaration')
             _oidSyntaxRules[oid] = cls
         return cls
 
@@ -34,6 +36,8 @@ class SyntaxRule(object):
     def __init__(self):
         oid = getattr(self, 'OID', None)
         if oid:
+            if oid in _oidSyntaxRuleObjects:
+                raise LDAPSchemaError('Multiple instantiations of syntax rule with OID {0}'.format(oid))
             _oidSyntaxRuleObjects[oid] = self
 
     def validate(self, s):
@@ -41,7 +45,7 @@ class SyntaxRule(object):
 
 
 class RegexSyntaxRule(SyntaxRule):
-    """For validateing rules based on a regular expression
+    """For validating rules based on a regular expression
      Subclasses must define the `regex` attribute
     """
     def __init__(self):
@@ -88,8 +92,12 @@ class MetaMatchingRule(type):
             dct['NAME'] = names
         cls = type.__new__(meta, clsname, bases, dct)
         if oid:
+            if oid in _oidMatchingRules:
+                raise LDAPSchemaError('Duplicate OID {0} in matching rule declaration'.format(oid))
             _oidMatchingRules[oid] = cls
         for name in names:
+            if name in _nameMatchingRules:
+                raise LDAPSchemaError('Duplicate name {0} in matching rule declaration'.format(name))
             _nameMatchingRules[name] = cls
         return cls
 
@@ -100,9 +108,13 @@ class MatchingRule(object):
     def __init__(self):
         oid = getattr(self, 'OID', None)
         if oid:
+            if oid in _oidMatchingRuleObjects:
+                raise LDAPSchemaError('Multiple instantiations of matching rule with OID {0}'.format(oid))
             _oidMatchingRuleObjects[oid] = self
         names = getattr(self, 'NAME', ())
         for name in names:
+            if name in _nameMatchingRuleObjects:
+                raise LDAPSchemaError('Multiple instantiations of matching rule with name {0}'.format(name))
             _nameMatchingRuleObjects[name] = self
 
     def validate(self, value):
