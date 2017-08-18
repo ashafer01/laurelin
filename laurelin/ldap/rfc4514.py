@@ -10,7 +10,7 @@ from . import rfc4512
 
 
 hexpair = rfc4512.HEX + r'{2}'
-hexstring = r'#(' + hexpair + r')+'
+hexstring = r'#(?:' + hexpair + r')+'
 
 escaped = r'"+,;<>\0\\'
 special = escaped + ' #='
@@ -22,14 +22,14 @@ leadchar = r'[^' + special + r']'
 trailchar = r'[^' + escaped + r' ]'
 
 string = (
-    r'(' + leadchar + r'|' + pair + r')' +
-    r'(' + stringchar + r'|' + pair + r')*' +
-    r'(' + trailchar + r'|' + pair + r')?'
+    r'(?:' + leadchar + r'|' + pair + r')' +
+    r'(?:' + stringchar + r'|' + pair + r')*' +
+    r'(?:' + trailchar + r'|' + pair + r')?'
 )
 
-attributeValue = r'(' + string + r'|' + hexstring + r')'
-attributeType = r'(' + rfc4512.descr + r'|' + rfc4512.numericoid + r')'
+attributeValue = r'(?:' + string + r'|' + hexstring + r')'
+attributeType = r'(?:' + rfc4512.descr + r'|' + rfc4512.numericoid + r')'
 attributeTypeAndValue = attributeType + r'=' + attributeValue
 
-relativeDistinguishedName = attributeTypeAndValue + r'(\+' + attributeTypeAndValue + r')*'
-distinguishedName = relativeDistinguishedName + r'(,' + relativeDistinguishedName + r')*'
+relativeDistinguishedName = attributeTypeAndValue + r'(?:\+' + attributeTypeAndValue + r')*'
+distinguishedName = relativeDistinguishedName + r'(?:,' + relativeDistinguishedName + r')*'

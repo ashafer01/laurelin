@@ -53,7 +53,7 @@ class CountryString(RegexSyntaxRule):
 class DeliveryMethod(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.14'
     DESC = 'Delivery Method'
-    _pdm = r'(any|mhs|physical|telex|teletext|g3fax|g4fax|ia5|videotext|telephone)'
+    _pdm = r'(?:any|mhs|physical|telex|teletext|g3fax|g4fax|ia5|videotext|telephone)'
     regex = r'^' + _pdm + r'(\s*\$\s*' + _pdm + r')*$'
 
 
@@ -88,8 +88,8 @@ class EnhancedGuide(RegexSyntaxRule):
     DESC = 'Enhanced Guide'
 
     _object_class = rfc4512.WSP + rfc4512.oid + rfc4512.WSP
-    _subset = r'(base[oO]bject|oneLevel|wholeSubtree)'
-    _match_type = r'(EQ|SUBSTR|GE|LE|APPROX)'
+    _subset = r'(?:base[oO]bject|oneLevel|wholeSubtree)'
+    _match_type = r'(?:EQ|SUBSTR|GE|LE|APPROX)'
     _term = (
         r'!?(' + # TODO (maybe?): circular reference in spec - wants ! _term
         rfc4512.oid + r'\$' + _match_type +
@@ -227,7 +227,7 @@ class MatchingRuleUseDescription(RegexSyntaxRule):
 class NameAndOptionalUID(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.34'
     DESC = 'Name And Optional UID'
-    regex = r'^' + rfc4514.distinguishedName + r'(#' + _BitString + r')?'
+    regex = r'^' + rfc4514.distinguishedName + r'(?:#' + _BitString + r')?'
 
 
 class NameFormDescription(RegexSyntaxRule):
@@ -290,7 +290,7 @@ class SubstringAssertion(RegexSyntaxRule):
 
     _substring_character = utils.escapedRegex('\\*')
     _substring = _substring_character + r'+'
-    regex = r'(' + _substring + r')?\*(' + _substring + r'\*)*(' + _substring + r')?'
+    regex = r'(?:' + _substring + r')?\*(?:' + _substring + r'\*)*(?:' + _substring + r')?'
 
 
 class TelephoneNumber(SyntaxRule):
