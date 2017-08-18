@@ -108,10 +108,3 @@ def escapedRegex(escapeChars):
     subpatterns.append('[^{0}]'.format(escapeChars))
 
     return '({0})'.format('|'.join(subpatterns))
-
-
-def parseQdescrs(spec):
-    """Parse an rfc4512.qdescrs to a tuple"""
-    if spec is None:
-        return ()
-    return tuple(qdescr.strip("'") for qdescr in spec.strip('( )').split(' '))

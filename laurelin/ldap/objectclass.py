@@ -2,7 +2,8 @@ from __future__ import absolute_import
 from . import rfc4512
 from . import utils
 from .attributetype import getAttributeType
-from .exceptions import LDAPWarning
+from .exceptions import LDAPSchemaError, LDAPWarning
+from .protoutils import parseQdescrs
 
 import re
 
@@ -51,15 +52,19 @@ class ObjectClass(object):
         spec = utils.collapseWhitespace(spec).strip()
         m = _reObjectClass.match(spec)
         if not m:
-            raise LDAPError('Invalid object class description')
+            raise LDAPSchemaError('Invalid object class description')
 
         # register OID
         self.oid = m.group('oid')
+        if self.oid in _oidObjectClasses:
+            raise LDAPSchemaError('Duplicate object class OID {0}'.format(self.oid))
         _oidObjectClasses[self.oid] = self
 
         # register names
-        self.names = utils.parseQdescrs(m.group('name'))
+        self.names = parseQdescrs(m.group('name'))
         for name in self.names:
+            if name in _nameObjectClasses:
+                raise LDAPSchemaError('Duplicate object class name {0}'.format(name))
             _nameObjectClasses[name] = self
 
         self.superclasses = _parseOIDs(m.group('superclass'))

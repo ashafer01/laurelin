@@ -18,6 +18,7 @@ RESULT_compareTrue = ResultCode('compareTrue')
 RESULT_compareFalse = ResultCode('compareFalse')
 RESULT_referral = ResultCode('referral')
 
+
 def _unpack(op, ldapMessage):
     """Unpack an object from an LDAPMessage envelope"""
     mID = ldapMessage.getComponentByName('messageID')
@@ -28,9 +29,17 @@ def _unpack(op, ldapMessage):
     else:
         raise UnexpectedResponseType()
 
+
 def _seqToList(seq):
     """Convert a pyasn1 sequence to a list of strings"""
     ret = []
     for i in range(len(seq)):
         ret.append(six.text_type(seq.getComponentByPosition(i)))
     return ret
+
+
+def parseQdescrs(spec):
+    """Parse an rfc4512.qdescrs to a tuple"""
+    if spec is None:
+        return ()
+    return tuple(qdescr.strip("'") for qdescr in spec.strip('( )').split(' '))

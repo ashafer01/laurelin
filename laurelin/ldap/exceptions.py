@@ -88,3 +88,8 @@ class InvalidSyntaxError(LDAPError):
 class ProhibitedCharacterError(LDAPError):
     """Raised when a prohibited character is detected in RFC4518 string prep"""
     pass
+
+
+class LDAPSchemaError(LDAPError):
+    """Error relating to setting up the LDAP schema"""
+    pass

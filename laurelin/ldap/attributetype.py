@@ -2,7 +2,8 @@ from __future__ import absolute_import
 from . import rfc4512
 from . import rules
 from . import utils
-from .exceptions import LDAPError
+from .exceptions import LDAPSchemaError
+from .protoutils import parseQdescrs
 
 import re
 
@@ -25,15 +26,19 @@ class AttributeType(object):
         spec = utils.collapseWhitespace(spec).strip()
         m = _reAttrType.match(spec)
         if not m:
-            raise LDAPError('Invalid attribute type specification')
+            raise LDAPSchemaError('Invalid attribute type specification')
 
         # register OID
         self.oid = m.group('oid')
+        if self.oid in _oidAttributeTypes:
+            raise LDAPSchemaError('Duplicate attribute type OID {0}'.format(self.oid))
         _oidAttributeTypes[self.oid] = self
 
         # register name(s)
-        self.names = utils.parseQdescrs(m.group('name'))
+        self.names = parseQdescrs(m.group('name'))
         for name in self.names:
+            if name in _nameAttributeTypes:
+                raise LDAPSchemaError('Duplicate attribute type name {0}'.format(name))
             _nameAttributeTypes[name] = self
 
         self.supertype = m.group('supertype')
