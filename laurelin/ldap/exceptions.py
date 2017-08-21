@@ -80,11 +80,6 @@ class ConnectionUnbound(InvalidBindState):
         LDAPError.__init__(self, 'The connection has been unbound')
 
 
-class InvalidSyntaxError(LDAPError):
-    """Raised when syntax validation fails"""
-    pass
-
-
 class ProhibitedCharacterError(LDAPError):
     """Raised when a prohibited character is detected in RFC4518 string prep"""
     pass
@@ -92,4 +87,14 @@ class ProhibitedCharacterError(LDAPError):
 
 class LDAPSchemaError(LDAPError):
     """Error relating to setting up the LDAP schema"""
+    pass
+
+
+class LDAPValidationError(LDAPError):
+    """Raised when validation fails"""
+    pass
+
+
+class InvalidSyntaxError(LDAPValidationError):
+    """Raised when syntax validation fails"""
     pass

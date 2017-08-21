@@ -115,7 +115,7 @@ class ObjectClass(object):
 
 
     def allowedAttr(self, name):
-        return (name in self.must or name in self.may)
+        return (name in self.may or name in self.must)
 
     def requiredAttr(self, name):
         return (name in self.must)

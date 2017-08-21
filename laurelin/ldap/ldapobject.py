@@ -192,7 +192,7 @@ class LDAPObject(AttrsDict, Extensible):
 
     def replaceAttrs(self, attrsDict, **ctrlKwds):
         self._requireLDAP()
-        self.ldapConn.replaceAttrs(self.dn, attrsDict, **ctrlKwds)
+        self.ldapConn.replaceAttrs(self.dn, attrsDict, current=self, **ctrlKwds)
         self.replaceAttrs_local(attrsDict)
         self._removeEmptyAttrs()
 
@@ -243,3 +243,9 @@ class LDAPObject(AttrsDict, Extensible):
     def move(self, newDN, cleanAttr=True, **ctrlKwds):
         newRDN, newParent = newDN.split(',', 1)
         return self.modDN(newRDN, cleanAttr, newParent, **ctrlKwds)
+
+    ## validation methods
+
+    def validate(self):
+        """Validate the object, assuming all attributes are present locally"""
+        self.ldapConn.validateObject(self, write=False)

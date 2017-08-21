@@ -27,6 +27,7 @@ from .protoutils import (
     _unpack,
     _seqToList,
 )
+from .validation import getValidators
 
 import logging
 import re
@@ -76,6 +77,8 @@ class LDAP(Extensible):
     DEFAULT_SASL_MECH = None
     DEFAULT_SASL_FATAL_DOWNGRADE_CHECK = True
     DEFAULT_CRITICALITY = False
+    DEFAULT_SKIP_VALIDATION = False
+    DEFAULT_SKIP_VALIDATORS = []
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -120,7 +123,8 @@ class LDAP(Extensible):
     def __init__(self, connectTo=None, baseDN=None, reuseConnection=None, connectTimeout=None,
         searchTimeout=None, derefAliases=None, strictModify=None, sslVerify=None, sslCAFile=None,
         sslCAPath=None, sslCAData=None, fetchResultRefs=None, defaultSaslMech=None,
-        saslFatalDowngradeCheck=None, defaultCriticality=None, followReferrals=None):
+        saslFatalDowngradeCheck=None, defaultCriticality=None, followReferrals=None,
+        skipValidation=None, skipValidators=None):
 
         # setup
         if connectTo is None:
@@ -155,6 +159,10 @@ class LDAP(Extensible):
             defaultCriticality = LDAP.DEFAULT_CRITICALITY
         if followReferrals is None:
             followReferrals = LDAP.DEFAULT_FOLLOW_REFERRALS
+        if skipValidation is None:
+            skipValidation = LDAP.DEFAULT_SKIP_VALIDATION
+        if skipValidators is None:
+            skipValidators = LDAP.DEFAULT_SKIP_VALIDATORS
 
         self.defaultSearchTimeout = searchTimeout
         self.defaultDerefAliases = derefAliases
@@ -221,6 +229,23 @@ class LDAP(Extensible):
 
         logger.debug('Creating base object for {0}'.format(self.baseDN))
         self.base = self.obj(self.baseDN, relativeSearchScope=Scope.SUBTREE)
+
+        # Validation setup
+        self.validators = []
+        if not skipValidation:
+            for validator in getValidators():
+                skip = False
+                for validatorSpec in skipValidators:
+                    if isinstance(validatorSpec, six.string_types):
+                        if validator.__name__ == validatorSpec:
+                            skip = True
+                            break
+                    else:
+                        if isinstance(validator, validatorSpec):
+                            skip = True
+                            break
+                if not skip:
+                    self.validators.append(validator)
 
     def refreshRootDSE(self):
         self.rootDSE = self.get('', ['*', '+'])
@@ -505,6 +530,10 @@ class LDAP(Extensible):
         if not isinstance(attrsDict, dict):
             raise TypeError('attrsDict must be dict')
 
+        obj = self.obj(DN, attrsDict, **kwds)
+
+        self.validateObject(obj)
+
         ar = rfc4511.AddRequest()
         ar.setComponentByName('entry', rfc4511.LDAPDN(DN))
         al = rfc4511.AttributeList()
@@ -527,7 +556,7 @@ class LDAP(Extensible):
         mID = self.sock.sendMessage('addRequest', ar, controls)
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
         self._successResult(mID, 'addResponse')
-        return self.obj(DN, attrsDict, **kwds)
+        return obj
 
     ## search+add patterns
 
@@ -617,7 +646,7 @@ class LDAP(Extensible):
 
     ## change attributes on an object
 
-    def modify(self, DN, modlist, **ctrlKwds):
+    def modify(self, DN, modlist, current=None, **ctrlKwds):
         """Perform a series of modify operations on an object
 
          modlist must be a list of laurelin.ldap.modify.Mod instances
@@ -625,6 +654,9 @@ class LDAP(Extensible):
         if len(modlist) > 0:
             if self.sock.unbound:
                 raise ConnectionUnbound()
+
+            self.validateModify(modlist, current)
+
             mr = rfc4511.ModifyRequest()
             mr.setComponentByName('object', rfc4511.LDAPDN(DN))
             cl = rfc4511.Changes()
@@ -665,7 +697,7 @@ class LDAP(Extensible):
             modlist = AddModlist(current, attrsDict)
         else:
             modlist = Modlist(Mod.ADD, attrsDict)
-        return self.modify(DN, modlist, **ctrlKwds)
+        return self.modify(DN, modlist, current, **ctrlKwds)
 
     def deleteAttrs(self, DN, attrsDict, current=None, **ctrlKwds):
         """Delete specific attribute values from dictionary
@@ -679,16 +711,22 @@ class LDAP(Extensible):
             modlist = DeleteModlist(current, attrsDict)
         else:
             modlist = Modlist(Mod.DELETE, attrsDict)
-        return self.modify(DN, modlist, **ctrlKwds)
+        return self.modify(DN, modlist, current, **ctrlKwds)
 
-    def replaceAttrs(self, DN, attrsDict, **ctrlKwds):
+    def replaceAttrs(self, DN, attrsDict, current=None, **ctrlKwds):
         """Replace all values on given attributes with the passed values
 
          * Attributes not mentioned in attrsDict are not touched
          * Attributes will be created if they do not exist
          * Specifying a 0-length entry will delete all values for that attribute
         """
-        return self.modify(DN, Modlist(Mod.REPLACE, attrsDict), **ctrlKwds)
+
+        # Only query for the current object if there are validators present and
+        # strict modify is disabled
+        if current is None and self.validators and not self.strictModify:
+            current = self.get(DN, list(attrsDict.keys())
+
+        return self.modify(DN, Modlist(Mod.REPLACE, attrsDict), current, **ctrlKwds)
 
     ## Extension methods
 
@@ -732,6 +770,23 @@ class LDAP(Extensible):
         self.sock._startTLS(verify, caFile, caPath, caData)
         self.refreshRootDSE()
         logger.info('StartTLS complete')
+
+    ## validation methods
+
+    def _runValidation(self, method, *args):
+        for validator in self.validators:
+            try:
+                getattr(validator, method)(*args)
+            except AttributeError:
+                pass
+
+    def validateObject(self, obj, write=True):
+        self._runValidation('validateObject', obj, write)
+
+    def validateModify(self, modlist, current=None):
+        self._runValidation('validateModify', modlist, current)
+
+    ## misc
 
     def processLDIF(self, ldifStr):
         """Process a basic LDIF
