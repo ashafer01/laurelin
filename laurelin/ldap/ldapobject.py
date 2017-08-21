@@ -156,13 +156,8 @@ class LDAPObject(AttrsDict, Extensible):
         self._removeEmptyAttrs()
 
     def compare(self, attr, value):
-        if attr in self:
-            logger.debug('Doing local compare for {0} ({1} = {2})'.format(self.dn, attr, value))
-            return (value in self.getAttr(attr))
-        elif self._hasLDAP():
-            return self.ldapConn.compare(self.dn, attr, value)
-        else:
-            raise RuntimeError('No LDAP object')
+        self._requireLDAP()
+        return self.ldapConn.compare(self.dn, attr, value)
 
     def _removeEmptyAttrs(self):
         """clean any 0-length attributes from the local dictionary so as to match the server
