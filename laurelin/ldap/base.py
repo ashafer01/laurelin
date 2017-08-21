@@ -724,7 +724,7 @@ class LDAP(Extensible):
         # Only query for the current object if there are validators present and
         # strict modify is disabled
         if current is None and self.validators and not self.strictModify:
-            current = self.get(DN, list(attrsDict.keys())
+            current = self.get(DN, list(attrsDict.keys()))
 
         return self.modify(DN, Modlist(Mod.REPLACE, attrsDict), current, **ctrlKwds)
 

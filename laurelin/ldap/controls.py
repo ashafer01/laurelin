@@ -64,9 +64,9 @@ class MetaControl(type):
         cls = type.__new__(meta, name, bases, dct)
         if cls.OID:
             if not cls.method:
-                raise ValueError('no method set on class {0}'.format(cls.__name__))
+                raise ValueError('no method set on class {0}'.format(name))
             if not cls.keyword:
-                raise ValueError('no keyword set on class {0}'.format(cls.__name__))
+                raise ValueError('no keyword set on class {0}'.format(name))
             _register(cls())
         return cls
 

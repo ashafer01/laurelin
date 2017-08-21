@@ -3,11 +3,11 @@ from .exceptions import LDAPValidationError, LDAPWarning
 from .objectclass import getObjectClass
 
 import six
-from six import range
+from six.moves import range
 
 _validators = []
 
-def getValidators()
+def getValidators():
     return _validators
 
 
