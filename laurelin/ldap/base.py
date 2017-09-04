@@ -2,11 +2,11 @@
 from __future__ import absolute_import
 
 from . import controls
-from . import filter
 from . import rfc4511
 from .constants import Scope, DerefAliases
 from .exceptions import *
 from .extensible import Extensible
+from .filter import parse as parseFilter
 from .ldapobject import LDAPObject
 from .modify import (
     Mod,
@@ -475,7 +475,7 @@ class LDAP(Extensible):
         req.setComponentByName('sizeLimit', rfc4511.Integer0ToMax(limit))
         req.setComponentByName('timeLimit', rfc4511.Integer0ToMax(searchTimeout))
         req.setComponentByName('typesOnly', rfc4511.TypesOnly(attrsOnly))
-        req.setComponentByName('filter', filter.parse(filter))
+        req.setComponentByName('filter', parseFilter(filter))
 
         _attrs = rfc4511.AttributeSelection()
         i = 0
@@ -488,7 +488,12 @@ class LDAP(Extensible):
             i += 1
         req.setComponentByName('attributes', _attrs)
 
-        controls = self._processCtrlKwds('search', kwds)
+        # check here because we need to do a search to get the root DSE, which is required by
+        # _processCtrlKwds, other methods don't need to check
+        if kwds:
+            controls = self._processCtrlKwds('search', kwds)
+        else:
+            controls = None
 
         mID = self.sock.sendMessage('searchRequest', req, controls)
         logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filter={3}'.format(
