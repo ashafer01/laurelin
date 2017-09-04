@@ -1,13 +1,50 @@
 from __future__ import absolute_import
 import re
 from laurelin.ldap import LDAP, LDAPObject, LDAPError
+from laurelin.ldap.attributetype import AttributeType
+from laurelin.ldap.objectclass import ObjectClass
+from laurelin.ldap.rules import RegexSyntaxRule
 import six
 
 TAG = 'netgroup_base'
 OBJECT_CLASS = 'nisNetgroup'
-NETGROUP_ATTRS = ['nisNetgroupTriple', 'memberNisNetgroup', 'objectClass', 'description']
+NETGROUP_ATTRS = ['cn', 'nisNetgroupTriple', 'memberNisNetgroup', 'objectClass']
+
+_TRIPLE_RE = '^\(([^,]*),([^,]*),([^)]*)\)$'
+
+
+## Schema definitions from RFC 2307
+
+
+ObjectClass('''
+( 1.3.6.1.1.1.2.8 NAME 'nisNetgroup' SUP top STRUCTURAL
+  MUST cn
+  MAY ( nisNetgroupTriple $ memberNisNetgroup $ description ) )
+''')
+
+AttributeType('''
+( 1.3.6.1.1.1.1.13 NAME 'memberNisNetgroup'
+  EQUALITY caseExactIA5Match
+  SUBSTR caseExactIA5SubstringsMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+''')
+
+AttributeType('''
+( 1.3.6.1.1.1.1.14 NAME 'nisNetgroupTriple'
+  DESC 'Netgroup triple'
+  EQUALITY caseExactMatch
+  SYNTAX 1.3.6.1.1.1.0.0 )
+''')
+
+
+class nisNetgroupTripleSytnax(RegexSyntaxRule)
+    OID = '1.3.6.1.1.1.0.0'
+    DESC = 'NIS netgroup triple'
+    regex = _TRIPLE_RE
+
 
 ## LDAP extension methods
+
 
 @LDAP.EXTEND()
 def getNetgroup(self, cn, attrs=NETGROUP_ATTRS):
@@ -47,7 +84,9 @@ def addNetgroupHosts(self, DN, members, domain=''):
         members = [members]
     self.addAttrs(DN, _memberHostListToAttrs(members, domain))
 
+
 ## LDAPObject extension methods
+
 
 @LDAPObject.EXTEND()
 def _requireNetgroup(self):
@@ -68,9 +107,11 @@ def obj_addNetgroupHosts(self, members, domain=''):
     self._requireNetgroup()
     self.ldapConn.addNetgroupHosts(self.dn, members, domain)
 
+
 ## private functions
 
-TRIPLE_RE = re.compile('^\(([^,]*),([^,]*),([^)]*)\)$')
+
+TRIPLE_RE = re.compile(_TRIPLE_RE)
 
 def _netgroupFilter(filter):
     return '(&(objectClass={0}){1})'.format(OBJECT_CLASS, filter)
