@@ -12,15 +12,18 @@ def reAnchor(r):
 
 def findClosingParen(text):
     if text[0] != '(':
-        raise ValueError()
+        raise ValueError('missing opening paren')
     parens = 1
     i = 0
-    while parens > 0:
-        i += 1
-        if text[i] == '(':
-            parens += 1
-        elif text[i] == ')':
-            parens -= 1
+    try:
+        while parens > 0:
+            i += 1
+            if text[i] == '(':
+                parens += 1
+            elif text[i] == ')':
+                parens -= 1
+    except IndexError:
+        raise ValueError('missing closing paren')
     return i
 
 def validatePhoneNumber(s):

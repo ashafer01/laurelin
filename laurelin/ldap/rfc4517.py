@@ -83,23 +83,113 @@ class DistinguishedName(RegexSyntaxRule):
     regex = utils.reAnchor(rfc4514.distinguishedName)
 
 
-class EnhancedGuide(RegexSyntaxRule):
+class EnhancedGuide(SyntaxRule):
+    #3.3.10.  Enhanced Guide
+    #
+    #   A value of the Enhanced Guide syntax suggests criteria, which consist
+    #   of combinations of attribute types and filter operators, to be used
+    #   in constructing filters to search for entries of particular object
+    #   classes.  The Enhanced Guide syntax improves upon the Guide syntax by
+    #   allowing the recommended depth of the search to be specified.
+    #
+    #   The LDAP-specific encoding of a value of this syntax is defined by
+    #   the following ABNF:
+    #
+    #      EnhancedGuide = object-class SHARP WSP criteria WSP
+    #                         SHARP WSP subset
+    #      object-class  = WSP oid WSP
+    #      subset        = "baseobject" / "oneLevel" / "wholeSubtree"
+    #
+    #      criteria   = and-term *( BAR and-term )
+    #      and-term   = term *( AMPERSAND term )
+    #      term       = EXCLAIM term /
+    #                   attributetype DOLLAR match-type /
+    #                   LPAREN criteria RPAREN /
+    #                   true /
+    #                   false
+    #      match-type = "EQ" / "SUBSTR" / "GE" / "LE" / "APPROX"
+    #      true       = "?true"
+    #      false      = "?false"
+    #      BAR        = %x7C  ; vertical bar ("|")
+    #      AMPERSAND  = %x26  ; ampersand ("&")
+    #      EXCLAIM    = %x21  ; exclamation mark ("!")
+    #
+    #   The <SHARP>, <WSP>, <oid>, <LPAREN>, <RPAREN>, <attributetype>, and
+    #   <DOLLAR> rules are defined in [RFC4512].
+    #
+    #   The LDAP definition for the Enhanced Guide syntax is:
+    #
+    #      ( 1.3.6.1.4.1.1466.115.121.1.21 DESC 'Enhanced Guide' )
+    #
+    #      Example:
+    #         person#(sn$EQ)#oneLevel
+    #
+    #   The Enhanced Guide syntax corresponds to the EnhancedGuide ASN.1 type
+    #   from [X.520].  The EnhancedGuide type references the Criteria ASN.1
+    #   type, also from [X.520].  The <true> rule, above, represents an empty
+    #   "and" expression in a value of the Criteria type.  The <false> rule,
+    #   above, represents an empty "or" expression in a value of the Criteria
+    #   type.
+
     OID = '1.3.6.1.4.1.1466.115.121.1.21'
     DESC = 'Enhanced Guide'
 
-    _object_class = rfc4512.WSP + rfc4512.oid + rfc4512.WSP
-    _subset = r'(?:base[oO]bject|oneLevel|wholeSubtree)'
-    _match_type = r'(?:EQ|SUBSTR|GE|LE|APPROX)'
+
+    def __init__(self):
+        SyntaxRule.__init__(self)
+        self._object_class = re.compile(EnhancedGuide._object_class)
+        self._term = re.compile(EnhancedGuide._term)
+
     _term = (
-        r'!?(' + # TODO (maybe?): circular reference in spec - wants ! _term
-        rfc4512.oid + r'\$' + _match_type +
-        r'|\(' + r'[^)]+' + r'\)' +  # TODO: circular reference in spec - wants _criteria
+        r'(?:' +
+        rfc4512.oid + r'\$(?:EQ|SUBSTR|GE|LE|APPROX)' +
         r'|\?true|\?false)'
     )
-    _and_term = _term + r'(\&' + _term + r')*'
-    _criteria = _and_term + r'(\|' + _and_term + r')*'
 
-    regex = _object_class + r'#' + rfc4512.WSP + _criteria + rfc4512.WSP + r'#' + rfc4512.WSP + _subset
+    def _validate_criteria(self, criteria, depth=0):
+        term = ''
+        i = 0
+        while i < len(criteria):
+            c = criteria[i]
+            if c == '(':
+                e = utils.findClosingParen(criteria[i:])
+                pterm = criteria[i+1:i+e]
+                print('recursing({1}): {0}'.format(pterm, depth))
+                self._validate_criteria(pterm, depth+1)
+                i += e+1
+            elif c == '|' or c == '&':
+                if term != '':
+                    print('matching({1}): {0}'.format(term, depth))
+                    if not self._term.match(term):
+                        raise InvalidSyntaxError('invalid term')
+                    term = ''
+                i += 1
+            elif c == '!':
+                i += 1
+            else:
+                term += c
+                i += 1
+        if term != '':
+            print('matching({1}): {0}'.format(term, depth))
+            if not self._term.match(term):
+                raise InvalidSyntaxError('invalid term')
+            term = ''
+
+    _object_class = rfc4512.WSP + rfc4512.oid + rfc4512.WSP
+    _subsets = ('baseobject', 'oneLevel', 'wholeSubtree')
+
+    def validate(self, s):
+        try:
+            objectclass, criteria, subset = s.split('#')
+        except ValueError:
+            raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
+        if not self._object_class.match(objectclass):
+            raise InvalidSyntaxError('Not a valid {0} - invalid object class'.format(self.DESC))
+        subset = subset.strip()
+        if subset not in self._subsets:
+            raise InvalidSyntaxError('Not a valid {0} - invalid subset'.format(self.DESC))
+        criteria = criteria.strip()
+        self._validate_criteria(criteria)
 
 
 class FacsimilieTelephoneNumber(SyntaxRule):

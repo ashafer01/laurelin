@@ -94,6 +94,7 @@ class LDAP(Extensible):
 
     @staticmethod
     def enableLogging(level=logging.DEBUG):
+        """Enable logging output to stderr"""
         stderrHandler = logging.StreamHandler()
         stderrHandler.setFormatter(logging.Formatter(LDAP.LOG_FORMAT))
         stderrHandler.setLevel(level)
@@ -102,14 +103,17 @@ class LDAP(Extensible):
 
     @staticmethod
     def disableWarnings():
+        """Prevent all LDAP warnings from being shown - default action for others"""
         warnings.showwarning = _showwarning_disabled
 
     @staticmethod
     def logWarnings():
+        """Log all LDAP warnings rather than showing them - default action for others"""
         warnings.showwarning = _showwarning_log
 
     @staticmethod
     def defaultWarnings():
+        """Always take the default action for warnings"""
         warnings.showwarning = _showwarning_default
 
     ## basic methods
