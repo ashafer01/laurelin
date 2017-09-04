@@ -109,10 +109,13 @@ class AttributeType(object):
             raise AttributeError("No attribute named '{0}' and no supertype specified".format(name))
 
     def validate(self, value):
+        """Validate a value according to the attribute type's syntax rule"""
         return self.syntax.validate(value)
 
     def match(self, attributeValue, assertionValue):
+        """Perform EQUALITY matching on an attribute value and assertion value, returning boolean"""
         self.validate(attributeValue)
+        self.validate(assertionValue)
         return self.equality.match(attributeValue, assertionValue)
 
 
@@ -132,7 +135,7 @@ class DefaultMatchingRule(object):
 
 
 class DefaultAttributeType(AttributeType):
-    def __init__(self, oid=None, name=None):
+    def __init__(self, name=None):
         self.oid = None
         self.names = (name,)
         self._equality = DefaultMatchingRule()

@@ -105,6 +105,7 @@ class MetaMatchingRule(type):
 @six.add_metaclass(MetaMatchingRule)
 class MatchingRule(object):
     """Base class for all matching rules"""
+
     def __init__(self):
         oid = getattr(self, 'OID', None)
         if oid:
@@ -118,9 +119,11 @@ class MatchingRule(object):
             _nameMatchingRuleObjects[name] = self
 
     def validate(self, value):
+        """Perform validation according to the matching rule's syntax"""
         return getSyntaxRule(self.SYNTAX).validate(value)
 
     def prepare(self, value):
+        """Prepare a string for matching"""
         for method in getattr(self, 'prepMethods', ()):
             value = method(value)
         return value
@@ -132,8 +135,12 @@ class MatchingRule(object):
 # support of new features not currently planned.
 
 class EqualityMatchingRule(MatchingRule):
+    """Base class for all EQUALITY matching rules"""
+
     def match(self, attributeValue, assertionValue):
-        self.validate(assertionValue)
+        """Perform matching and return a boolean
+         Users should not call this method. Use `AttributeType.match` instead.
+        """
         attributeValue = self.prepare(attributeValue)
         assertionValue = self.prepare(assertionValue)
         return (attributeValue == assertionValue)
