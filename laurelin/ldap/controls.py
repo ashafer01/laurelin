@@ -23,7 +23,7 @@ def _register(ctrl):
     _registeredControls[ctrl.keyword] = ctrl
 
 
-def _processCtrlKwds(method, kwds, supportedCtrls, defaultCriticality, final=False):
+def processKwds(method, kwds, supportedCtrls, defaultCriticality, final=False):
     """Process keyword arguments for registered controls, returning a protocol-level Controls
 
      Removes entries from kwds as they are used, allowing the same dictionary to be passed on

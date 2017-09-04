@@ -1,10 +1,10 @@
 """Contains base classes for laurelin.ldap"""
 from __future__ import absolute_import
 
+from . import controls
+from . import filter
 from . import rfc4511
 from .constants import Scope, DerefAliases
-from .controls import _processCtrlKwds
-from .filter import parse as parseFilter
 from .exceptions import *
 from .extensible import Extensible
 from .ldapobject import LDAPObject
@@ -258,7 +258,7 @@ class LDAP(Extensible):
     def _processCtrlKwds(self, method, kwds, final=False):
         supportedCtrls = self.rootDSE.getAttr('supportedControl')
         defaultCrit = self.defaultCriticality
-        return _processCtrlKwds(method, kwds, supportedCtrls, defaultCrit, final)
+        return controls.processKwds(method, kwds, supportedCtrls, defaultCrit, final)
 
     def _successResult(self, messageID, operation):
         """Receive an object from the socket and raise an LDAPError if its not a success result"""
@@ -475,7 +475,7 @@ class LDAP(Extensible):
         req.setComponentByName('sizeLimit', rfc4511.Integer0ToMax(limit))
         req.setComponentByName('timeLimit', rfc4511.Integer0ToMax(searchTimeout))
         req.setComponentByName('typesOnly', rfc4511.TypesOnly(attrsOnly))
-        req.setComponentByName('filter', parseFilter(filter))
+        req.setComponentByName('filter', filter.parse(filter))
 
         _attrs = rfc4511.AttributeSelection()
         i = 0
