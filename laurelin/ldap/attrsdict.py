@@ -48,37 +48,68 @@ class AttrsDict(dict):
     replaceAttrs_local = dictModReplace
     deleteAttrs_local = dictModDelete
 
-    ## dict overrides for enforcing types
+    ## dict overrides for case-insensitive keys and enforcing types
 
     def __init__(self, attrsDict=None):
+        self._keys = {}
         if attrsDict is not None:
-            AttrsDict.validate(attrsDict)
-            dict.__init__(self, attrsDict)
+            self.update(attrsDict)
 
     def __contains__(self, attr):
-        if dict.__contains__(self, attr):
-            return (len(self[attr]) > 0)
-        else:
+        try:
+            key = self._keys[six.text_type(attr).lower()]
+            if dict.__contains__(self, key):
+                return (len(self[key]) > 0)
+            else:
+                return False
+        except KeyError:
             return False
 
     def __setitem__(self, attr, values):
+        AttrsDict.validateAttr(attr)
         AttrsDict.validateValues(values)
+        self._keys[attr.lower()] = attr
         dict.__setitem__(self, attr, values)
 
     def setdefault(self, attr, default=None):
-        if not isinstance(attr, six.string_types):
-            raise TypeError('attribute name must be string')
+        AttrsDict.validateAttr(attr)
         if default is None:
             default = []
         try:
             AttrsDict.validateValues(default)
-            return dict.setdefault(self, attr, default)
         except TypeError as e:
-            raise TypeError('invalid default - {0}'.format(e.message))
+            raise TypeError('invalid default - {0}'.format(str(e)))
+        try:
+            return self[attr]
+        except KeyError:
+            self[attr] = default
+            return default
+
+    def __getitem__(self, key):
+        key = self._keys[key.lower()]
+        return dict.__getitem__(self, key)
+
+    def get(self, key, default=None):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            return default
 
     def update(self, attrsDict):
         AttrsDict.validate(attrsDict)
         dict.update(self, attrsDict)
+        for key in self:
+            self._keys[key.lower()] = key
+
+    def __delitem__(self, key):
+        lkey = key.lower()
+        key = self._keys[lkey]
+        dict.__delitem__(self, key)
+        del self._keys[lkey]
+
+    def clear(self):
+        dict.clear(self)
+        self._keys.clear()
 
     @staticmethod
     def validate(attrsDict):
@@ -87,9 +118,13 @@ class AttrsDict(dict):
         if not isinstance(attrsDict, dict):
             raise TypeError('must be dict')
         for attr in attrsDict:
-            if not isinstance(attr, six.string_types):
-                raise TypeError('attribute name must be string')
+            AttrsDict.validateAttr(attr)
             AttrsDict.validateValues(attrsDict[attr])
+
+    @staticmethod
+    def validateAttr(attr):
+        if not isinstance(attr, six.string_types):
+            raise TypeError('attribute name must be string')
 
     @staticmethod
     def validateValues(attrValList):
