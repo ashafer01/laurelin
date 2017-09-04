@@ -154,12 +154,10 @@ class EnhancedGuide(SyntaxRule):
             if c == '(':
                 e = utils.findClosingParen(criteria[i:])
                 pterm = criteria[i+1:i+e]
-                print('recursing({1}): {0}'.format(pterm, depth))
                 self._validate_criteria(pterm, depth+1)
                 i += e+1
             elif c == '|' or c == '&':
                 if term != '':
-                    print('matching({1}): {0}'.format(term, depth))
                     if not self._term.match(term):
                         raise InvalidSyntaxError('invalid term')
                     term = ''
@@ -170,7 +168,6 @@ class EnhancedGuide(SyntaxRule):
                 term += c
                 i += 1
         if term != '':
-            print('matching({1}): {0}'.format(term, depth))
             if not self._term.match(term):
                 raise InvalidSyntaxError('invalid term')
             term = ''
