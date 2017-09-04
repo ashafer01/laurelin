@@ -128,6 +128,18 @@ class MatchingRule(object):
             value = method(value)
         return value
 
+    def do_match(self, attributeValue, assertionValue):
+        """Perform the match operation"""
+        raise NotImplementedError()
+
+    def match(self, attributeValue, assertionValue):
+        """Prepare values and perform the match operation. Assumes values have
+         already been validated.
+        """
+        attributeValue = self.prepare(attributeValue)
+        assertionValue = self.prepare(assertionValue)
+        return self.do_match(attributeValue, assertionValue)
+
 
 # Note: currently only implementing equality matching rules since there is no
 # use for ordering or substring matching rules for correct functioning of the
@@ -137,10 +149,6 @@ class MatchingRule(object):
 class EqualityMatchingRule(MatchingRule):
     """Base class for all EQUALITY matching rules"""
 
-    def match(self, attributeValue, assertionValue):
-        """Perform matching and return a boolean
-         Users should not call this method. Use `AttributeType.match` instead.
-        """
-        attributeValue = self.prepare(attributeValue)
-        assertionValue = self.prepare(assertionValue)
+    def do_match(self, attributeValue, assertionValue):
+        """Perform equality matching"""
         return (attributeValue == assertionValue)

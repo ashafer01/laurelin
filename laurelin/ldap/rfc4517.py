@@ -484,9 +484,8 @@ class distinguishedNameMatch(EqualityMatchingRule):
             rdnDicts.append(rdnDict)
         return rdnDicts
 
-    def match(self, attributeValue, assertionValue):
+    def do_match(self, attributeValue, assertionValue):
         from .attributetype import getAttributeType
-        self.validate(assertionValue)
         attributeValue = self._parseDN(attributeValue)
         assertionValue = self._parseDN(assertionValue)
         if len(attributeValue) != len(assertionValue):
@@ -510,7 +509,7 @@ class generalizedTimeMatch(EqualityMatchingRule):
     NAME = 'generalizedTimeMatch'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.24'
 
-    def match(self, attributeValue, assertionValue):
+    def do_match(self, attributeValue, assertionValue):
         m = self.validate(assertionValue)
         # TODO
         return True

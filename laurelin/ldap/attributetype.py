@@ -118,6 +118,18 @@ class AttributeType(object):
         self.validate(assertionValue)
         return self.equality.match(attributeValue, assertionValue)
 
+    def compare(self, valueList, assertionValue):
+        """Implements the compare operation for a given list of attribute values and an assertion
+         value. Assumes valueList has already been validated.
+        """
+        self.validate(assertionValue)
+        assertionValue = self.equality.prepare(assertionValue)
+        for val in valueList:
+            val = self.equality.prepare(val)
+            if self.equality.do_match(val, assertionValue):
+                return True
+        return False
+
 
 ## Defaults used when an attribute type is undefined
 
