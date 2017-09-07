@@ -139,10 +139,10 @@ def dictModDelete(toDict, attrsDict):
     """Implements the "delete" modification, deleting attribute values from toDict that appear in
      attrsDict
     """
-    for attr, vals in six.iteritems(attrsDict):
+    for attr, delVals in six.iteritems(attrsDict):
         if attr in toDict:
-            if len(vals) > 0:
-                for val in vals:
+            if delVals:
+                for val in delVals:
                     try:
                         toDict[attr].remove(val)
                     except Exception:

@@ -55,9 +55,10 @@ class SchemaValidator(BaseValidator):
             disallowedAttrs = ','.join(attrs)
             ocNames = ','.join(objectClasses)
             raise LDAPValidationError('attributes {0} are not permitted with objectClasses {1}'.format(disallowedAttrs, ocNames))
-        self.validateAttributes(obj, write)
+        for attr, values in six.iteritems(obj):
+            self._validateAttribute(attr, values, write)
 
-    def validateModify(self, modlist, current):
+    def validateModify(self, dn, modlist, current):
         for mod in modlist:
             if mod.vals:
                 self._validateAttribute(mod.attr, mod.vals, True)

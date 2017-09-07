@@ -664,7 +664,7 @@ class LDAP(Extensible):
             if self.sock.unbound:
                 raise ConnectionUnbound()
 
-            self.validateModify(modlist, current)
+            self.validateModify(DN, modlist, current)
 
             mr = rfc4511.ModifyRequest()
             mr.setComponentByName('object', rfc4511.LDAPDN(DN))

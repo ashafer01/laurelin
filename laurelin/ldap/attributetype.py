@@ -112,17 +112,13 @@ class AttributeType(object):
         """Validate a value according to the attribute type's syntax rule"""
         return self.syntax.validate(value)
 
-    def match(self, attributeValue, assertionValue):
-        """Perform EQUALITY matching on an attribute value and assertion value, returning boolean"""
-        self.validate(attributeValue)
-        self.validate(assertionValue)
-        return self.equality.match(attributeValue, assertionValue)
-
     def compare(self, valueList, assertionValue):
         """Implements the compare operation for a given list of attribute values and an assertion
          value. Assumes valueList has already been validated.
         """
         self.validate(assertionValue)
+        if not valueList:
+            return False
         assertionValue = self.equality.prepare(assertionValue)
         for val in valueList:
             val = self.equality.prepare(val)
@@ -142,8 +138,14 @@ class DefaultMatchingRule(object):
     def validate(self, value):
         return True
 
-    def match(self, a, b):
+    def prepare(self, a):
+        return a
+
+    def do_match(self, a, b):
         return (a == b)
+
+    def match(self, a, b):
+        return self.do_match(a, b)
 
 
 class DefaultAttributeType(AttributeType):
