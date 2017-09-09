@@ -4,7 +4,7 @@ class LDAPError(Exception):
 
 
 class Abandon(Exception):
-    """Can be raised to cleanly exit a search result context manager and abandon unread results"""
+    """Can be raised to cleanly exit a context manager and abandon unread results"""
     pass
 
 
@@ -97,4 +97,9 @@ class LDAPValidationError(LDAPError):
 
 class InvalidSyntaxError(LDAPValidationError):
     """Raised when syntax validation fails"""
+    pass
+
+
+class LDAPTransactionError(LDAPError):
+    """Raised by actions not included in a modify transaction"""
     pass

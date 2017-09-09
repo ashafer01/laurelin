@@ -1,6 +1,7 @@
 """Contains utilities for performing object modification"""
 
 from __future__ import absolute_import
+from .attributetype import getAttributeType
 from .rfc4511 import Operation
 import six
 
@@ -77,8 +78,13 @@ def AddModlist(curAttrs, newAttrs):
     addAttrs = {}
     for attr, vals in six.iteritems(newAttrs):
         if attr in curAttrs:
+            attrType = getAttributeType(attr)
             for val in vals:
-                if val not in curAttrs[attr]:
+                try:
+                    attrType.index(curAttrs[attr], val)
+                    # attribute value already exists, do nothing
+                except ValueError:
+                    # attribute value does not exist, add it
                     if attr not in addAttrs:
                         addAttrs[attr] = []
                     addAttrs[attr].append(val)
@@ -96,14 +102,20 @@ def DeleteModlist(curAttrs, delAttrs):
     _delAttrs = {}
     for attr, vals in six.iteritems(delAttrs):
         if attr in curAttrs:
-            if len(vals) == 0:
+            if not vals:
                 _delAttrs[attr] = vals
             else:
+                attrType = getAttributeType(attr)
                 for val in vals:
-                    if val in curAttrs[attr]:
+                    try:
+                        attrType.index(curAttrs[attr], val)
+                        # attribute value exists, delete it
                         if attr not in _delAttrs:
                             _delAttrs[attr] = []
                         _delAttrs[attr].append(val)
+                    except ValueError:
+                        # attribute value does not exist, do nothing
+                        pass
     return Modlist(Mod.DELETE, _delAttrs)
 
 def ReplaceModlist(*args):
@@ -116,36 +128,3 @@ def ReplaceModlist(*args):
     """
     attrsDict = args[-1]
     return Modlist(Mod.REPLACE, attrsDict)
-
-## Implementation of modify operations with dicts
-
-def dictModAdd(toDict, attrsDict):
-    """Implements the "add" modification, adding attributes from attrsDict to toDict"""
-    for attr, vals in six.iteritems(attrsDict):
-        if attr not in toDict:
-            toDict[attr] = vals
-        else:
-            for val in vals:
-                if val not in toDict[attr]:
-                    toDict[attr].append(val)
-
-def dictModReplace(toDict, attrsDict):
-    """Implements the "replace" modification, replacing attribute values in toDict with those from
-     attrsDict
-    """
-    toDict.update(attrsDict)
-
-def dictModDelete(toDict, attrsDict):
-    """Implements the "delete" modification, deleting attribute values from toDict that appear in
-     attrsDict
-    """
-    for attr, delVals in six.iteritems(attrsDict):
-        if attr in toDict:
-            if delVals:
-                for val in delVals:
-                    try:
-                        toDict[attr].remove(val)
-                    except Exception:
-                        pass
-            else:
-                toDict[attr] = []

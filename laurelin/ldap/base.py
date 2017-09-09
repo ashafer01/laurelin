@@ -792,8 +792,8 @@ class LDAP(Extensible):
     def validateObject(self, obj, write=True):
         self._runValidation('validateObject', obj, write)
 
-    def validateModify(self, modlist, current=None):
-        self._runValidation('validateModify', modlist, current)
+    def validateModify(self, dn, modlist, current=None):
+        self._runValidation('validateModify', dn, modlist, current)
 
     ## misc
 

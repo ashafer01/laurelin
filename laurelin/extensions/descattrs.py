@@ -4,11 +4,6 @@
 
 from laurelin.ldap import LDAPObject
 from laurelin.ldap.attrsdict import AttrsDict
-from laurelin.ldap.modify import (
-    dictModAdd,
-    dictModReplace,
-    dictModDelete,
-)
 
 DESC_ATTR_DELIM = '='
 
@@ -36,6 +31,33 @@ def _modifyDescAttrs(self, method, attrsDict):
         for value in values:
             descStrings.append(key + DESC_ATTR_DELIM + value)
     self.replaceAttrs({'description':descStrings + list(self._unstructuredDesc)})
+
+def dictModAdd(toDict, attrsDict):
+    """Adds attributes from attrsDict to toDict"""
+    for attr, vals in six.iteritems(attrsDict):
+        if attr not in toDict:
+            toDict[attr] = vals
+        else:
+            for val in vals:
+                if val not in toDict[attr]:
+                    toDict[attr].append(val)
+
+def dictModReplace(toDict, attrsDict):
+    """Replaces attribute values in toDict with those from attrsDict"""
+    toDict.update(attrsDict)
+
+def dictModDelete(toDict, attrsDict):
+    """Deletes attribute values from toDict that appear in attrsDict"""
+    for attr, delVals in six.iteritems(attrsDict):
+        if attr in toDict:
+            if delVals:
+                for val in delVals:
+                    try:
+                        toDict[attr].remove(val)
+                    except Exception:
+                        pass
+            else:
+                del toDict[attr]
 
 @LDAPObject.EXTEND()
 def addDescAttrs(self, attrsDict):

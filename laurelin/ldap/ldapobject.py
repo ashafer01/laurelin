@@ -1,12 +1,18 @@
 from __future__ import absolute_import
+from .attributetype import getAttributeType
 from .attrsdict import AttrsDict
 from .constants import Scope
-from .exceptions import LDAPError
+from .exceptions import (
+    LDAPError,
+    Abandon,
+    LDAPTransactionError,
+)
 from .extensible import Extensible
 from .modify import (
-    dictModAdd,
-    dictModReplace,
-    dictModDelete,
+    Mod,
+    AddModlist,
+    DeleteModlist,
+    ReplaceModlist,
 )
 import six
 
@@ -118,6 +124,10 @@ class LDAPObject(AttrsDict, Extensible):
         else:
             raise ValueError('Unknown relativeSearchScope')
 
+    def compare(self, attr, value):
+        self._requireLDAP()
+        return self.ldapConn.compare(self.dn, attr, value)
+
     ## object-specific methods
 
     def formatLDIF(self):
@@ -147,55 +157,58 @@ class LDAPObject(AttrsDict, Extensible):
         if len(missingAttrs) > 0:
             self.refresh(missingAttrs)
 
-    def commit(self):
-        """update the server with the local attributes dictionary"""
-        self._requireLDAP()
-        self.ldapConn.replaceAttrs(self.dn, self)
-        self._removeEmptyAttrs()
-
-    def compare(self, attr, value):
-        self._requireLDAP()
-        return self.ldapConn.compare(self.dn, attr, value)
-
-    def _removeEmptyAttrs(self):
-        """clean any 0-length attributes from the local dictionary so as to match the server
-         called automatically after writing to the server
-        """
-        for attr in self.keys():
-            if len(self[attr]) == 0:
-                del self[attr]
-
-    ## online modify methods
-    ## these call the LDAP methods of the same name, passing the object's DN as the first
-    ## argument, then call the matching local modify method after a successful request to the
-    ## server
+    ## object modify methods
 
     def modify(self, modlist, **ctrlKwds):
         self._requireLDAP()
-        self.ldapConn.modify(self.dn, modlist, **ctrlKwds)
-        self.modify_local(modlist)
-        self._removeEmptyAttrs()
+        self.ldapConn.modify(self.dn, modlist, current=self, **ctrlKwds)
+        self._localModify(modlist)
 
     def addAttrs(self, attrsDict, **ctrlKwds):
-        self._requireLDAP()
         if not self.ldapConn.strictModify:
             self.refreshMissing(list(attrsDict.keys()))
-        self.ldapConn.addAttrs(self.dn, attrsDict, current=self, **ctrlKwds)
-        self.addAttrs_local(attrsDict)
+        modlist = AddModlist(self, attrsDict)
+        self.modify(modlist, **ctrlKwds)
 
     def replaceAttrs(self, attrsDict, **ctrlKwds):
-        self._requireLDAP()
-        self.ldapConn.replaceAttrs(self.dn, attrsDict, current=self, **ctrlKwds)
-        self.replaceAttrs_local(attrsDict)
-        self._removeEmptyAttrs()
+        modlist = ReplaceModlist(attrsDict)
+        self.modify(modlist, **ctrlKwds)
 
     def deleteAttrs(self, attrsDict, **ctrlKwds):
-        self._requireLDAP()
         if not self.ldapConn.strictModify:
             self.refreshMissing(list(attrsDict.keys()))
-        self.ldapConn.deleteAttrs(self.dn, attrsDict, current=self, **ctrlKwds)
-        self.deleteAttrs_local(attrsDict)
-        self._removeEmptyAttrs()
+        modlist = DeleteModlist(self, attrsDict)
+        self.modify(modlist, **ctrlKwds)
+
+    def _localModify(self, modlist):
+        """Perform local modify after writing to server"""
+        for mod in modlist:
+            if mod.op == Mod.ADD:
+                if mod.attr not in self:
+                    self[mod.attr] = mod.vals
+                else:
+                    self[mod.attr].extend(mod.vals)
+            elif mod.op == Mod.REPLACE:
+                if mod.vals:
+                    self[mod.attr] = mod.vals
+                else:
+                    del self[mod.attr]
+            elif mod.op == Mod.DELETE:
+                if mod.attr in self:
+                    if mod.vals:
+                        attrType = getAttributeType(mod.attr)
+                        for val in mod.vals:
+                            try:
+                                i = attrType.index(self[mod.attr], val)
+                                del self[mod.attr][i]
+                                if not self[mod.attr]:
+                                    del self[mod.attr]
+                            except ValueError:
+                                pass
+                    else:
+                        del self[mod.attr]
+            else:
+                raise ValueError('Invalid mod op')
 
     ## online-only object-level methods
 
@@ -220,7 +233,8 @@ class LDAPObject(AttrsDict, Extensible):
             rdnAttr, rdnVal = curRDN.split('=', 1)
             try:
                 self[rdnAttr].remove(rdnVal)
-                self._removeEmptyAttrs()
+                if not self[rdnAttr]:
+                    del self[rdnAttr]
             except Exception:
                 pass
         rdnAttr, rdnVal = newRDN.split('=', 1)
@@ -242,3 +256,54 @@ class LDAPObject(AttrsDict, Extensible):
     def validate(self):
         """Validate the object, assuming all attributes are present locally"""
         self.ldapConn.validateObject(self, write=False)
+
+    def validateModify(self, modlist):
+        """Validate a modification list"""
+        self.ldapConn.validateModify(self.dn, modlist, self)
+
+    ## transactions
+
+    def modTransaction(self):
+        return ModTransactionObject(self)
+
+
+class ModTransactionObject(LDAPObject):
+    """Provides a transaction-like construct for building up a single modify operation"""
+
+    def __init__(self, ldapObject):
+        self._origObj = ldapObject
+        self._modlist = []
+
+        LDAPObject.__init__(self,
+            dn=ldapObject.dn,
+            attrsDict=ldapObject.deepcopy(),
+            ldapConn=ldapObject.ldapConn,
+            relativeSearchScope=ldapObject.relativeSearchScope,
+            rdnAttr=ldapObject.rdnAttr,
+        )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, e, trace):
+        self._modlist = []
+        if etype == Abandon:
+            return True
+
+    def commit(self):
+        self._origObj.modify(self._modlist)
+        self._localModify(self._modlist)
+        self._modlist = []
+
+    def modify(self, modlist):
+        self.validateModify(modlist)
+        self._modlist.extend(modlist)
+
+    def addChild(self, rdn, attrsDict, **kwds):
+        raise LDAPTransactionError('add not included in modify transaction')
+
+    def delete(self, **ctrlKwds):
+        raise LDAPTransactionError('delete not included in modify transaction')
+
+    def modDN(self, newRDN, cleanAttr=True, newParent=None, **ctrlKwds):
+        raise LDAPTransactionError('modDN not included in modify transaction')

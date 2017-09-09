@@ -112,19 +112,20 @@ class AttributeType(object):
         """Validate a value according to the attribute type's syntax rule"""
         return self.syntax.validate(value)
 
-    def compare(self, valueList, assertionValue):
-        """Implements the compare operation for a given list of attribute values and an assertion
-         value. Assumes valueList has already been validated.
+    def index(self, valueList, assertionValue):
+        """Finds the index of a value in a list of attribute values. Raises a
+         ValueError if the value is not found in the list. Assumes values in
+         valueList are already validated.
         """
-        self.validate(assertionValue)
         if not valueList:
-            return False
+            raise ValueError('empty valueList')
+        self.validate(assertionValue)
         assertionValue = self.equality.prepare(assertionValue)
-        for val in valueList:
+        for i, val in enumerate(valueList):
             val = self.equality.prepare(val)
             if self.equality.do_match(val, assertionValue):
-                return True
-        return False
+                return i
+        raise ValueError('assertionValue not found')
 
 
 ## Defaults used when an attribute type is undefined

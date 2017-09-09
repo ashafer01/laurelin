@@ -1,16 +1,10 @@
 from __future__ import absolute_import
-from .modify import (
-    Mod,
-    dictModAdd,
-    dictModReplace,
-    dictModDelete,
-)
 import six
 
 class AttrsDict(dict):
     """Stores attributes and provides utility methods without any server or object affinity
 
-     Dict keys are attribute names, and dict values are a list of attribute values
+     Dict keys are case-insensitive attribute names, and dict values are a list of attribute values
     """
 
     def getAttr(self, attr):
@@ -29,24 +23,6 @@ class AttrsDict(dict):
             for val in vals:
                 ret[attr].append(val)
         return ret
-
-    ## local modify methods
-    ## accept same input as online versions, but only update the local attributes dictionary
-
-    def modify_local(self, modlist):
-        for mod in modlist:
-            if mod.op == Mod.ADD:
-                self.addAttrs_local({mod.attr: mod.vals})
-            elif mod.op == Mod.REPLACE:
-                self.replaceAttrs_local({mod.attr: mod.vals})
-            elif mod.op == Mod.DELETE:
-                self.deleteAttrs_local({mod.attr: mod.vals})
-            else:
-                raise ValueError('Invalid mod op')
-
-    addAttrs_local = dictModAdd
-    replaceAttrs_local = dictModReplace
-    deleteAttrs_local = dictModDelete
 
     ## dict overrides for case-insensitive keys and enforcing types
 
