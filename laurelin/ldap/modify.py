@@ -117,14 +117,3 @@ def DeleteModlist(curAttrs, delAttrs):
                         # attribute value does not exist, do nothing
                         pass
     return Modlist(Mod.DELETE, _delAttrs)
-
-def ReplaceModlist(*args):
-    """For completeness - a replace operation should never return an error:
-
-     * All attribute values will be replaced with those given if the attribute exists
-     * Attributes will be created if they do not exist
-     * Specifying a 0-length entry will delete that attribute
-     * Attributes not mentioned are not touched
-    """
-    attrsDict = args[-1]
-    return Modlist(Mod.REPLACE, attrsDict)

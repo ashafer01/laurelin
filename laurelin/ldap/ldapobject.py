@@ -10,9 +10,9 @@ from .exceptions import (
 from .extensible import Extensible
 from .modify import (
     Mod,
+    Modlist,
     AddModlist,
     DeleteModlist,
-    ReplaceModlist,
 )
 import six
 
@@ -171,7 +171,7 @@ class LDAPObject(AttrsDict, Extensible):
         self.modify(modlist, **ctrlKwds)
 
     def replaceAttrs(self, attrsDict, **ctrlKwds):
-        modlist = ReplaceModlist(attrsDict)
+        modlist = Modlist(Mod.REPLACE, attrsDict)
         self.modify(modlist, **ctrlKwds)
 
     def deleteAttrs(self, attrsDict, **ctrlKwds):
@@ -196,19 +196,23 @@ class LDAPObject(AttrsDict, Extensible):
             elif mod.op == Mod.DELETE:
                 if mod.attr in self:
                     if mod.vals:
-                        attrType = getAttributeType(mod.attr)
                         for val in mod.vals:
                             try:
-                                i = attrType.index(self[mod.attr], val)
-                                del self[mod.attr][i]
-                                if not self[mod.attr]:
-                                    del self[mod.attr]
+                                self._deleteAttrValue(mod.attr, val)
                             except ValueError:
                                 pass
                     else:
                         del self[mod.attr]
             else:
                 raise ValueError('Invalid mod op')
+
+    def _deleteAttrValue(self, attr, val):
+        """Delete a single local attribute value"""
+        attrType = getAttributeType(mod.attr)
+        i = attrType.index(self[attr], val)
+        del self[attr][i]
+        if not self[attr]:
+            del self[attr]
 
     ## online-only object-level methods
 
@@ -232,9 +236,7 @@ class LDAPObject(AttrsDict, Extensible):
         if cleanAttr:
             rdnAttr, rdnVal = curRDN.split('=', 1)
             try:
-                self[rdnAttr].remove(rdnVal)
-                if not self[rdnAttr]:
-                    del self[rdnAttr]
+                self._deleteAttrValue(rdnAttr, rdnVal)
             except Exception:
                 pass
         rdnAttr, rdnVal = newRDN.split('=', 1)
