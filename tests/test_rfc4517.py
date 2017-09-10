@@ -8,7 +8,7 @@ def test_bit_string():
         "'01010101'B",
         "'11110000'B",
         "'10101000010101'B",
-        "''B"
+        "''B",
         "'1'B",
     )
 
@@ -26,7 +26,7 @@ def test_bit_string():
         try:
             testobj.validate(test)
             assert False
-        except InvalidSyntaxError
+        except InvalidSyntaxError:
             pass
 
 
