@@ -14,3 +14,20 @@ def test_enhanced_guide():
 
     for test in tests_good:
         testobj.validate(test)
+
+
+def test_distinguished_name():
+    import laurelin.ldap.schema
+    testobj = rfc4517.DistinguishedName()
+
+    tests_good = (
+        'UID=jsmith,DC=example,DC=net',
+        'OU=Sales+CN=J.  Smith,DC=example,DC=net',
+        'CN=James \"Jim\" Smith\, III,DC=example,DC=net',
+        'CN=Before\0dAfter,DC=example,DC=net',
+        '1.3.6.1.4.1.1466.0=#04024869',
+        'CN=Lu\C4\8Di\C4\87',
+    )
+
+    for test in tests_good:
+        testobj.validate(test)
