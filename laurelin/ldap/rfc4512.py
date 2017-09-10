@@ -38,7 +38,7 @@ oids = r'(?:' + oid + r'|\(' + WSP + oidlist + WSP + r'\))'
 noidlen = numericoid + r'(\{[0-9]+\})?'
 
 xstring = r'(?:X-[A-Za-z_-]+)'
-extensions = r'(?P<extensions> ' + xstring + r' ' + qdstrings + r')'
+extensions = r'(?P<extensions> ' + xstring + r' ' + qdstrings + r')?'
 
 ObjectClassDescription = (
     r'\(' + WSP +

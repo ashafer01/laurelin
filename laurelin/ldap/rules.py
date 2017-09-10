@@ -57,7 +57,7 @@ class RegexSyntaxRule(SyntaxRule):
         if m:
             return m
         else:
-            raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
+            raise InvalidSyntaxError('Not a valid {0}: {1}'.format(self.DESC, s))
 
 
 ## Matching Rules
