@@ -1,4 +1,34 @@
 from laurelin.ldap import rfc4517
+from laurelin.ldap.exceptions import InvalidSyntaxError
+
+def test_bit_string():
+    testobj = rfc4517.BitString()
+
+    tests_good = (
+        "'01010101'B",
+        "'11110000'B",
+        "'10101000010101'B",
+        "''B"
+        "'1'B",
+    )
+
+    for test in tests_good:
+        testobj.validate(test)
+
+    tests_bad = (
+        '"01"B',
+        "'01'b",
+        "01B",
+        "'02'B",
+    )
+
+    for test in tests_bad:
+        try:
+            testobj.validate(test)
+            assert False
+        except InvalidSyntaxError
+            pass
+
 
 def test_enhanced_guide():
     testobj = rfc4517.EnhancedGuide()

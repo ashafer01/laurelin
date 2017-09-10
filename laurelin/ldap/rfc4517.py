@@ -146,7 +146,7 @@ class EnhancedGuide(SyntaxRule):
         r'|\?true|\?false)'
     )
 
-    def _validate_criteria(self, criteria, depth=0):
+    def _validate_criteria(self, criteria):
         term = ''
         i = 0
         while i < len(criteria):
@@ -154,7 +154,7 @@ class EnhancedGuide(SyntaxRule):
             if c == '(':
                 e = utils.findClosingParen(criteria[i:])
                 pterm = criteria[i+1:i+e]
-                self._validate_criteria(pterm, depth+1)
+                self._validate_criteria(pterm)
                 i += e+1
             elif c == '|' or c == '&':
                 if term != '':
