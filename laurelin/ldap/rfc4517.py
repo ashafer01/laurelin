@@ -293,7 +293,7 @@ class JPEG(SyntaxRule):
         return
 
 
-class LDAPSytnaxDescription(RegexSyntaxRule):
+class LDAPSyntaxDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.54'
     DESC = 'LDAP Syntax Description'
     regex = utils.reAnchor(rfc4512.SyntaxDescription)
