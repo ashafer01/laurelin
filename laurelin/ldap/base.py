@@ -241,7 +241,7 @@ class LDAP(Extensible):
                 skip = False
                 for validatorSpec in skipValidators:
                     if isinstance(validatorSpec, six.string_types):
-                        if validator.__name__ == validatorSpec:
+                        if validator.__class__.__name__ == validatorSpec:
                             skip = True
                             break
                     else:
