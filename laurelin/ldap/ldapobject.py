@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from .attributetype import getAttributeType
 from .attrsdict import AttrsDict
+from .attrvaluelist import AttrValueList
 from .constants import Scope
 from .exceptions import (
     LDAPError,
@@ -37,7 +38,11 @@ class LDAPObject(AttrsDict, Extensible):
         self.ldapConn = ldapConn
         self.relativeSearchScope = relativeSearchScope
         self.rdnAttr = rdnAttr
-        AttrsDict.__init__(self, attrsDict)
+        AttrsDict.__init__(self)
+        if attrsDict:
+            AttrsDict.validate(attrsDict)
+            for attr, values in six.iteritems(attrsDict):
+                self[attr] = AttrValueList(attr, values)
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))

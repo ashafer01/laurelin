@@ -63,15 +63,14 @@ class AttrsDict(dict):
 
     def get(self, key, default=None):
         try:
-            return self.__getitem__(key)
+            return self[key]
         except KeyError:
             return default
 
     def update(self, attrsDict):
         AttrsDict.validate(attrsDict)
-        dict.update(self, attrsDict)
-        for key in self:
-            self._keys[key.lower()] = key
+        for key in attrsDict:
+            self[key] = attrsDict[key]
 
     def __delitem__(self, key):
         lkey = key.lower()
