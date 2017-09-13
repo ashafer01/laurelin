@@ -18,7 +18,7 @@ class AttrValueList(list):
         except ValueError:
             return False
 
-    def index(self, value, *args):
+    def index(self, value, *args, **kwds):
         """Find the index of value or raise a ValueError if not found.
          The stock start/end arguments are ignored since a list of attribute
          values is defined to have exactly zero or one unique matching values.
@@ -31,3 +31,7 @@ class AttrValueList(list):
             return 1
         except ValueError:
             return 0
+
+    def remove(self, value):
+        i = self.index(value)
+        del self[i]

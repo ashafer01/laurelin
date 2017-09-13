@@ -1,5 +1,4 @@
 from __future__ import absolute_import
-from .attributetype import getAttributeType
 from .attrsdict import AttrsDict
 from .attrvaluelist import AttrValueList
 from .constants import Scope
@@ -42,7 +41,7 @@ class LDAPObject(AttrsDict, Extensible):
         if attrsDict:
             AttrsDict.validate(attrsDict)
             for attr, values in six.iteritems(attrsDict):
-                self[attr] = AttrValueList(attr, values)
+                self[attr] = values
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))
@@ -57,6 +56,12 @@ class LDAPObject(AttrsDict, Extensible):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+    def __setitem__(self, attr, values):
+        if not isinstance(values, list):
+            raise TypeError('must be list')
+        values = AttrValueList(attr, values)
+        AttrsDict.__setitem__(self, attr, values)
 
     def _hasLDAP(self):
         return (self.ldapConn is not None)
@@ -213,9 +218,7 @@ class LDAPObject(AttrsDict, Extensible):
 
     def _deleteAttrValue(self, attr, val):
         """Delete a single local attribute value"""
-        attrType = getAttributeType(mod.attr)
-        i = attrType.index(self[attr], val)
-        del self[attr][i]
+        self[attr].remove(val)
         if not self[attr]:
             del self[attr]
 

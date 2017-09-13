@@ -169,3 +169,6 @@ class DefaultAttributeType(AttributeType):
     @property
     def equality(self):
         return self._equality
+
+    def index(self, valueList, assertionValue):
+        return list.index(valueList, assertionValue)
