@@ -15,7 +15,7 @@ def test_findClosingParen():
 
     test_bad = (
         'a(bc)d',
-        'a(bcd',
+        '(abcd',
     )
 
     for test in test_bad:
