@@ -1,8 +1,63 @@
 """Schema specifications from various RFCs"""
 
 from __future__ import absolute_import
-from .attributetype import AttributeType
-from .objectclass import ObjectClass, ExtensibleObjectClass
+from .attributetype import getAttributeType, AttributeType
+from .exceptions import LDAPValidationError, LDAPWarning
+from .objectclass import getObjectClass, ObjectClass, ExtensibleObjectClass
+from .validation import BaseValidator
+
+# load standard syntaxes and matching rules
+from . import rfc4517
+
+
+class SchemaValidator(BaseValidator):
+    """Ensures parameters conform to the available defined schema"""
+
+    def validateObject(self, obj, write=True):
+        """Validates an object when all attributes are present
+
+         * Requires the objectClass attribute
+         * Checks that all attributes required by the objectClass are defined
+         * Checks that all attributes are allowed by the objectClass
+         * Performs validation against the attribute type spec for all attributes
+        """
+        try:
+            objectClasses = obj['objectClass']
+        except KeyError:
+            raise LDAPValidationError('missing objectClass')
+        attrs = list(obj.keys())
+        for ocName in objectClasses:
+            oc = getObjectClass(ocName)
+            for reqdAttr in oc.must:
+                if reqdAttr not in attrs:
+                    raise LDAPValidationError('missing attribute {0} required by objectClass {1}'.format(reqdAttr, ocName))
+                else:
+                    attrs.remove(reqdAttr)
+            for attr in attrs:
+                if attr in oc.may:
+                    attrs.remove(attr)
+        if attrs:
+            disallowedAttrs = ','.join(attrs)
+            ocNames = ','.join(objectClasses)
+            raise LDAPValidationError('attributes {0} are not permitted with objectClasses {1}'.format(disallowedAttrs, ocNames))
+        for attr, values in six.iteritems(obj):
+            self._validateAttribute(attr, values, write)
+
+    def validateModify(self, dn, modlist, current):
+        for mod in modlist:
+            if mod.vals:
+                self._validateAttribute(mod.attr, mod.vals, True)
+
+    def _validateAttribute(self, attrName, values, write):
+        attr = getAttributeType(attrName)
+        if attr.obsolete:
+            warn('Attribute {0} is obsolete'.format(attrName), LDAPWarning)
+        if attr.singleValue and len(values) > 1:
+            raise LDAPValidationError('Multiple values for single-value attribute {0}'.format(attrName))
+        if write and attr.noUserMod:
+            raise LDAPValidationError('Attribute {0} is not user modifiable'.format(attrName))
+        for value in values:
+            attr.validate(value)
 
 
 ## RFC 4512 2.4.1 Abstract Object Classes
