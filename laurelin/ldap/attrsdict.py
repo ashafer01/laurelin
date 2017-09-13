@@ -33,11 +33,7 @@ class AttrsDict(dict):
 
     def __contains__(self, attr):
         try:
-            key = self._keys[six.text_type(attr).lower()]
-            if dict.__contains__(self, key):
-                return (len(self[key]) > 0)
-            else:
-                return False
+            return (len(self[attr]) > 0)
         except KeyError:
             return False
 

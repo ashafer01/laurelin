@@ -294,12 +294,12 @@ class ModTransactionObject(LDAPObject):
 
     def commit(self):
         self._origObj.modify(self._modlist)
-        self._localModify(self._modlist)
         self._modlist = []
 
     def modify(self, modlist):
         self.validateModify(modlist)
         self._modlist.extend(modlist)
+        self._localModify(modlist)
 
     def addChild(self, rdn, attrsDict, **kwds):
         raise LDAPTransactionError('add not included in modify transaction')
