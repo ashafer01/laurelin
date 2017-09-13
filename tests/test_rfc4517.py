@@ -253,3 +253,26 @@ def test_oid():
         ),
         tests_bad = (),
     )
+
+
+def test_postal_address():
+    run_syntax(
+        testobj = rfc4517.PostalAddress(),
+        tests_good = (
+            '1234 Main St.$Anytown, CA 12345$USA',
+            r'\241,000,000 Sweepstakes$PO Box 1000000$Anytown, CA 12345$USA',
+        ),
+        tests_bad = (),
+    )
+
+
+def test_telephone_number():
+    run_syntax(
+        testobj = rfc4517.TelephoneNumber(),
+        tests_good = (
+            '+1 512 315 0280',
+            '+1-512-315-0280',
+            '+61 3 9896 7830',
+        ),
+        tests_bad = (),
+    )
