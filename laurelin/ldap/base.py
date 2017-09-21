@@ -24,7 +24,7 @@ from .protoutils import (
     RESULT_compareTrue,
     RESULT_compareFalse,
     RESULT_referral,
-    _unpack,
+    unpack,
     _seqToList,
 )
 from .validation import getValidators
@@ -262,11 +262,13 @@ class LDAP(Extensible):
 
     def _successResult(self, messageID, operation):
         """Receive an object from the socket and raise an LDAPError if its not a success result"""
-        mID, obj = _unpack(operation, self.sock.recvOne(messageID))
+        mID, obj, resCtrls = unpack(operation, self.sock.recvOne(messageID))
         res = obj.getComponentByName('resultCode')
         if res == RESULT_success:
             logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
-            return True
+            ret = LDAPResponse()
+            controls.handleResponse(ret, resCtrls)
+            return ret
         else:
             raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
 
@@ -287,15 +289,16 @@ class LDAP(Extensible):
         ac.setComponentByName('simple', rfc4511.Simple(password))
         br.setComponentByName('authentication', ac)
 
-        controls = self._processCtrlKwds('bind', ctrlKwds, final=True)
+        reqCtrls = self._processCtrlKwds('bind', ctrlKwds, final=True)
 
-        mID = self.sock.sendMessage('bindRequest', br, controls)
+        mID = self.sock.sendMessage('bindRequest', br, reqCtrls)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
             self.sock.ID, username))
         ret = self._successResult(mID, 'bindResponse')
-        self.sock.bound = ret
+        self.sock.bound = True
         logger.info('Simple bind successful')
         return ret
+
 
     def getSASLMechs(self):
         """Query root DSE for supported SASL mechanisms"""
@@ -337,7 +340,7 @@ class LDAP(Extensible):
         if self.sock.bound:
             raise ConnectionAlreadyBound()
 
-        controls = self._processCtrlKwds('bind', props)
+        reqCtrls = self._processCtrlKwds('bind', props)
 
         mechs = self.getSASLMechs()
         if mech is None:
@@ -364,11 +367,11 @@ class LDAP(Extensible):
             ac.setComponentByName('sasl', sasl)
             br.setComponentByName('authentication', ac)
 
-            mID = self.sock.sendMessage('bindRequest', br, controls)
+            mID = self.sock.sendMessage('bindRequest', br, reqCtrls)
             logger.debug('Sent SASL bind request (ID {0}) on connection #{1}'.format(mID,
                 self.sock.ID))
 
-            mID, res = _unpack('bindResponse', self.sock.recvOne(mID))
+            mID, res, resCtrls = unpack('bindResponse', self.sock.recvOne(mID))
             status = res.getComponentByName('resultCode')
             if status == RESULT_saslBindInProgress:
                 challengeResponse = self.sock.saslProcessAuthChallenge(
@@ -380,7 +383,10 @@ class LDAP(Extensible):
                 logger.debug('Negotiated SASL QoP = {0}'.format(self.sock.saslQoP))
                 self.sock.bound = True
                 self.recheckSASLMechs()
-                return True
+
+                ret = LDAPResponse()
+                controls.handleResponse(ret, resCtrls)
+                return ret
             else:
                 raise LDAPError('Got {0} during SASL bind'.format(repr(status)))
         raise LDAPError('Programming error - reached end of saslBind')
@@ -512,22 +518,25 @@ class LDAP(Extensible):
         ava.setComponentByName('assertionValue', rfc4511.AssertionValue(six.text_type(value)))
         cr.setComponentByName('ava', ava)
 
-        controls = self._processCtrlKwds('compare', ctrlKwds, final=True)
+        reqCtrls = self._processCtrlKwds('compare', ctrlKwds, final=True)
 
-        messageID = self.sock.sendMessage('compareRequest', cr, controls)
+        messageID = self.sock.sendMessage('compareRequest', cr, reqCtrls)
         logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(
             messageID, DN, attr, value))
         msg = self.sock.recvOne(messageID)
-        mID, res = _unpack('compareResponse', msg)
+        mID, res, resCtrls = unpack('compareResponse', msg)
         res = res.getComponentByName('resultCode')
         if res == RESULT_compareTrue:
             logger.debug('Compared True (ID {0})'.format(mID))
-            return True
+            compareResult = True
         elif res == RESULT_compareFalse:
             logger.debug('Compared False (ID {0})'.format(mID))
-            return False
+            compareResult = False
         else:
             raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
+        ret = CompareResponse(compareResult)
+        controls.handleResponse(ret, resCtrls)
+        return ret
 
     def add(self, DN, attrsDict, **kwds):
         """Add new object and return corresponding LDAPObject on success"""
@@ -560,12 +569,20 @@ class LDAP(Extensible):
             i += 1
         ar.setComponentByName('attributes', al)
 
-        controls = self._processCtrlKwds('add', kwds)
+        reqCtrls = self._processCtrlKwds('add', kwds)
 
-        mID = self.sock.sendMessage('addRequest', ar, controls)
+        mID = self.sock.sendMessage('addRequest', ar, reqCtrls)
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
-        self._successResult(mID, 'addResponse')
-        return obj
+
+        lm = self.sock.recvOne(mID)
+        mID, res, resCtrls = unpack('addResponse', lm)
+        res = res.getComponentByName('resultCode')
+        if res == RESULT_success:
+            logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
+            controls.handleResponse(obj, resCtrls)
+            return obj
+        else:
+            raise LDAPError('Got {0} for add (ID {1})'.format(repr(res), mID))
 
     ## search+add patterns
 
@@ -695,7 +712,7 @@ class LDAP(Extensible):
             return self._successResult(mID, 'modifyResponse')
         else:
             logger.debug('Not sending 0-length modlist for DN {0}'.format(DN))
-            return True
+            return LDAPResponse()
 
     def addAttrs(self, DN, attrsDict, current=None, **ctrlKwds):
         """Add new attribute values to existing object"""
@@ -845,6 +862,19 @@ class LDAP(Extensible):
             raise ValueError('changetype {0} unknown/not yet implemented'.format(changetype))
 
 
+class LDAPResponse(object):
+    """Empty object for storing response control values"""
+    pass
+
+
+class CompareResponse(LDAPResponse):
+    def __init__(self, compareResult):
+        self.compareResult = compareResult
+
+    def __bool__(self):
+        return self.compareResult
+
+
 class ResponseHandle(object):
     def __enter__(self):
         return self
@@ -882,7 +912,7 @@ class SearchResultHandle(ResponseHandle):
             raise StopIteration()
         for msg in self.ldapConn.sock.recvMessages(self.messageID):
             try:
-                mID, entry = _unpack('searchResEntry', msg)
+                mID, entry, resCtrls = unpack('searchResEntry', msg)
                 DN = six.text_type(entry.getComponentByName('objectName'))
                 attrs = {}
                 _attrs = entry.getComponentByName('attributes')
@@ -892,16 +922,19 @@ class SearchResultHandle(ResponseHandle):
                     vals = _attr.getComponentByName('vals')
                     attrs[attrType] = _seqToList(vals)
                 logger.debug('Got search result entry (ID {0}) {1}'.format(mID, DN))
-                yield self.ldapConn.obj(DN, attrs, **self.objKwds)
+                ret = self.ldapConn.obj(DN, attrs, **self.objKwds)
+                controls.handleResponse(ret, resCtrls)
+                yield ret
             except UnexpectedResponseType:
                 try:
-                    mID, resobj = _unpack('searchResDone', msg)
+                    mID, resobj, resCtrls = unpack('searchResDone', msg)
                     self.done = True
                     res = resobj.getComponentByName('resultCode')
                     if res == RESULT_success or res == RESULT_noSuchObject:
                         logger.debug('Got all search results for ID={0}, result is {1}'.format(
                             mID, repr(res)
                         ))
+                        # TODO: handle response controls on searchResDone message
                         raise StopIteration()
                     elif res == RESULT_referral:
                         if self.followReferrals:
@@ -918,7 +951,7 @@ class SearchResultHandle(ResponseHandle):
                             repr(res), mID
                         ))
                 except UnexpectedResponseType:
-                    mID, resref = _unpack('searchResRef', ldapMessage)
+                    mID, resref, resCtrls = unpack('searchResRef', ldapMessage)
                     URIs = _seqToList(resref)
                     logger.debug('Got search result reference (ID {0}) to: {1}'.format(
                         mID, ' | '.join(URIs)
@@ -928,6 +961,7 @@ class SearchResultHandle(ResponseHandle):
                         for obj in ref.fetch():
                             yield obj
                     else:
+                        controls.handleResponse(ref, resCtrls)
                         yield ref
 
 
@@ -946,12 +980,12 @@ class ExtendedResponseHandle(ResponseHandle):
 
     def _handleMsg(self, lm):
         try:
-            mID, ir = _unpack('intermediateResponse', lm)
+            mID, ir, resCtrls = unpack('intermediateResponse', lm)
             resName = ir.getComponentByName('responseName')
             logger.debug('Got name={0} intermediate response for ID={1}'.format(resName, mID))
             return ir
         except UnexpectedResponseType:
-            mID, xr = _unpack('extendedResp', lm)
+            mID, xr, resCtrls = unpack('extendedResp', lm)
             self.done = True
             resName = xr.getComponentByName('responseName')
             logger.debug('Got name={0} extended response for ID={1}'.format(resName, mID))

@@ -19,13 +19,14 @@ RESULT_compareFalse = ResultCode('compareFalse')
 RESULT_referral = ResultCode('referral')
 
 
-def _unpack(op, ldapMessage):
+def unpack(op, ldapMessage):
     """Unpack an object from an LDAPMessage envelope"""
     mID = ldapMessage.getComponentByName('messageID')
     po = ldapMessage.getComponentByName('protocolOp')
+    controls = ldapMessage.getComponentByName('controls')
     ret = po.getComponentByName(op)
     if ret is not None:
-        return mID, ret
+        return mID, ret, controls
     else:
         raise UnexpectedResponseType()
 

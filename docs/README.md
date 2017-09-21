@@ -4,7 +4,6 @@ The following features have not yet been implemented or are incomplete
 
 * Controls
   * Framework in place, no actual controls implemented yet
-  * Response controls not yet handled
 * Extensions
   * Framework in place, couple of extension methods implemented
   * Missing extensible filters
