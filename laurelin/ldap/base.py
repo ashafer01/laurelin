@@ -934,7 +934,7 @@ class SearchResultHandle(ResponseHandle):
                         logger.debug('Got all search results for ID={0}, result is {1}'.format(
                             mID, repr(res)
                         ))
-                        # TODO: handle response controls on searchResDone message
+                        controls.handleResponse(self, resCtrls)
                         raise StopIteration()
                     elif res == RESULT_referral:
                         if self.followReferrals:
@@ -958,6 +958,8 @@ class SearchResultHandle(ResponseHandle):
                     ))
                     ref = SearchReferenceHandle(URIs, self.objKwds)
                     if self.fetchResultRefs:
+                        if resCtrls:
+                            warn('Unhandled response controls on searchResRef message', LDAPWarning)
                         for obj in ref.fetch():
                             yield obj
                     else:
