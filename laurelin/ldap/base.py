@@ -1018,7 +1018,10 @@ class LDAPURI(object):
      * attrs    - list
      * scope    - one of the Scope.* constants
      * filter   - string
-     * Extensions not yet implemented
+     * starttls - bool
+
+     Supported extensions:
+     * "StartTLS"
     """
     def __init__(self, uri):
         self._orig = uri
@@ -1044,7 +1047,22 @@ class LDAPURI(object):
         else:
             self.filter = LDAP.DEFAULT_FILTER
         if (nparams > 3) and (len(params[3]) > 0):
-            raise LDAPError('Extensions for LDAPURI not yet implemented')
+            extensions = params[3].split(',')
+            for ext in extensions:
+                if ext.startswith('!'):
+                    critical = True
+                    ext = ext[1:]
+                else:
+                    critical = False
+                if ext == 'StartTLS':
+                    self.starttls = True
+                else:
+                    if critical:
+                        raise LDAPError('Unsupported critical extension {0}'.format(ext))
+                    else:
+                        warn('Unsupported extension {0}'.format(ext), LDAPWarning)
+        else:
+            self.starttls = False
 
     def search(self, **kwds):
         """Perform the search operation described by the parsed URI
@@ -1053,6 +1071,8 @@ class LDAPURI(object):
          unbinds the connection. Server must allow anonymous read.
         """
         ldap = LDAP(self.hostURI, reuseConnection=False)
+        if self.starttls:
+            ldap.startTLS()
         ret = ldap.search(self.DN, self.scope, filter=self.filter, attrs=self.attrs, **kwds)
         ldap.unbind()
         return ret
