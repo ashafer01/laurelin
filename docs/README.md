@@ -6,7 +6,6 @@ The following features have not yet been implemented or are incomplete
   * Framework in place, no actual controls implemented yet
 * Extensions
   * Framework in place, couple of extension methods implemented
-  * Missing extensible filters
   * Missing LDAPURI support
 * Referrals
   * In place for search but untested

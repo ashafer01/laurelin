@@ -20,6 +20,10 @@ from .rfc4511 import (
     Initial,
     Any,
     Final,
+    ExtensibleMatch,
+    MatchValue,
+    MatchingRuleId,
+    DnAttributes,
 )
 from .exceptions import LDAPError
 from .utils import findClosingParen
@@ -74,7 +78,48 @@ def parse(filterStr):
             ava.setComponentByName('assertionValue', AssertionValue(val))
             fil.setComponentByName('approxMatch', ava)
         elif attr[-1] == ':':
-            raise LDAPError('extensible filters not yet implemented')
+            # 1
+            # attr:=value
+            # 2
+            # attr:dn:=value
+            # attr:rule:=value
+            # :rule:=value
+            # 3
+            # attr:dn:rule:=value
+            # :dn:rule:=value
+
+            params = attr[0:-1].split(':')
+            n = len(params)
+
+            attr = None
+            dnattrs = False
+            rule = None
+
+            if n == 1:
+                attr = params[0]
+            elif n == 2:
+                attr = params[0]
+                if params[1] == 'dn':
+                    dnattrs = True
+                else:
+                    rule = params[1]
+            elif n == 3:
+                if params[1] != 'dn':
+                    raise LDAPError('invalid extensible filter')
+                dnattrs = True
+                attr = params[0]
+                rule = params[2]
+            else:
+                raise LDAPError('invalid extensible filter')
+
+            xm = ExtensibleMatch()
+            xm.setComponentByName('matchValue', MatchValue(val))
+            xm.setComponentByName('dnAttributes', DnAttributes(dnattrs))
+            if attr:
+                xm.setComponentByName('type', AttributeDescription(attr))
+            if rule:
+                xm.setComponentByName('matchingRule', MatchingRuleId(rule))
+            fil.setComponentByName('extensibleMatch', xm)
         elif val.strip() == '*':
             fil.setComponentByName('present', Present(attr))
         elif '*' in val:
