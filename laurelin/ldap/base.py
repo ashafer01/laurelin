@@ -1058,9 +1058,9 @@ class LDAPURI(object):
                     self.starttls = True
                 else:
                     if critical:
-                        raise LDAPError('Unsupported critical extension {0}'.format(ext))
+                        raise LDAPError('Unsupported critical URI extension {0}'.format(ext))
                     else:
-                        warn('Unsupported extension {0}'.format(ext), LDAPWarning)
+                        warn('Unsupported URI extension {0}'.format(ext), LDAPWarning)
         else:
             self.starttls = False
 
