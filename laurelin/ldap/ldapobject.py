@@ -37,11 +37,7 @@ class LDAPObject(AttrsDict, Extensible):
         self.ldapConn = ldapConn
         self.relativeSearchScope = relativeSearchScope
         self.rdnAttr = rdnAttr
-        AttrsDict.__init__(self)
-        if attrsDict:
-            AttrsDict.validate(attrsDict)
-            for attr, values in six.iteritems(attrsDict):
-                self[attr] = values
+        AttrsDict.__init__(self, attrsDict)
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))

@@ -78,6 +78,8 @@ class LDAPSocket(object):
             if netloc == '/':
                 for sockGlob in LDAPSocket.LDAPI_SOCKET_PATHS:
                     fn = glob(sockGlob)
+                    if not fn:
+                        continue
                     if len(fn) > 1:
                         logger.debug('Multiple results for glob {0}'.format(sockGlob))
                         continue

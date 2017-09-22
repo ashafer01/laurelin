@@ -9,7 +9,7 @@ class AttrValueList(list):
 
     def __init__(self, attr, values):
         self.attrType = getAttributeType(attr)
-        list.__init__(values)
+        list.__init__(self, values)
 
     def __contains__(self, value):
         try:
