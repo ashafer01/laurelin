@@ -53,6 +53,11 @@ def processKwds(method, kwds, supportedCtrls, defaultCriticality, final=False):
 
 
 def handleResponse(obj, controls):
+    """Handle response control values and set attributes on the given object.
+
+     Accepts any object to set attributes on, and an rfc4511.Controls instance
+     from a server response.
+    """
     if controls:
         for i in range(len(controls)):
             control = controls.getComponentByPosition(i)
@@ -62,7 +67,10 @@ def handleResponse(obj, controls):
             except KeyError:
                 raise LDAPExtensionError('No response control defined for {0}'.format(ctrlOID))
             value = ctrl.handle(control.getComponentByName('controlValue'))
-            setattr(obj, ctrl.responseAttr, value)
+            if not hasattr(obj, ctrl.responseAttr):
+                setattr(obj, ctrl.responseAttr, value)
+            else:
+                raise LDAPExtensionError('Response control attribute "{0}" is already defined on the object'.format(ctrl.responseAttr))
 
 
 class MetaControl(type):
@@ -84,8 +92,6 @@ class MetaControl(type):
         if cls.RESPONSE_OID:
             if not cls.responseAttr:
                 raise ValueError('Missing responseAttr on control {0}'.format(name))
-            if not hasattr(cls, 'handle'):
-                raise ValueError('Missing handle method for control {0}'.format(name))
             if cls.RESPONSE_OID in _responseControls:
                 raise LDAPExtensionError('Response control OID {0} is already defined'.format(cls.RESPONSE_OID))
             _responseControls[cls.RESPONSE_OID] = instance
