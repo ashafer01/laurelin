@@ -985,6 +985,7 @@ class ExtendedResponseHandle(ResponseHandle):
             mID, ir, resCtrls = unpack('intermediateResponse', lm)
             resName = ir.getComponentByName('responseName')
             logger.debug('Got name={0} intermediate response for ID={1}'.format(resName, mID))
+            controls.handleResponse(ir, resCtrls)
             return ir
         except UnexpectedResponseType:
             mID, xr, resCtrls = unpack('extendedResp', lm)
@@ -995,6 +996,7 @@ class ExtendedResponseHandle(ResponseHandle):
                 res = xr.getComponentByName('resultCode')
                 if res != RESULT_success:
                     raise LDAPError('Got {0} for ID={1}'.format(repr(res), mID))
+            controls.handleResponse(xr, resCtrls)
             return xr
 
     def __iter__(self):
