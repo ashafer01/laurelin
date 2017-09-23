@@ -770,14 +770,14 @@ class LDAP(Extensible):
             if not isinstance(value, six.string_types):
                 raise TypeError('extendedRequest value must be string')
             xr.setComponentByName('requestValue', rfc4511.RequestValue(value))
-        controls = self._processCtrlKwds('ext', kwds)
-        mID = self.sock.sendMessage('extendedReq', xr, controls)
+        reqCtrls = self._processCtrlKwds('ext', kwds)
+        mID = self.sock.sendMessage('extendedReq', xr, reqCtrls)
         logger.info('Sent extended request ID={0} OID={1}'.format(mID, OID))
         return ExtendedResponseHandle(ldapConn=self, mID=mID, **kwds)
 
     def whoAmI(self, **ctrlKwds):
         handle = self.sendExtendedRequest(LDAP.OID_WHOAMI, requireSuccess=True, **ctrlKwds)
-        xr = handle.recvResponse()
+        xr, resCtrls = handle.recvResponse()
         return six.text_type(xr.getComponentByName('responseValue'))
 
     def startTLS(self, verify=None, caFile=None, caPath=None, caData=None):
@@ -792,7 +792,7 @@ class LDAP(Extensible):
         if caData is None:
             caData = self.sslCAData
         handle = self.sendExtendedRequest(LDAP.OID_STARTTLS, requireSuccess=True)
-        xr = handle.recvResponse()
+        xr, resCtrls = handle.recvResponse()
         self.sock._startTLS(verify, caFile, caPath, caData)
         self.refreshRootDSE()
         logger.info('StartTLS complete')
@@ -985,8 +985,7 @@ class ExtendedResponseHandle(ResponseHandle):
             mID, ir, resCtrls = unpack('intermediateResponse', lm)
             resName = ir.getComponentByName('responseName')
             logger.debug('Got name={0} intermediate response for ID={1}'.format(resName, mID))
-            controls.handleResponse(ir, resCtrls)
-            return ir
+            return ir, resCtrls
         except UnexpectedResponseType:
             mID, xr, resCtrls = unpack('extendedResp', lm)
             self.done = True
@@ -996,8 +995,7 @@ class ExtendedResponseHandle(ResponseHandle):
                 res = xr.getComponentByName('resultCode')
                 if res != RESULT_success:
                     raise LDAPError('Got {0} for ID={1}'.format(repr(res), mID))
-            controls.handleResponse(xr, resCtrls)
-            return xr
+            return xr, resCtrls
 
     def __iter__(self):
         for lm in self._recvr:
