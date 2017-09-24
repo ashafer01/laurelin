@@ -1,4 +1,10 @@
-from laurelin.ldap.attributetype import AttributeType, _oidAttributeTypes, _nameAttributeTypes
+from laurelin.ldap.attributetype import (
+    AttributeType,
+    _oidAttributeTypes,
+    _nameAttributeTypes,
+    DefaultAttributeType,
+    getAttributeType,
+)
 from laurelin.ldap.exceptions import LDAPSchemaError
 
 def reset_registrations():
@@ -145,5 +151,31 @@ def test_index():
         assert False
     except ValueError:
         pass
+    finally:
+        reset_registrations()
+
+
+def test_getAttributeType():
+    spec = '''
+      ( 1.2.3.4 NAME 'testing'
+        EQUALITY caseIgnoreMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+    '''
+    t1 = AttributeType(spec)
+
+    t2 = getAttributeType('testing')
+    t3 = getAttributeType('1.2.3.4')
+
+    try:
+        assert t1 is t2
+        assert t1 is t3
+    finally:
+        reset_registrations()
+
+
+def test_default():
+    test = getAttributeType('foo')
+    try:
+        assert isinstance(test, DefaultAttributeType)
     finally:
         reset_registrations()
