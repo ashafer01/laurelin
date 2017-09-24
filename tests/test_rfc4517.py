@@ -1,5 +1,20 @@
 from laurelin.ldap import rfc4517
+from laurelin.ldap import rules
 from laurelin.ldap.exceptions import InvalidSyntaxError
+
+def reset_registrations():
+    rules._oidSyntaxRules.clear()
+    rules._oidSyntaxRuleObjects.clear()
+    rules._oidMatchingRules.clear()
+    rules._nameMatchingRules.clear()
+    rules._oidMatchingRuleObjects.clear()
+    rules._nameMatchingRuleObjects.clear()
+
+def setup():
+    reset_registrations()
+
+def teardown():
+    reset_registrations()
 
 def run_syntax(testobj, tests_good, tests_bad):
     for test in tests_good:
