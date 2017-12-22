@@ -33,6 +33,7 @@ import logging
 import re
 import six
 import warnings
+from pyasn1.error import PyAsn1Error
 from six.moves import range
 from six.moves.urllib.parse import urlparse
 from warnings import warn
@@ -915,7 +916,13 @@ class SearchResultHandle(ResponseHandle):
         for msg in self.ldapConn.sock.recvMessages(self.messageID):
             try:
                 mID, entry, resCtrls = unpack('searchResEntry', msg)
-                DN = six.text_type(entry.getComponentByName('objectName'))
+                try:
+                    DN = six.text_type(entry.getComponentByName('objectName'))
+                except PyAsn1Error:
+                    # Newer versions of pyasn1 don't seem to handle an empty
+                    # string properly
+                    logger.debug('Setting DN to empty string due to PyAsn1Error')
+                    DN = ''
                 attrs = {}
                 _attrs = entry.getComponentByName('attributes')
                 for i in range(0, len(_attrs)):
