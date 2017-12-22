@@ -270,7 +270,8 @@ class LDAP(Extensible):
             controls.handleResponse(ret, resCtrls)
             return ret
         else:
-            raise LDAPError('Got {0} for {1} (ID {2})'.format(repr(res), operation, mID))
+            msg = obj.getComponentByName('diagnosticMessage')
+            raise LDAPError('Got {0} for {1} (ID {2}) ({3})'.format(repr(res), operation, mID, msg))
 
     def simpleBind(self, username='', password='', **ctrlKwds):
         """Performs a simple bind operation
@@ -388,7 +389,8 @@ class LDAP(Extensible):
                 controls.handleResponse(ret, resCtrls)
                 return ret
             else:
-                raise LDAPError('Got {0} during SASL bind'.format(repr(status)))
+                msg = res.getComponentByName('diagnosticMessage')
+                raise LDAPError('Got {0} during SASL bind ({1})'.format(repr(status), msg))
         raise LDAPError('Programming error - reached end of saslBind')
 
     def unbind(self, force=False):

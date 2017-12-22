@@ -157,7 +157,7 @@ class LDAPSocket(object):
             self._sock = ssl.wrap_socket(self._sock, ca_certs=caFile, cert_reqs=verifyMode, ssl_version=proto)
 
         if verify:
-            # implement a consistent match_hostname according to RFC 4513 sec 3.1.3
+            # implement a consistent check_hostname according to RFC 4513 sec 3.1.3
             cert = self._sock.getpeercert()
             certCN = dict([e[0] for e in cert['subject']])['commonName']
             if self.host == certCN:
