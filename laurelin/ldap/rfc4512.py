@@ -73,7 +73,7 @@ AttributeTypeDescription = (
 
 MatchingRuleDescription = (
     r'\(' + WSP +
-    r'(?:' + numericoid + r')' +
+    r'(?P<oid>' + numericoid + r')' +
     r'(?:' + SP + r'NAME' + SP + qdescrs + r')?' +
     r'(?:' + SP + r'DESC' + SP + qdstring + r')?' +
     r'(?:' + SP + r'OBSOLETE)?' +
@@ -83,7 +83,7 @@ MatchingRuleDescription = (
 
 MatchingRuleUseDescription = (
     r'\(' + WSP +
-    r'(?:' + numericoid + r')' +
+    r'(?P<oid>' + numericoid + r')' +
     r'(?:' + SP + r'NAME' + SP + qdescrs + r')?' +
     r'(?:' + SP + r'DESC' + SP + qdstring + r')?' +
     r'(?:' + SP + r'OBSOLETE)?' +
@@ -93,14 +93,14 @@ MatchingRuleUseDescription = (
 
 SyntaxDescription = (
     r'\(' + WSP +
-    r'(?:' + numericoid + r')' +
+    r'(?P<oid>' + numericoid + r')' +
     r'(?:' + SP + r'DESC' + SP + qdstring + r')?' +
     extensions + WSP + r'\)'
 )
 
 DITContentRuleDescription = (
     r'\(' + WSP +
-    r'(?:' + numericoid + r')' +
+    r'(?P<oid>' + numericoid + r')' +
     r'(?:' + SP + r'NAME' + SP + qdescrs + r')?' +
     r'(?:' + SP + r'DESC' + SP + qdstring + r')?' +
     r'(?:' + SP + r'OBSOLETE' + SP + r')?' +
