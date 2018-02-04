@@ -58,6 +58,8 @@ def handleResponse(obj, controls):
      Accepts any object to set attributes on, and an rfc4511.Controls instance
      from a server response.
     """
+
+    # controls may be None or zero-length depending on pyasn1 version
     if controls:
         for i in range(len(controls)):
             control = controls.getComponentByPosition(i)

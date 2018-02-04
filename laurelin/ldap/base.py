@@ -960,7 +960,7 @@ class SearchResultHandle(ResponseHandle):
                             repr(res), mID
                         ))
                 except UnexpectedResponseType:
-                    mID, resref, resCtrls = unpack('searchResRef', ldapMessage)
+                    mID, resref, resCtrls = unpack('searchResRef', msg)
                     URIs = _seqToList(resref)
                     logger.debug('Got search result reference (ID {0}) to: {1}'.format(
                         mID, ' | '.join(URIs)
