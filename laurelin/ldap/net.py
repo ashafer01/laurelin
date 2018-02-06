@@ -30,21 +30,10 @@ class LDAPSocket(object):
     def __init__(self, hostURI, connectTimeout=5, sslVerify=True, sslCAFile=None,
         sslCAPath=None, sslCAData=None):
 
-        # parse hostURI
-        parts = hostURI.split('://')
-        if len(parts) == 1:
-            netloc = unquote(parts[0])
-            if netloc[0] == '/':
-                scheme == 'ldapi'
-            else:
-                scheme = 'ldap'
-        elif len(parts) == 2:
-            scheme = parts[0]
-            netloc = unquote(parts[1])
-        else:
-            raise LDAPError('Invalid hostURI')
-        self.URI = '{0}://{1}'.format(scheme, netloc)
+        self._propInit(connectTimeout)
+        self._uriConnect(hostURI, sslVerify, sslCAFile, sslCAPath, sslCAData)
 
+    def _propInit(self, connectTimeout=5):
         # get socket ID number
         global _nextSockID
         self.ID = _nextSockID
@@ -62,7 +51,27 @@ class LDAPSocket(object):
         self.startedTLS = False
         self.connectTimeout = connectTimeout
 
+    def _parseURI(self, hostURI):
+        # parse hostURI
+        parts = hostURI.split('://')
+        if len(parts) == 1:
+            netloc = unquote(parts[0])
+            if netloc[0] == '/':
+                scheme == 'ldapi'
+            else:
+                scheme = 'ldap'
+        elif len(parts) == 2:
+            scheme = parts[0]
+            netloc = unquote(parts[1])
+        else:
+            raise LDAPError('Invalid hostURI')
+        self.URI = '{0}://{1}'.format(scheme, netloc)
+        return scheme, netloc
+
+
+    def _uriConnect(self, hostURI, sslVerify, sslCAFile, sslCAPath, sslCAData):
         # connect
+        scheme, netloc = self._parseURI(hostURI)
         logger.info('Connecting to {0} on #{1}'.format(self.URI, self.ID))
         if scheme == 'ldap':
             self._inetConnect(netloc, 389)
