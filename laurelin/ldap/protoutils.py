@@ -5,6 +5,8 @@ from .rfc4511 import (
     Version,
 )
 from .exceptions import UnexpectedResponseType
+from pyasn1.error import PyAsn1Error
+import logging
 import six
 from six.moves import range
 
@@ -17,6 +19,8 @@ RESULT_noSuchObject = ResultCode('noSuchObject')
 RESULT_compareTrue = ResultCode('compareTrue')
 RESULT_compareFalse = ResultCode('compareFalse')
 RESULT_referral = ResultCode('referral')
+
+logger = logging.getLogger(__name__)
 
 
 def unpack(op, ldapMessage):
@@ -44,3 +48,12 @@ def parseQdescrs(spec):
     if spec is None:
         return ()
     return tuple(qdescr.strip("'") for qdescr in spec.strip('( )').split(' '))
+
+
+def getStringComponent(obj, name):
+    try:
+        comp = obj.getComponentByName(name)
+        return six.text_type(comp)
+    except PyAsn1Error:
+        logger.debug("Returning empty string for {0} due to PyAsn1Error".format(name))
+        return ''
