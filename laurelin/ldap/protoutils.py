@@ -51,6 +51,7 @@ def parseQdescrs(spec):
 
 
 def getStringComponent(obj, name):
+    """Try to get a string component from a PyASN1 object, or an empty string on error"""
     try:
         comp = obj.getComponentByName(name)
         return six.text_type(comp)
