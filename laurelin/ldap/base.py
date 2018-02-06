@@ -263,7 +263,7 @@ class LDAP(Extensible):
 
     def _successResult(self, messageID, operation):
         """Receive an object from the socket and raise an LDAPError if its not a success result"""
-        mID, obj, resCtrls = unpack(operation, self.sock.recvOne(messageID))
+        mID, obj, resCtrls = unpack(operation, self.sock.recv_one(messageID))
         res = obj.getComponentByName('resultCode')
         if res == RESULT_success:
             logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
@@ -293,7 +293,7 @@ class LDAP(Extensible):
 
         reqCtrls = self._processCtrlKwds('bind', ctrlKwds, final=True)
 
-        mID = self.sock.sendMessage('bindRequest', br, reqCtrls)
+        mID = self.sock.send_message('bindRequest', br, reqCtrls)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
             self.sock.ID, username))
         ret = self._successResult(mID, 'bindResponse')
@@ -352,8 +352,8 @@ class LDAP(Extensible):
                 raise LDAPSupportError('SASL mech "{0}" is not supported by the server'.format(mech))
             else:
                 mechs = [mech]
-        self.sock.saslInit(mechs, **props)
-        logger.debug('Selected SASL mech = {0}'.format(self.sock.saslMech))
+        self.sock.sasl_init(mechs, **props)
+        logger.debug('Selected SASL mech = {0}'.format(self.sock.sasl_mech))
 
         challengeResponse = None
         while True:
@@ -362,27 +362,26 @@ class LDAP(Extensible):
             br.setComponentByName('name', EMPTY_DN)
             ac = rfc4511.AuthenticationChoice()
             sasl = rfc4511.SaslCredentials()
-            sasl.setComponentByName('mechanism', six.text_type(self.sock.saslMech))
+            sasl.setComponentByName('mechanism', six.text_type(self.sock.sasl_mech))
             if challengeResponse is not None:
                 sasl.setComponentByName('credentials', challengeResponse)
                 challengeResponse = None
             ac.setComponentByName('sasl', sasl)
             br.setComponentByName('authentication', ac)
 
-            mID = self.sock.sendMessage('bindRequest', br, reqCtrls)
+            mID = self.sock.send_message('bindRequest', br, reqCtrls)
             logger.debug('Sent SASL bind request (ID {0}) on connection #{1}'.format(mID,
                 self.sock.ID))
 
-            mID, res, resCtrls = unpack('bindResponse', self.sock.recvOne(mID))
+            mID, res, resCtrls = unpack('bindResponse', self.sock.recv_one(mID))
             status = res.getComponentByName('resultCode')
             if status == RESULT_saslBindInProgress:
-                challengeResponse = self.sock.saslProcessAuthChallenge(
-                    six.text_type(res.getComponentByName('serverSaslCreds'))
-                )
+                challengeResponse = self.sock.sasl_process_auth_challenge(
+                    six.text_type(res.getComponentByName('serverSaslCreds')))
                 continue
             elif status == RESULT_success:
                 logger.info('SASL bind successful')
-                logger.debug('Negotiated SASL QoP = {0}'.format(self.sock.saslQoP))
+                logger.debug('Negotiated SASL QoP = {0}'.format(self.sock.sasl_qop))
                 self.sock.bound = True
                 self.recheckSASLMechs()
 
@@ -401,7 +400,7 @@ class LDAP(Extensible):
 
         self.sock.refcount -= 1
         if force or self.sock.refcount == 0:
-            self.sock.sendMessage('unbindRequest', rfc4511.UnbindRequest())
+            self.sock.send_message('unbindRequest', rfc4511.UnbindRequest())
             self.sock.close()
             self.sock.unbound = True
             logger.info('Unbound on {0} (#{1})'.format(self.sock.URI, self.sock.ID))
@@ -504,7 +503,7 @@ class LDAP(Extensible):
         else:
             controls = None
 
-        mID = self.sock.sendMessage('searchRequest', req, controls)
+        mID = self.sock.send_message('searchRequest', req, controls)
         logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filter={3}'.format(
             mID, baseDN, scope, filter))
         return SearchResultHandle(self, mID, fetchResultRefs, followReferrals, kwds)
@@ -523,10 +522,10 @@ class LDAP(Extensible):
 
         reqCtrls = self._processCtrlKwds('compare', ctrlKwds, final=True)
 
-        messageID = self.sock.sendMessage('compareRequest', cr, reqCtrls)
+        messageID = self.sock.send_message('compareRequest', cr, reqCtrls)
         logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(
             messageID, DN, attr, value))
-        msg = self.sock.recvOne(messageID)
+        msg = self.sock.recv_one(messageID)
         mID, res, resCtrls = unpack('compareResponse', msg)
         res = res.getComponentByName('resultCode')
         if res == RESULT_compareTrue:
@@ -574,10 +573,10 @@ class LDAP(Extensible):
 
         reqCtrls = self._processCtrlKwds('add', kwds)
 
-        mID = self.sock.sendMessage('addRequest', ar, reqCtrls)
+        mID = self.sock.send_message('addRequest', ar, reqCtrls)
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
 
-        lm = self.sock.recvOne(mID)
+        lm = self.sock.recv_one(mID)
         mID, res, resCtrls = unpack('addResponse', lm)
         res = res.getComponentByName('resultCode')
         if res == RESULT_success:
@@ -642,7 +641,7 @@ class LDAP(Extensible):
         if self.sock.unbound:
             raise ConnectionUnbound()
         controls = self._processCtrlKwds('delete', ctrlKwds, final=True)
-        mID = self.sock.sendMessage('delRequest', rfc4511.DelRequest(DN), controls)
+        mID = self.sock.send_message('delRequest', rfc4511.DelRequest(DN), controls)
         logger.info('Sent delete request (ID {0}) for DN {1}'.format(mID, DN))
         return self._successResult(mID, 'delResponse')
 
@@ -659,7 +658,7 @@ class LDAP(Extensible):
         if newParent is not None:
             mdr.setComponentByName('newSuperior', rfc4511.NewSuperior(newParent))
         controls = self._processCtrlKwds('modDN', ctrlKwds, final=True)
-        mID = self.sock.sendMessage('modDNRequest', mdr, controls)
+        mID = self.sock.send_message('modDNRequest', mdr, controls)
         logger.info('Sent modDN request (ID {0}) for DN {1} newRDN="{2}" newParent="{3}"'.format(
             mID, DN, newRDN, newParent))
         return self._successResult(mID, 'modDNResponse')
@@ -710,7 +709,7 @@ class LDAP(Extensible):
                 i += 1
             mr.setComponentByName('changes', cl)
             controls = self._processCtrlKwds('modify', ctrlKwds, final=True)
-            mID = self.sock.sendMessage('modifyRequest', mr, controls)
+            mID = self.sock.send_message('modifyRequest', mr, controls)
             logger.info('Sent modify request (ID {0}) for DN {1}'.format(mID, DN))
             return self._successResult(mID, 'modifyResponse')
         else:
@@ -774,7 +773,7 @@ class LDAP(Extensible):
                 raise TypeError('extendedRequest value must be string')
             xr.setComponentByName('requestValue', rfc4511.RequestValue(value))
         reqCtrls = self._processCtrlKwds('ext', kwds)
-        mID = self.sock.sendMessage('extendedReq', xr, reqCtrls)
+        mID = self.sock.send_message('extendedReq', xr, reqCtrls)
         logger.info('Sent extended request ID={0} OID={1}'.format(mID, OID))
         return ExtendedResponseHandle(ldapConn=self, mID=mID, **kwds)
 
@@ -784,7 +783,7 @@ class LDAP(Extensible):
         return six.text_type(xr.getComponentByName('responseValue'))
 
     def startTLS(self, verify=None, caFile=None, caPath=None, caData=None):
-        if self.sock.startedTLS:
+        if self.sock.started_tls:
             raise LDAPError('TLS layer already installed')
         if verify is None:
             verify = self.sslVerify
@@ -796,7 +795,7 @@ class LDAP(Extensible):
             caData = self.sslCAData
         handle = self.sendExtendedRequest(LDAP.OID_STARTTLS, requireSuccess=True)
         xr, resCtrls = handle.recvResponse()
-        self.sock._startTLS(verify, caFile, caPath, caData)
+        self.sock._start_tls(verify, caFile, caPath, caData)
         self.refreshRootDSE()
         logger.info('StartTLS complete')
 
@@ -892,7 +891,7 @@ class ResponseHandle(object):
         """Request to abandon an operation in progress"""
         if not self.abandoned:
             logger.info('Abandoning ID={0}'.format(self.messageID))
-            self.ldapConn.sock.sendMessage('abandonRequest', rfc4511.AbandonRequest(self.messageID))
+            self.ldapConn.sock.send_message('abandonRequest', rfc4511.AbandonRequest(self.messageID))
             self.abandoned = True
             self.ldapConn.sock.abandonedMIDs.append(self.messageID)
         else:
@@ -913,7 +912,7 @@ class SearchResultHandle(ResponseHandle):
         if self.abandoned:
             logger.debug('ID={0} has been abandoned'.format(self.messageID))
             raise StopIteration()
-        for msg in self.ldapConn.sock.recvMessages(self.messageID):
+        for msg in self.ldapConn.sock.recv_messages(self.messageID):
             try:
                 mID, entry, resCtrls = unpack('searchResEntry', msg)
                 DN = getStringComponent(entry, 'objectName')
@@ -979,7 +978,7 @@ class ExtendedResponseHandle(ResponseHandle):
         self.messageID = mID
         self.ldapConn = ldapConn
         self.requireSuccess = requireSuccess
-        self._recvr = ldapConn.sock.recvMessages(mID)
+        self._recvr = ldapConn.sock.recv_messages(mID)
         self.done = False
         self.abandoned = False
 
