@@ -30,9 +30,9 @@ def unpack(op, ldapMessage):
     controls = ldapMessage.getComponentByName('controls')
     if po.getName() == op:
         ret = po.getComponent()
-        return mID, ret, controls
-    else:
-        raise UnexpectedResponseType()
+        if ret.isValue:
+            return mID, ret, controls
+    raise UnexpectedResponseType()
 
 
 def _seqToList(seq):
