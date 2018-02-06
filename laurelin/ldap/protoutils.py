@@ -24,8 +24,8 @@ def unpack(op, ldapMessage):
     mID = ldapMessage.getComponentByName('messageID')
     po = ldapMessage.getComponentByName('protocolOp')
     controls = ldapMessage.getComponentByName('controls')
-    ret = po.getComponentByName(op)
-    if ret:
+    if po.getName() == op:
+        ret = po.getComponent()
         return mID, ret, controls
     else:
         raise UnexpectedResponseType()
