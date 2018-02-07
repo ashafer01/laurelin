@@ -53,7 +53,7 @@ class LDAPSocket(object):
         self.connect_timeout = connect_timeout
 
     def _parse_uri(self, host_uri):
-        # parse hostURI
+        # parse host_uri
         parts = host_uri.split('://')
         if len(parts) == 1:
             netloc = unquote(parts[0])
@@ -65,14 +65,14 @@ class LDAPSocket(object):
             scheme = parts[0]
             netloc = unquote(parts[1])
         else:
-            raise LDAPError('Invalid hostURI')
-        self.URI = '{0}://{1}'.format(scheme, netloc)
+            raise LDAPError('Invalid host_uri')
+        self.uri = '{0}://{1}'.format(scheme, netloc)
         return scheme, netloc
 
     def _uri_connect(self, host_uri, ssl_verify, ssl_ca_file, ssl_ca_path, ssl_ca_data):
         # connect
         scheme, netloc = self._parse_uri(host_uri)
-        logger.info('Connecting to {0} on #{1}'.format(self.URI, self.ID))
+        logger.info('Connecting to {0} on #{1}'.format(self.uri, self.ID))
         if scheme == 'ldap':
             self._inet_connect(netloc, 389)
         elif scheme == 'ldaps':

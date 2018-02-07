@@ -40,13 +40,16 @@ from warnings import warn
 
 logger = logging.getLogger('laurelin.ldap')
 logger.addHandler(logging.NullHandler())
-logger.setLevel(logging.DEBUG) # set to DEBUG to allow handler levels full discretion
+logger.setLevel(logging.DEBUG)  # set to DEBUG to allow handler levels full discretion
+
 
 _showwarning_default = warnings.showwarning
+
 
 def _showwarning_disabled(message, category, filename, lineno, file=None, line=None):
     if not issubclass(category, LDAPWarning):
         _showwarning_default(message, category, filename, lineno, file, line)
+
 
 def _showwarning_log(message, category, filename, lineno, file=None, line=None):
     if issubclass(category, LDAPWarning):
@@ -54,15 +57,17 @@ def _showwarning_log(message, category, filename, lineno, file=None, line=None):
     else:
         _showwarning_default(message, category, filename, lineno, file, line)
 
+
 # for storing reusable sockets
 _sockets = {}
+
 
 class LDAP(Extensible):
     """Provides the connection to the LDAP DB"""
 
     # global defaults
     DEFAULT_SERVER = 'ldap://localhost'
-    DEFAULT_BASEDN = None
+    DEFAULT_BASE_DN = None
     DEFAULT_FILTER = '(objectClass=*)'
     DEFAULT_DEREF_ALIASES = DerefAliases.ALWAYS
     DEFAULT_SEARCH_TIMEOUT = 0
@@ -70,9 +75,9 @@ class LDAP(Extensible):
     DEFAULT_STRICT_MODIFY = False
     DEFAULT_REUSE_CONNECTION = True
     DEFAULT_SSL_VERIFY = True
-    DEFAULT_SSL_CAFILE = None
-    DEFAULT_SSL_CAPATH = None
-    DEFAULT_SSL_CADATA = None
+    DEFAULT_SSL_CA_FILE = None
+    DEFAULT_SSL_CA_PATH = None
+    DEFAULT_SSL_CA_DATA = None
     DEFAULT_FETCH_RESULT_REFS = True
     DEFAULT_FOLLOW_REFERRALS = True
     DEFAULT_SASL_MECH = None
@@ -94,26 +99,26 @@ class LDAP(Extensible):
     ## logging and warning controls
 
     @staticmethod
-    def enableLogging(level=logging.DEBUG):
+    def enable_logging(level=logging.DEBUG):
         """Enable logging output to stderr"""
-        stderrHandler = logging.StreamHandler()
-        stderrHandler.setFormatter(logging.Formatter(LDAP.LOG_FORMAT))
-        stderrHandler.setLevel(level)
-        logger.addHandler(stderrHandler)
-        return stderrHandler
+        stderr_handler = logging.StreamHandler()
+        stderr_handler.setFormatter(logging.Formatter(LDAP.LOG_FORMAT))
+        stderr_handler.setLevel(level)
+        logger.addHandler(stderr_handler)
+        return stderr_handler
 
     @staticmethod
-    def disableWarnings():
+    def disable_warnings():
         """Prevent all LDAP warnings from being shown - default action for others"""
         warnings.showwarning = _showwarning_disabled
 
     @staticmethod
-    def logWarnings():
+    def log_warnings():
         """Log all LDAP warnings rather than showing them - default action for others"""
         warnings.showwarning = _showwarning_log
 
     @staticmethod
-    def defaultWarnings():
+    def default_warnings():
         """Always take the default action for warnings"""
         warnings.showwarning = _showwarning_default
 
@@ -125,122 +130,113 @@ class LDAP(Extensible):
     def __exit__(self, etype, e, trace):
         self.close()
 
-    def __init__(self, connectTo=None, baseDN=None, reuseConnection=None, connectTimeout=None,
-        searchTimeout=None, derefAliases=None, strictModify=None, sslVerify=None, sslCAFile=None,
-        sslCAPath=None, sslCAData=None, fetchResultRefs=None, defaultSaslMech=None,
-        saslFatalDowngradeCheck=None, defaultCriticality=None, followReferrals=None,
-        skipValidation=None, skipValidators=None):
+    def __init__(self, server=None, base_dn=None, reuse_connection=None, connect_timeout=None, search_timeout=None,
+                 deref_aliases=None, strict_modify=None, ssl_verify=None, ssl_ca_file=None, ssl_ca_path=None,
+                 ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
+                 default_criticality=None, follow_referrals=None, skip_validation=None, skip_validators=None):
 
         # setup
-        if connectTo is None:
-            connectTo = LDAP.DEFAULT_SERVER
-        if baseDN is None:
-            baseDN = LDAP.DEFAULT_BASEDN
-        if reuseConnection is None:
-            reuseConnection = LDAP.DEFAULT_REUSE_CONNECTION
-        if connectTimeout is None:
-            connectTimeout = LDAP.DEFAULT_CONNECT_TIMEOUT
-        if searchTimeout is None:
-            searchTimeout = LDAP.DEFAULT_SEARCH_TIMEOUT
-        if derefAliases is None:
-            derefAliases = LDAP.DEFAULT_DEREF_ALIASES
-        if strictModify is None:
-            strictModify = LDAP.DEFAULT_STRICT_MODIFY
-        if sslVerify is None:
-            sslVerify = LDAP.DEFAULT_SSL_VERIFY
-        if sslCAFile is None:
-            sslCAFile = LDAP.DEFAULT_SSL_CAFILE
-        if sslCAPath is None:
-            sslCAPath = LDAP.DEFAULT_SSL_CAPATH
-        if sslCAData is None:
-            sslCAData = LDAP.DEFAULT_SSL_CADATA
-        if fetchResultRefs is None:
-            fetchResultRefs = LDAP.DEFAULT_FETCH_RESULT_REFS
-        if defaultSaslMech is None:
-            defaultSaslMech = LDAP.DEFAULT_SASL_MECH
-        if saslFatalDowngradeCheck is None:
-            saslFatalDowngradeCheck = LDAP.DEFAULT_SASL_FATAL_DOWNGRADE_CHECK
-        if defaultCriticality is None:
-            defaultCriticality = LDAP.DEFAULT_CRITICALITY
-        if followReferrals is None:
-            followReferrals = LDAP.DEFAULT_FOLLOW_REFERRALS
-        if skipValidation is None:
-            skipValidation = LDAP.DEFAULT_SKIP_VALIDATION
-        if skipValidators is None:
-            skipValidators = LDAP.DEFAULT_SKIP_VALIDATORS
+        if server is None:
+            server = LDAP.DEFAULT_SERVER
+        if base_dn is None:
+            base_dn = LDAP.DEFAULT_BASE_DN
+        if reuse_connection is None:
+            reuse_connection = LDAP.DEFAULT_REUSE_CONNECTION
+        if connect_timeout is None:
+            connect_timeout = LDAP.DEFAULT_CONNECT_TIMEOUT
+        if search_timeout is None:
+            search_timeout = LDAP.DEFAULT_SEARCH_TIMEOUT
+        if deref_aliases is None:
+            deref_aliases = LDAP.DEFAULT_DEREF_ALIASES
+        if strict_modify is None:
+            strict_modify = LDAP.DEFAULT_STRICT_MODIFY
+        if ssl_verify is None:
+            ssl_verify = LDAP.DEFAULT_SSL_VERIFY
+        if ssl_ca_file is None:
+            ssl_ca_file = LDAP.DEFAULT_SSL_CA_FILE
+        if ssl_ca_path is None:
+            ssl_ca_path = LDAP.DEFAULT_SSL_CA_PATH
+        if ssl_ca_data is None:
+            ssl_ca_data = LDAP.DEFAULT_SSL_CA_DATA
+        if fetch_result_refs is None:
+            fetch_result_refs = LDAP.DEFAULT_FETCH_RESULT_REFS
+        if default_sasl_mech is None:
+            default_sasl_mech = LDAP.DEFAULT_SASL_MECH
+        if sasl_fatal_downgrade_check is None:
+            sasl_fatal_downgrade_check = LDAP.DEFAULT_SASL_FATAL_DOWNGRADE_CHECK
+        if default_criticality is None:
+            default_criticality = LDAP.DEFAULT_CRITICALITY
+        if follow_referrals is None:
+            follow_referrals = LDAP.DEFAULT_FOLLOW_REFERRALS
+        if skip_validation is None:
+            skip_validation = LDAP.DEFAULT_SKIP_VALIDATION
+        if skip_validators is None:
+            skip_validators = LDAP.DEFAULT_SKIP_VALIDATORS
 
-        self.defaultSearchTimeout = searchTimeout
-        self.defaultDerefAliases = derefAliases
-        self.defaultFetchResultRefs = fetchResultRefs
-        self.defaultFollowReferrals = followReferrals
-        self.defaultSaslMech = defaultSaslMech
-        self.defaultCriticality = defaultCriticality
+        self.default_search_timeout = search_timeout
+        self.default_deref_aliases = deref_aliases
+        self.default_fetch_result_refs = fetch_result_refs
+        self.default_follow_referrals = follow_referrals
+        self.default_sasl_mech = default_sasl_mech
+        self.default_criticality = default_criticality
 
-        self.strictModify = strictModify
-        self.saslFatalDowngradeCheck = saslFatalDowngradeCheck
+        self.strict_modify = strict_modify
+        self.sasl_fatal_downgrade_check = sasl_fatal_downgrade_check
 
-        self._taggedObjects = {}
-        self._saslMechs = None
+        self._tagged_objects = {}
+        self._sasl_mechs = None
 
-        self.sockParams = (connectTimeout, sslVerify, sslCAFile, sslCAPath, sslCAData)
-        self.sslVerify = sslVerify
-        self.sslCAFile = sslCAFile
-        self.sslCAPath = sslCAPath
-        self.sslCAData = sslCAData
+        self.sock_params = (connect_timeout, ssl_verify, ssl_ca_file, ssl_ca_path, ssl_ca_data)
+        self.ssl_verify = ssl_verify
+        self.ssl_ca_file = ssl_ca_file
+        self.ssl_ca_path = ssl_ca_path
+        self.ssl_ca_data = ssl_ca_data
 
         # connect
-        if isinstance(connectTo, six.string_types):
-            self.hostURI = connectTo
-            if reuseConnection:
-                if self.hostURI not in _sockets:
-                    _sockets[self.hostURI] = LDAPSocket(self.hostURI, *self.sockParams)
-                self.sock = _sockets[self.hostURI]
+        if isinstance(server, six.string_types):
+            self.host_uri = server
+            if reuse_connection:
+                if self.host_uri not in _sockets:
+                    _sockets[self.host_uri] = LDAPSocket(self.host_uri, *self.sock_params)
+                self.sock = _sockets[self.host_uri]
             else:
-                self.sock = LDAPSocket(self.hostURI, *self.sockParams)
-            logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
-        elif isinstance(connectTo, LDAP):
-            self.hostURI = connectTo.hostURI
-            if reuseConnection:
-                self.sock = connectTo.sock
-                self.sockParams = connectTo.sockParams
-                logger.info('Connected to {0} (#{1}) from existing object'.format(
-                    self.hostURI, self.sock.ID))
-            else:
-                self.sock = LDAPSocket(self.hostURI, *self.sockParams)
-                logger.info('Connected to {0} (#{1})'.format(self.hostURI, self.sock.ID))
-            if baseDN is None:
-                baseDN = connectTo.baseDN
+                self.sock = LDAPSocket(self.host_uri, *self.sock_params)
+            logger.info('Connected to {0} (#{1})'.format(self.host_uri, self.sock.ID))
+        elif isinstance(server, LDAPSocket):
+            self.sock = server
+            self.host_uri = server.uri
+            logger.info('Using existing socket {0} (#{1})'.format(self.host_uri, self.sock.ID))
         else:
-            raise TypeError('Must supply URI string or LDAP instance for connectTo')
+            raise TypeError('Must supply URI string or LDAPSocket for server')
         self.sock.refcount += 1
 
         self.refreshRootDSE()
-        if baseDN is None:
+        if base_dn is None:
             if 'defaultNamingContext' in self.rootDSE:
-                baseDN = self.rootDSE['defaultNamingContext'][0]
+                base_dn = self.rootDSE['defaultNamingContext'][0]
             else:
                 ncs = self.rootDSE.getAttr('namingContexts')
                 n = len(ncs)
                 if n == 0:
-                    raise LDAPError('baseDN must be provided - no namingContexts')
+                    raise LDAPError('base_dn must be provided - no namingContexts')
                 elif n == 1:
-                    baseDN = ncs[0]
+                    base_dn = ncs[0]
                 else:
-                    raise LDAPError('baseDN must be provided - multiple namingContexts')
-        self.baseDN = baseDN
+                    raise LDAPError('base_dn must be provided - multiple namingContexts')
+        self.base_dn = base_dn
 
-        if self.defaultSaslMech is None and self.hostURI.startswith('ldapi:'):
-            self.defaultSaslMech = 'EXTERNAL'
+        if self.default_sasl_mech is None and self.host_uri.startswith('ldapi:'):
+            self.default_sasl_mech = 'EXTERNAL'
 
-        logger.debug('Creating base object for {0}'.format(self.baseDN))
-        self.base = self.obj(self.baseDN, relativeSearchScope=Scope.SUBTREE)
+        logger.debug('Creating base object for {0}'.format(self.base_dn))
+        self.base = self.obj(self.base_dn, relativeSearchScope=Scope.SUBTREE)
 
         # Validation setup
         self.validators = []
-        if not skipValidation:
+        if not skip_validation:
             for validator in getValidators():
                 skip = False
-                for validatorSpec in skipValidators:
+                for validatorSpec in skip_validators:
                     if isinstance(validatorSpec, six.string_types):
                         if validator.__class__.__name__ == validatorSpec:
                             skip = True
@@ -254,11 +250,11 @@ class LDAP(Extensible):
 
     def refreshRootDSE(self):
         self.rootDSE = self.get('', ['*', '+'])
-        self._saslMechs = self.rootDSE.getAttr('supportedSASLMechanisms')
+        self._sasl_mechs = self.rootDSE.getAttr('supportedSASLMechanisms')
 
     def _processCtrlKwds(self, method, kwds, final=False):
         supportedCtrls = self.rootDSE.getAttr('supportedControl')
-        defaultCrit = self.defaultCriticality
+        defaultCrit = self.default_criticality
         return controls.processKwds(method, kwds, supportedCtrls, defaultCrit, final)
 
     def _successResult(self, messageID, operation):
@@ -305,25 +301,25 @@ class LDAP(Extensible):
     def getSASLMechs(self):
         """Query root DSE for supported SASL mechanisms"""
 
-        if self._saslMechs is None:
+        if self._sasl_mechs is None:
             logger.debug('Querying server to find supported SASL mechs')
             o = self.get('', ['supportedSASLMechanisms'])
-            self._saslMechs = o.getAttr('supportedSASLMechanisms')
-            logger.debug('Server supported SASL mechs = {0}'.format(','.join(self._saslMechs)))
-        return self._saslMechs
+            self._sasl_mechs = o.getAttr('supportedSASLMechanisms')
+            logger.debug('Server supported SASL mechs = {0}'.format(','.join(self._sasl_mechs)))
+        return self._sasl_mechs
 
     def recheckSASLMechs(self):
         """Query the root DSE again after performing a SASL bind to check for a downgrade attack"""
 
-        if self._saslMechs is None:
+        if self._sasl_mechs is None:
             raise LDAPError('SASL mechs have not yet been queried')
         else:
-            origMechs = set(self._saslMechs)
-            self._saslMechs = None
+            origMechs = set(self._sasl_mechs)
+            self._sasl_mechs = None
             self.getSASLMechs()
-            if origMechs != set(self._saslMechs):
+            if origMechs != set(self._sasl_mechs):
                 msg = 'Supported SASL mechs differ on recheck, possible downgrade attack'
-                if self.saslFatalDowngradeCheck:
+                if self.sasl_fatal_downgrade_check:
                     raise LDAPError(msg)
                 else:
                     warn(msg, LDAPWarning)
@@ -346,7 +342,7 @@ class LDAP(Extensible):
 
         mechs = self.getSASLMechs()
         if mech is None:
-            mech = self.defaultSaslMech
+            mech = self.default_sasl_mech
         if mech is not None:
             if mech not in mechs:
                 raise LDAPSupportError('SASL mech "{0}" is not supported by the server'.format(mech))
@@ -403,9 +399,9 @@ class LDAP(Extensible):
             self.sock.send_message('unbindRequest', rfc4511.UnbindRequest())
             self.sock.close()
             self.sock.unbound = True
-            logger.info('Unbound on {0} (#{1})'.format(self.sock.URI, self.sock.ID))
+            logger.info('Unbound on {0} (#{1})'.format(self.sock.uri, self.sock.ID))
             try:
-                del _sockets[self.sock.URI]
+                del _sockets[self.sock.uri]
             except KeyError:
                 pass
         else:
@@ -416,7 +412,7 @@ class LDAP(Extensible):
     def tag(self, tag):
         """Get a tagged object"""
         try:
-            return self._taggedObjects[tag]
+            return self._tagged_objects[tag]
         except KeyError:
             raise TagError('tag {0} does not exist'.format(tag))
 
@@ -424,10 +420,10 @@ class LDAP(Extensible):
         """Factory for LDAPObjects bound to this connection"""
         obj = LDAPObject(DN, attrsDict=attrsDict, ldapConn=self, *args, **kwds)
         if tag is not None:
-            if tag in self._taggedObjects:
+            if tag in self._tagged_objects:
                 raise TagError('tag {0} already exists'.format(tag))
             else:
-                self._taggedObjects[tag] = obj
+                self._tagged_objects[tag] = obj
         return obj
 
     def get(self, DN, attrs=None, **objKwds):
@@ -469,13 +465,13 @@ class LDAP(Extensible):
         if filter is None:
             filter = LDAP.DEFAULT_FILTER
         if searchTimeout is None:
-            searchTimeout = self.defaultSearchTimeout
+            searchTimeout = self.default_search_timeout
         if derefAliases is None:
-            derefAliases = self.defaultDerefAliases
+            derefAliases = self.default_deref_aliases
         if fetchResultRefs is None:
-            fetchResultRefs = self.defaultFetchResultRefs
+            fetchResultRefs = self.default_fetch_result_refs
         if followReferrals is None:
-            followReferrals = self.defaultFollowReferrals
+            followReferrals = self.default_follow_referrals
         req = rfc4511.SearchRequest()
         req.setComponentByName('baseObject', rfc4511.LDAPDN(baseDN))
         req.setComponentByName('scope', scope)
@@ -504,7 +500,7 @@ class LDAP(Extensible):
             controls = None
 
         mID = self.sock.send_message('searchRequest', req, controls)
-        logger.info('Sent search request (ID {0}): baseDN={1}, scope={2}, filter={3}'.format(
+        logger.info('Sent search request (ID {0}): base_dn={1}, scope={2}, filter={3}'.format(
             mID, baseDN, scope, filter))
         return SearchResultHandle(self, mID, fetchResultRefs, followReferrals, kwds)
 
@@ -720,7 +716,7 @@ class LDAP(Extensible):
         """Add new attribute values to existing object"""
         if current is not None:
             modlist = AddModlist(current, attrsDict)
-        elif not self.strictModify:
+        elif not self.strict_modify:
             current = self.get(DN, list(attrsDict.keys()))
             modlist = AddModlist(current, attrsDict)
         else:
@@ -734,7 +730,7 @@ class LDAP(Extensible):
         """
         if current is not None:
             modlist = DeleteModlist(current, attrsDict)
-        elif not self.strictModify:
+        elif not self.strict_modify:
             current = self.get(DN, list(attrsDict.keys()))
             modlist = DeleteModlist(current, attrsDict)
         else:
@@ -751,7 +747,7 @@ class LDAP(Extensible):
 
         # Only query for the current object if there are validators present and
         # strict modify is disabled
-        if current is None and self.validators and not self.strictModify:
+        if current is None and self.validators and not self.strict_modify:
             current = self.get(DN, list(attrsDict.keys()))
 
         return self.modify(DN, Modlist(Mod.REPLACE, attrsDict), current, **ctrlKwds)
@@ -786,13 +782,13 @@ class LDAP(Extensible):
         if self.sock.started_tls:
             raise LDAPError('TLS layer already installed')
         if verify is None:
-            verify = self.sslVerify
+            verify = self.ssl_verify
         if caFile is None:
-            caFile = self.sslCAFile
+            caFile = self.ssl_ca_file
         if caPath is None:
-            caPath = self.sslCAPath
+            caPath = self.ssl_ca_path
         if caData is None:
-            caData = self.sslCAData
+            caData = self.ssl_ca_data
         handle = self.sendExtendedRequest(LDAP.OID_STARTTLS, requireSuccess=True)
         xr, resCtrls = handle.recvResponse()
         self.sock._start_tls(verify, caFile, caPath, caData)
@@ -1015,7 +1011,7 @@ class LDAPURI(object):
      Attributes:
      * scheme   - urlparse standard
      * netloc   - urlparse standard
-     * hostURI  - scheme://netloc for use with LDAPSocket
+     * host_uri  - scheme://netloc for use with LDAPSocket
      * DN       - string
      * attrs    - list
      * scope    - one of the Scope.* constants
@@ -1072,7 +1068,7 @@ class LDAPURI(object):
          First opens a new connection with connection reuse disabled, then performs the search, and
          unbinds the connection. Server must allow anonymous read.
         """
-        ldap = LDAP(self.hostURI, reuseConnection=False)
+        ldap = LDAP(self.hostURI, reuse_connection=False)
         if self.starttls:
             ldap.startTLS()
         ret = ldap.search(self.DN, self.scope, filter=self.filter, attrs=self.attrs, **kwds)

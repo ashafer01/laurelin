@@ -9,7 +9,7 @@
 
 from inspect import getargspec, stack
 from os import fdopen, remove
-from os.path import dirname, abspath
+from os.path import dirname, abspath, join as path_join
 from tempfile import mkstemp
 from shutil import move
 
@@ -46,8 +46,8 @@ reservedKwdsStr = 'set({0})'.format(repr(reservedKwds))
 
 ## modify the file
 
-baseDir = dirname(abspath(stack()[0][1]))
-controlsFn = baseDir + '/laurelin/ldap/controls.py'
+baseDir = path_join(dirname(abspath(stack()[0][1])), '..')
+controlsFn = path_join(baseDir, 'laurelin/ldap/controls.py')
 
 varname = '_reservedKwds'
 
