@@ -35,7 +35,7 @@ def unpack(op, ldapMessage):
     raise UnexpectedResponseType()
 
 
-def _seqToList(seq):
+def seq_to_list(seq):
     """Convert a pyasn1 sequence to a list of strings"""
     ret = []
     for i in range(len(seq)):

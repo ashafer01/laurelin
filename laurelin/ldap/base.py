@@ -25,7 +25,7 @@ from .protoutils import (
     RESULT_compareFalse,
     RESULT_referral,
     unpack,
-    _seqToList,
+    seq_to_list,
     getStringComponent,
 )
 from .validation import getValidators
@@ -922,7 +922,7 @@ class SearchResultHandle(ResponseHandle):
                     _attr = _attrs.getComponentByPosition(i)
                     attrType = six.text_type(_attr.getComponentByName('type'))
                     vals = _attr.getComponentByName('vals')
-                    attrs[attrType] = _seqToList(vals)
+                    attrs[attrType] = seq_to_list(vals)
                 logger.debug('Got search result entry (ID {0}) {1}'.format(mID, DN))
                 ret = self.ldapConn.obj(DN, attrs, **self.objKwds)
                 controls.handleResponse(ret, resCtrls)
@@ -942,7 +942,7 @@ class SearchResultHandle(ResponseHandle):
                         if self.followReferrals:
                             logger.info('Following referral for ID={0}'.format(mID))
                             ref = resobj.getComponentByName('referral')
-                            URIs = _seqToList(ref)
+                            URIs = seq_to_list(ref)
                             for obj in SearchReferenceHandle(URIs, self.objKwds).fetch():
                                 yield obj
                         else:
@@ -954,7 +954,7 @@ class SearchResultHandle(ResponseHandle):
                         ))
                 except UnexpectedResponseType:
                     mID, resref, resCtrls = unpack('searchResRef', msg)
-                    URIs = _seqToList(resref)
+                    URIs = seq_to_list(resref)
                     logger.debug('Got search result reference (ID {0}) to: {1}'.format(
                         mID, ' | '.join(URIs)
                     ))

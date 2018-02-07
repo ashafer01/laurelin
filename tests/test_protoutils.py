@@ -1,13 +1,13 @@
 from laurelin.ldap import exceptions, rfc4511, protoutils
-from pyasn1.codec.ber.encoder import encode as berEncode
-from pyasn1.codec.ber.decoder import decode as berDecode
+from pyasn1.codec.ber.encoder import encode as ber_encode
+from pyasn1.codec.ber.decoder import decode as ber_decode
 import unittest
 
 
 def encode_decode(lm):
     """Simulate transmission over the network"""
-    raw = berEncode(lm)
-    response, raw = berDecode(raw, asn1Spec=rfc4511.LDAPMessage())
+    raw = ber_encode(lm)
+    response, raw = ber_decode(raw, asn1Spec=rfc4511.LDAPMessage())
     if raw:
         raise Exception('Unexpected leftover bits')
     return response

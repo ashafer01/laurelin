@@ -7,8 +7,8 @@ from glob import glob
 from socket import create_connection, socket, AF_UNIX, error as SocketError
 from six.moves.urllib.parse import unquote
 from collections import deque
-from pyasn1.codec.ber.encoder import encode as berEncode
-from pyasn1.codec.ber.decoder import decode as berDecode
+from pyasn1.codec.ber.encoder import encode as ber_encode
+from pyasn1.codec.ber.decoder import decode as ber_decode
 from pyasn1.error import SubstrateUnderrunError
 from puresasl.client import SASLClient
 
@@ -196,7 +196,7 @@ class LDAPSocket(object):
         self._sasl_client.choose_mechanism(mechs)
 
     def _has_sasl_client(self):
-        return (self._sasl_client is not None)
+        return self._sasl_client is not None
 
     def _require_sasl_client(self):
         if not self._has_sasl_client():
@@ -238,7 +238,7 @@ class LDAPSocket(object):
         lm.setComponentByName('protocolOp', po)
         if controls:
             lm.setComponentByName('controls', controls)
-        raw = berEncode(lm)
+        raw = ber_encode(lm)
         if self._has_sasl_client():
             raw = self._sasl_client.wrap(raw)
         self._sock.sendall(raw)
@@ -271,7 +271,7 @@ class LDAPSocket(object):
                     newraw = self._sasl_client.unwrap(newraw)
                 raw += newraw
                 while len(raw) > 0:
-                    response, raw = berDecode(raw, asn1Spec=LDAPMessage())
+                    response, raw = ber_decode(raw, asn1Spec=LDAPMessage())
                     have_message_id = response.getComponentByName('messageID')
                     if want_message_id == have_message_id:
                         yield response
