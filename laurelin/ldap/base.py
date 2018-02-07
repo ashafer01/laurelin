@@ -229,7 +229,7 @@ class LDAP(Extensible):
             self.default_sasl_mech = 'EXTERNAL'
 
         logger.debug('Creating base object for {0}'.format(self.base_dn))
-        self.base = self.obj(self.base_dn, relativeSearchScope=Scope.SUBTREE)
+        self.base = self.obj(self.base_dn, relative_search_scope=Scope.SUBTREE)
 
         # Validation setup
         self.validators = []
@@ -415,7 +415,7 @@ class LDAP(Extensible):
 
     def obj(self, dn, attrs_dict=None, tag=None, *args, **kwds):
         """Factory for LDAPObjects bound to this connection"""
-        obj = LDAPObject(dn, attrsDict=attrs_dict, ldapConn=self, *args, **kwds)
+        obj = LDAPObject(dn, attrs_dict=attrs_dict, ldap_conn=self, *args, **kwds)
         if tag is not None:
             if tag in self._tagged_objects:
                 raise TagError('tag {0} already exists'.format(tag))

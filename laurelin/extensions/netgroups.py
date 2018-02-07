@@ -90,7 +90,7 @@ def addNetgroupHosts(self, DN, members, domain=''):
 
 @LDAPObject.EXTEND()
 def _requireNetgroup(self):
-    if not self.hasObjectClass(OBJECT_CLASS):
+    if not self.has_object_class(OBJECT_CLASS):
         raise RuntimeError('objectClass {0} is required'.format(OBJECT_CLASS))
 
 @LDAPObject.EXTEND('getNetgroupUsers')

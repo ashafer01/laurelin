@@ -9,7 +9,7 @@ DESC_ATTR_DELIM = '='
 
 @LDAPObject.EXTEND()
 def descAttrs(self):
-    self.refreshMissing(['description'])
+    self.refresh_missing(['description'])
     ret = AttrsDict()
     self._unstructuredDesc = set()
     for desc in self.getAttr('description'):
@@ -23,7 +23,7 @@ def descAttrs(self):
 
 @LDAPObject.EXTEND()
 def _modifyDescAttrs(self, method, attrsDict):
-    self._requireLDAP()
+    self._require_ldap()
     descDict = self.descAttrs()
     method(descDict, attrsDict)
     descStrings = []

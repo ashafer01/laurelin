@@ -6,6 +6,8 @@ from .exceptions import (
     LDAPError,
     Abandon,
     LDAPTransactionError,
+    NoSearchResults,
+    MultipleSearchResults,
 )
 from .extensible import Extensible
 from .modify import (
@@ -14,7 +16,6 @@ from .modify import (
     AddModlist,
     DeleteModlist,
 )
-import six
 
 
 class LDAPObject(AttrsDict, Extensible):
@@ -26,18 +27,12 @@ class LDAPObject(AttrsDict, Extensible):
      Attributes and values are stored using the mapping interface inherited from AttrsDict.
     """
 
-    def __init__(self, dn,
-        attrsDict=None,
-        ldapConn=None,
-        relativeSearchScope=Scope.SUBTREE,
-        rdnAttr=None
-        ):
-
+    def __init__(self, dn, attrs_dict=None, ldap_conn=None, relative_search_scope=Scope.SUBTREE, rdn_attr=None):
         self.dn = dn
-        self.ldapConn = ldapConn
-        self.relativeSearchScope = relativeSearchScope
-        self.rdnAttr = rdnAttr
-        AttrsDict.__init__(self, attrsDict)
+        self.ldap_conn = ldap_conn
+        self.relative_search_scope = relative_search_scope
+        self.rdn_attr = rdn_attr
+        AttrsDict.__init__(self, attrs_dict)
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))
@@ -59,66 +54,66 @@ class LDAPObject(AttrsDict, Extensible):
         values = AttrValueList(attr, values)
         AttrsDict.__setitem__(self, attr, values)
 
-    def _hasLDAP(self):
-        return (self.ldapConn is not None)
+    def _has_ldap(self):
+        return (self.ldap_conn is not None)
 
-    def _requireLDAP(self):
-        if not self._hasLDAP():
+    def _require_ldap(self):
+        if not self._has_ldap():
             raise RuntimeError('No LDAP instance')
 
     ## relative methods
 
-    def _rdnAttr(self, rdn):
+    def _rdn_attr(self, rdn):
         if '=' not in rdn:
-            if self.rdnAttr is not None:
-                return '{0}={1}'.format(self.rdnAttr, rdn)
+            if self.rdn_attr is not None:
+                return '{0}={1}'.format(self.rdn_attr, rdn)
             else:
-                raise ValueError('No rdnAttr specified, must supply full RDN attr=val')
+                raise ValueError('No rdn_attr specified, must supply full RDN attr=val')
         else:
             return rdn
 
-    def RDN(self, rdn):
-        rdn = self._rdnAttr(rdn)
+    def rdn(self, rdn):
+        rdn = self._rdn_attr(rdn)
         return '{0},{1}'.format(rdn, self.dn)
 
-    def _setObjKwdDefaults(self, objKwds):
+    def _set_obj_kwd_defaults(self, obj_kwds):
         """set inherited attributes on keywords dictionary, to make its way into new LDAPObjects"""
-        objKwds.setdefault('relativeSearchScope', self.relativeSearchScope)
-        objKwds.setdefault('rdnAttr', self.rdnAttr)
+        obj_kwds.setdefault('relative_search_scope', self.relative_search_scope)
+        obj_kwds.setdefault('rdn_attr', self.rdn_attr)
 
-    def obj(self, rdn, attrsDict=None, tag=None, *args, **kwds):
-        self._setObjKwdDefaults(kwds)
-        if self._hasLDAP():
-            return self.ldapConn.obj(self.RDN(rdn), attrs_dict=attrsDict, tag=tag, *args, **kwds)
+    def obj(self, rdn, attrs_dict=None, tag=None, *args, **kwds):
+        self._set_obj_kwd_defaults(kwds)
+        if self._has_ldap():
+            return self.ldap_conn.obj(self.rdn(rdn), attrs_dict=attrs_dict, tag=tag, *args, **kwds)
         else:
             if tag is not None:
                 raise LDAPError('tagging requires LDAP instance')
-            return LDAPObject(self.RDN(rdn), attrsDict=attrsDict, *args, **kwds)
+            return LDAPObject(self.rdn(rdn), attrs_dict=attrs_dict, *args, **kwds)
 
-    def getChild(self, rdn, attrs=None, **kwds):
-        self._requireLDAP()
-        self._setObjKwdDefaults(kwds)
-        return self.ldapConn.get(self.RDN(rdn), attrs, **kwds)
+    def get_child(self, rdn, attrs=None, **kwds):
+        self._require_ldap()
+        self._set_obj_kwd_defaults(kwds)
+        return self.ldap_conn.get(self.rdn(rdn), attrs, **kwds)
 
-    def addChild(self, rdn, attrsDict, **kwds):
-        self._requireLDAP()
-        self._setObjKwdDefaults(kwds)
-        return self.ldapConn.add(self.RDN(rdn), attrsDict, **kwds)
+    def add_child(self, rdn, attrs_dict, **kwds):
+        self._require_ldap()
+        self._set_obj_kwd_defaults(kwds)
+        return self.ldap_conn.add(self.rdn(rdn), attrs_dict, **kwds)
 
     def search(self, filter=None, attrs=None, *args, **kwds):
-        self._requireLDAP()
-        self._setObjKwdDefaults(kwds)
-        return self.ldapConn.search(self.dn, self.relativeSearchScope, filter, attrs, *args, **kwds)
+        self._require_ldap()
+        self._set_obj_kwd_defaults(kwds)
+        return self.ldap_conn.search(self.dn, self.relative_search_scope, filter, attrs, *args, **kwds)
 
     def find(self, rdn, attrs=None, **kwds):
-        self._requireLDAP()
-        self._setObjKwdDefaults(kwds)
-        if self.relativeSearchScope == Scope.BASE:
+        self._require_ldap()
+        self._set_obj_kwd_defaults(kwds)
+        if self.relative_search_scope == Scope.BASE:
             raise LDAPError('Object has no children')
-        elif self.relativeSearchScope == Scope.ONELEVEL:
-            return self.getChild(rdn, attrs, **kwds)
-        elif self.relativeSearchScope == Scope.SUBTREE:
-            filter = '({0})'.format(self._rdnAttr(rdn))
+        elif self.relative_search_scope == Scope.ONELEVEL:
+            return self.get_child(rdn, attrs, **kwds)
+        elif self.relative_search_scope == Scope.SUBTREE:
+            filter = '({0})'.format(self._rdn_attr(rdn))
             res = list(self.search(filter=filter, attrs=attrs, limit=2, **kwds))
             n = len(res)
             if n == 0:
@@ -128,65 +123,65 @@ class LDAPObject(AttrsDict, Extensible):
             else:
                 raise MultipleSearchResults()
         else:
-            raise ValueError('Unknown relativeSearchScope')
+            raise ValueError('Unknown relative_search_scope')
 
     def compare(self, attr, value):
-        self._requireLDAP()
-        return self.ldapConn.compare(self.dn, attr, value)
+        self._require_ldap()
+        return self.ldap_conn.compare(self.dn, attr, value)
 
     ## object-specific methods
 
-    def formatLDIF(self):
+    def format_ldif(self):
         lines = ['dn: {0}'.format(self.dn)]
         for attr, val in self.iterattrs():
             lines.append('{0}: {1}'.format(attr, val))
         lines.append('')
         return '\n'.join(lines)
 
-    def hasObjectClass(self, objectClass):
-        self.refreshMissing(['objectClass'])
-        return (objectClass in self['objectClass'])
+    def has_object_class(self, object_class):
+        self.refresh_missing(['objectClass'])
+        return object_class in self['objectClass']
 
     def refresh(self, attrs=None):
-        self._requireLDAP()
-        self.update(self.ldapConn.get(self.dn, attrs))
+        self._require_ldap()
+        self.update(self.ldap_conn.get(self.dn, attrs))
 
-    def refreshAll(self):
-        self._requiredLDAP()
+    def refresh_all(self):
+        self._require_ldap()
         self.refresh(['*', '+'])
 
-    def refreshMissing(self, attrs):
-        missingAttrs = []
+    def refresh_missing(self, attrs):
+        missing_attrs = []
         for attr in attrs:
             if attr not in self:
-                missingAttrs.append(attr)
-        if len(missingAttrs) > 0:
-            self.refresh(missingAttrs)
+                missing_attrs.append(attr)
+        if len(missing_attrs) > 0:
+            self.refresh(missing_attrs)
 
     ## object modify methods
 
-    def modify(self, modlist, **ctrlKwds):
-        self._requireLDAP()
-        self.ldapConn.modify(self.dn, modlist, current=self, **ctrlKwds)
-        self._localModify(modlist)
+    def modify(self, modlist, **ctrl_kwds):
+        self._require_ldap()
+        self.ldap_conn.modify(self.dn, modlist, current=self, **ctrl_kwds)
+        self._local_modify(modlist)
 
-    def addAttrs(self, attrsDict, **ctrlKwds):
-        if not self.ldapConn.strictModify:
-            self.refreshMissing(list(attrsDict.keys()))
-        modlist = AddModlist(self, attrsDict)
-        self.modify(modlist, **ctrlKwds)
+    def add_attrs(self, attrs_dict, **ctrl_kwds):
+        if not self.ldap_conn.strictModify:
+            self.refresh_missing(list(attrs_dict.keys()))
+        modlist = AddModlist(self, attrs_dict)
+        self.modify(modlist, **ctrl_kwds)
 
-    def replaceAttrs(self, attrsDict, **ctrlKwds):
-        modlist = Modlist(Mod.REPLACE, attrsDict)
-        self.modify(modlist, **ctrlKwds)
+    def replace_attrs(self, attrs_dict, **ctrl_kwds):
+        modlist = Modlist(Mod.REPLACE, attrs_dict)
+        self.modify(modlist, **ctrl_kwds)
 
-    def deleteAttrs(self, attrsDict, **ctrlKwds):
-        if not self.ldapConn.strictModify:
-            self.refreshMissing(list(attrsDict.keys()))
-        modlist = DeleteModlist(self, attrsDict)
-        self.modify(modlist, **ctrlKwds)
+    def delete_attrs(self, attrs_dict, **ctrl_kwds):
+        if not self.ldap_conn.strictModify:
+            self.refresh_missing(list(attrs_dict.keys()))
+        modlist = DeleteModlist(self, attrs_dict)
+        self.modify(modlist, **ctrl_kwds)
 
-    def _localModify(self, modlist):
+    def _local_modify(self, modlist):
         """Perform local modify after writing to server"""
         for mod in modlist:
             if mod.op == Mod.ADD:
@@ -204,7 +199,7 @@ class LDAPObject(AttrsDict, Extensible):
                     if mod.vals:
                         for val in mod.vals:
                             try:
-                                self._deleteAttrValue(mod.attr, val)
+                                self._delete_attr_value(mod.attr, val)
                             except ValueError:
                                 pass
                     else:
@@ -212,7 +207,7 @@ class LDAPObject(AttrsDict, Extensible):
             else:
                 raise ValueError('Invalid mod op')
 
-    def _deleteAttrValue(self, attr, val):
+    def _delete_attr_value(self, attr, val):
         """Delete a single local attribute value"""
         self[attr].remove(val)
         if not self[attr]:
@@ -220,73 +215,68 @@ class LDAPObject(AttrsDict, Extensible):
 
     ## online-only object-level methods
 
-    def delete(self, **ctrlKwds):
+    def delete(self, **ctrl_kwds):
         """delete the entire object from the server, and render this instance useless"""
-        self._requireLDAP()
-        self.ldapConn.delete(self.dn, **ctrlKwds)
+        self._require_ldap()
+        self.ldap_conn.delete(self.dn, **ctrl_kwds)
         self.clear()
         self.dn = None
-        self.ldapConn = None
+        self.ldap_conn = None
 
-    def modDN(self, newRDN, cleanAttr=True, newParent=None, **ctrlKwds):
+    def mod_dn(self, new_rdn, clean_attr=True, new_parent=None, **ctrl_kwds):
         """change the object DN, and possibly its location in the tree"""
-        self._requireLDAP()
-        curRDN, curParent = self.dn.split(',', 1)
-        if newParent is None:
-            parent = curParent
+        self._require_ldap()
+        cur_rdn, cur_parent = self.dn.split(',', 1)
+        if new_parent is None:
+            parent = cur_parent
         else:
-            parent = newParent
-        self.ldapConn.mod_dn(self.dn, newRDN, cleanAttr, parent, **ctrlKwds)
-        if cleanAttr:
-            rdnAttr, rdnVal = curRDN.split('=', 1)
+            parent = new_parent
+        self.ldap_conn.mod_dn(self.dn, new_rdn, clean_attr, parent, **ctrl_kwds)
+        if clean_attr:
+            rdn_attr, rdn_val = cur_rdn.split('=', 1)
             try:
-                self._deleteAttrValue(rdnAttr, rdnVal)
+                self._delete_attr_value(rdn_attr, rdn_val)
             except Exception:
                 pass
-        rdnAttr, rdnVal = newRDN.split('=', 1)
-        if rdnAttr not in self:
-            self[rdnAttr] = [rdnVal]
-        elif rdnVal not in self[rdnAttr]:
-            self[rdnAttr].append(rdnVal)
-        self.dn = '{0},{1}'.format(newRDN, parent)
+        rdn_attr, rdn_val = new_rdn.split('=', 1)
+        if rdn_attr not in self:
+            self[rdn_attr] = [rdn_val]
+        elif rdn_val not in self[rdn_attr]:
+            self[rdn_attr].append(rdn_val)
+        self.dn = '{0},{1}'.format(new_rdn, parent)
 
-    def rename(self, newRDN, cleanAttr=True, **ctrlKwds):
-        return self.modDN(newRDN, cleanAttr, **ctrlKwds)
+    def rename(self, new_rdn, clean_attr=True, **ctrl_kwds):
+        return self.mod_dn(new_rdn, clean_attr, **ctrl_kwds)
 
-    def move(self, newDN, cleanAttr=True, **ctrlKwds):
-        newRDN, newParent = newDN.split(',', 1)
-        return self.modDN(newRDN, cleanAttr, newParent, **ctrlKwds)
+    def move(self, new_dn, clean_attr=True, **ctrl_kwds):
+        new_rdn, new_parent = new_dn.split(',', 1)
+        return self.mod_dn(new_rdn, clean_attr, new_parent, **ctrl_kwds)
 
     ## validation methods
 
     def validate(self):
         """Validate the object, assuming all attributes are present locally"""
-        self.ldapConn.validate_object(self, write=False)
+        self.ldap_conn.validate_object(self, write=False)
 
-    def validateModify(self, modlist):
+    def validate_modify(self, modlist):
         """Validate a modification list"""
-        self.ldapConn.validate_modify(self.dn, modlist, self)
+        self.ldap_conn.validate_modify(self.dn, modlist, self)
 
     ## transactions
 
-    def modTransaction(self):
+    def mod_transaction(self):
         return ModTransactionObject(self)
 
 
 class ModTransactionObject(LDAPObject):
     """Provides a transaction-like construct for building up a single modify operation"""
 
-    def __init__(self, ldapObject):
-        self._origObj = ldapObject
+    def __init__(self, ldap_object):
+        self._orig_obj = ldap_object
         self._modlist = []
 
-        LDAPObject.__init__(self,
-            dn=ldapObject.dn,
-            attrsDict=ldapObject.deepcopy(),
-            ldapConn=ldapObject.ldapConn,
-            relativeSearchScope=ldapObject.relativeSearchScope,
-            rdnAttr=ldapObject.rdnAttr,
-        )
+        LDAPObject.__init__(dn=ldap_object.dn, attrs_dict=ldap_object.deepcopy(), ldap_conn=ldap_object.ldap_conn,
+                            relative_search_scope=ldap_object.relative_search_scope, rdn_attr=ldap_object.rdn_attr)
 
     def __enter__(self):
         return self
@@ -297,19 +287,21 @@ class ModTransactionObject(LDAPObject):
             return True
 
     def commit(self):
-        self._origObj.modify(self._modlist)
+        self._orig_obj.modify(self._modlist)
         self._modlist = []
 
-    def modify(self, modlist):
-        self.validateModify(modlist)
+    def modify(self, modlist, **kwds):
+        if kwds:
+            raise TypeError('Unhandled keyword arguments: {0}'.format(', '.join(kwds.keys())))
+        self.validate_modify(modlist)
         self._modlist.extend(modlist)
-        self._localModify(modlist)
+        self._local_modify(modlist)
 
-    def addChild(self, rdn, attrsDict, **kwds):
+    def add_child(self, rdn, attrs_dict, **kwds):
         raise LDAPTransactionError('add not included in modify transaction')
 
-    def delete(self, **ctrlKwds):
+    def delete(self, **ctrl_kwds):
         raise LDAPTransactionError('delete not included in modify transaction')
 
-    def modDN(self, newRDN, cleanAttr=True, newParent=None, **ctrlKwds):
+    def mod_dn(self, new_rdn, clean_attr=True, new_parent=None, **ctrl_kwds):
         raise LDAPTransactionError('modDN not included in modify transaction')
