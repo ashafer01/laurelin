@@ -1,28 +1,30 @@
 from __future__ import absolute_import
 from . import rfc4512
 from . import utils
-from .attributetype import getAttributeType
+from .attributetype import get_attribute_type
 from .exceptions import LDAPSchemaError, LDAPWarning
-from .protoutils import parseQdescrs
+from .protoutils import parse_qdescrs
 
 import re
+from warnings import warn
 
-_reObjectClass = re.compile(utils.reAnchor(rfc4512.ObjectClassDescription))
+_re_object_class = re.compile(utils.re_anchor(rfc4512.ObjectClassDescription))
 
-_oidObjectClasses = {}
-_nameObjectClasses = {}
+_oid_object_classes = {}
+_name_object_classes = {}
 
-def getObjectClass(ident):
+
+def get_object_class(ident):
     if ident[0].isdigit():
-        return _oidObjectClasses[ident]
+        return _oid_object_classes[ident]
     else:
         try:
-            return _nameObjectClasses[ident]
+            return _name_object_classes[ident]
         except KeyError:
-            return _nameObjectClasses.setdefault(ident, DefaultObjectClass(ident))
+            return _name_object_classes.setdefault(ident, DefaultObjectClass(ident))
 
 
-def _parseOIDs(spec):
+def _parse_oids(spec):
     if not spec:
         return []
     spec = spec.strip('() ')
@@ -30,18 +32,17 @@ def _parseOIDs(spec):
     return [oid.strip() for oid in spec]
 
 
-def _parseAttrList(spec):
+def _parse_attr_list(spec):
     ret = []
-    for attr in _parseOIDs(spec):
+    for attr in _parse_oids(spec):
         if attr[0].isdigit():
             try:
-                for name in getAttributeType(attr).names:
+                for name in get_attribute_type(attr).names:
                     ret.append(name)
             except KeyError:
                 warn('Attribute type OID {0} has not been defined, excluding from '
-                    'valid attributes on object class'.format(attr),
-                    LDAPWarning,
-                )
+                     'valid attributes on object class'.format(attr),
+                     LDAPWarning)
         else:
             ret.append(attr)
     return ret
@@ -49,25 +50,25 @@ def _parseAttrList(spec):
 
 class ObjectClass(object):
     def __init__(self, spec):
-        spec = utils.collapseWhitespace(spec).strip()
-        m = _reObjectClass.match(spec)
+        spec = utils.collapse_whitespace(spec).strip()
+        m = _re_object_class.match(spec)
         if not m:
             raise LDAPSchemaError('Invalid object class description')
 
         # register OID
         self.oid = m.group('oid')
-        if self.oid in _oidObjectClasses:
+        if self.oid in _oid_object_classes:
             raise LDAPSchemaError('Duplicate object class OID {0}'.format(self.oid))
-        _oidObjectClasses[self.oid] = self
+        _oid_object_classes[self.oid] = self
 
         # register names
-        self.names = parseQdescrs(m.group('name'))
+        self.names = parse_qdescrs(m.group('name'))
         for name in self.names:
-            if name in _nameObjectClasses:
+            if name in _name_object_classes:
                 raise LDAPSchemaError('Duplicate object class name {0}'.format(name))
-            _nameObjectClasses[name] = self
+            _name_object_classes[name] = self
 
-        self.superclasses = _parseOIDs(m.group('superclass'))
+        self.superclasses = _parse_oids(m.group('superclass'))
 
         kind = m.group('kind')
         if kind is not None:
@@ -81,8 +82,8 @@ class ObjectClass(object):
         else:
             self.obsolete = False
 
-        self.myMust = _parseAttrList(m.group('must'))
-        self.myMay = _parseAttrList(m.group('may'))
+        self.my_must = _parse_attr_list(m.group('must'))
+        self.my_may = _parse_attr_list(m.group('may'))
 
         self._must = None
         self._may = None
@@ -92,12 +93,12 @@ class ObjectClass(object):
         if self._must is not None:
             return self._must
         elif self.superclasses:
-            self._must = self.myMust
+            self._must = self.my_must
             for oc in self.superclasses:
-                self._must += getObjectClass(oc).must
+                self._must += get_object_class(oc).must
             return self._must
         else:
-            self._must = self.myMust
+            self._must = self.my_must
             return self._must
 
     @property
@@ -105,19 +106,18 @@ class ObjectClass(object):
         if self._may is not None:
             return self._may
         elif self.superclasses:
-            self._may = self.myMay
+            self._may = self.my_may
             for oc in self.superclasses:
-                self._may += getObjectClass(oc).may
+                self._may += get_object_class(oc).may
             return self._may
         else:
-            self._may = self.myMay
+            self._may = self.my_may
             return self._may
 
-
-    def allowedAttr(self, name):
+    def allowed_attr(self, name):
         return (name in self.may or name in self.must)
 
-    def requiredAttr(self, name):
+    def required_attr(self, name):
         return (name in self.must)
 
 
@@ -128,8 +128,8 @@ class DefaultObjectClass(ObjectClass):
         self.supertype = None
         self.kind = 'STRUCTURAL'
         self.obsolete = False
-        self.myMust = []
-        self.myMay = []
+        self.my_must = []
+        self.my_may = []
         self._must = None
         self._may = None
 
@@ -140,5 +140,5 @@ class DefaultObjectClass(ObjectClass):
 # belong to it to hold any user attribute.
 
 class ExtensibleObjectClass(ObjectClass):
-    def allowedAttr(self, name):
+    def allowed_attr(self, name):
         return True

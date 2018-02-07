@@ -1,13 +1,14 @@
 from __future__ import absolute_import
 import six
 
+
 class AttrsDict(dict):
     """Stores attributes and provides utility methods without any server or object affinity
 
      Dict keys are case-insensitive attribute names, and dict values are a list of attribute values
     """
 
-    def getAttr(self, attr):
+    def get_attr(self, attr):
         return self.get(attr, [])
 
     def iterattrs(self):
@@ -26,29 +27,29 @@ class AttrsDict(dict):
 
     ## dict overrides for case-insensitive keys and enforcing types
 
-    def __init__(self, attrsDict=None):
+    def __init__(self, attrs_dict=None):
         self._keys = {}
-        if attrsDict is not None:
-            self.update(attrsDict)
+        if attrs_dict is not None:
+            self.update(attrs_dict)
 
     def __contains__(self, attr):
         try:
-            return (len(self[attr]) > 0)
+            return len(self[attr]) > 0
         except KeyError:
             return False
 
     def __setitem__(self, attr, values):
-        AttrsDict.validateAttr(attr)
-        AttrsDict.validateValues(values)
+        AttrsDict.validate_attr(attr)
+        AttrsDict.validate_values(values)
         self._keys[attr.lower()] = attr
         dict.__setitem__(self, attr, values)
 
     def setdefault(self, attr, default=None):
-        AttrsDict.validateAttr(attr)
+        AttrsDict.validate_attr(attr)
         if default is None:
             default = []
         try:
-            AttrsDict.validateValues(default)
+            AttrsDict.validate_values(default)
         except TypeError as e:
             raise TypeError('invalid default - {0}'.format(str(e)))
         try:
@@ -67,10 +68,10 @@ class AttrsDict(dict):
         except KeyError:
             return default
 
-    def update(self, attrsDict):
-        AttrsDict.validate(attrsDict)
-        for key in attrsDict:
-            self[key] = attrsDict[key]
+    def update(self, attrs_dict):
+        AttrsDict.validate(attrs_dict)
+        for key in attrs_dict:
+            self[key] = attrs_dict[key]
 
     def __delitem__(self, key):
         lkey = key.lower()
@@ -83,25 +84,25 @@ class AttrsDict(dict):
         self._keys.clear()
 
     @staticmethod
-    def validate(attrsDict):
-        if isinstance(attrsDict, AttrsDict):
+    def validate(attrs_dict):
+        if isinstance(attrs_dict, AttrsDict):
             return
-        if not isinstance(attrsDict, dict):
+        if not isinstance(attrs_dict, dict):
             raise TypeError('must be dict')
-        for attr in attrsDict:
-            AttrsDict.validateAttr(attr)
-            AttrsDict.validateValues(attrsDict[attr])
+        for attr in attrs_dict:
+            AttrsDict.validate_attr(attr)
+            AttrsDict.validate_values(attrs_dict[attr])
 
     @staticmethod
-    def validateAttr(attr):
+    def validate_attr(attr):
         if not isinstance(attr, six.string_types):
             raise TypeError('attribute name must be string')
 
     @staticmethod
-    def validateValues(attrValList):
-        if not isinstance(attrValList, list):
+    def validate_values(attr_val_list):
+        if not isinstance(attr_val_list, list):
             raise TypeError('must be list')
-        for val in attrValList:
+        for val in attr_val_list:
             # TODO binary data support throughout...
             if not isinstance(val, six.string_types):
                 raise TypeError('attribute values must be string')

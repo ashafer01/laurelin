@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from .exceptions import LDAPExtensionError
 
+
 class Extensible(object):
     @classmethod
     def EXTEND(cls, *names):
@@ -14,6 +15,6 @@ class Extensible(object):
                     setattr(cls, name, method)
                 else:
                     raise LDAPExtensionError('Cannot add extension attribute {0} - class {1}'
-                        ' already has an attribute by that name'.format(name, cls.__name__))
+                                             ' already has an attribute by that name'.format(name, cls.__name__))
             return method
         return _extend

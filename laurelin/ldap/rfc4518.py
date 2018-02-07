@@ -17,10 +17,10 @@ if sys.maxunicode >= 1114111:
     UCS = 4
 else:
     warn('This python build only supports unicode code points up to {0} - string '
-       'preparation will not be fully compliant with RFC4518'.format(sys.maxunicode),
-       LDAPUnicodeWarning,
-    )
+         'preparation will not be fully compliant with RFC4518'.format(sys.maxunicode),
+         LDAPUnicodeWarning)
     UCS = 2
+
 
 def Transcode(value):
     try:
@@ -49,6 +49,7 @@ else:
 _map_space = re.compile(
     u'[\u0009-\u000D\u0085\u0020\u00A0\u1680\u2000-\u200A\u2028-\u2029\u202F\u205F\u3000]'
 )
+
 
 class Map:
     @staticmethod
@@ -197,6 +198,7 @@ else:
         u'\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE-\uFFFF\uD800-\uDFFF\uFFFD]'
     )
 
+
 def Prohibit(value):
     if _prohibited.match(value):
         raise ProhibitedCharacterError()
@@ -212,11 +214,11 @@ class Insignificant:
         return value
 
     @staticmethod
-    def numericString(value):
+    def numeric_string(value):
         value = re.sub(' +', '', value)
         return value
 
     @staticmethod
-    def telephoneNumber(value):
+    def telephone_number(value):
         value = re.sub(u'[ \u002D\u058A\u2010\u2011\u2212\uFE63\uFF0D]', '', value)
         return value

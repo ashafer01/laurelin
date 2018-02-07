@@ -80,7 +80,7 @@ class LDAPSocket(object):
             self.start_tls(ssl_verify, ssl_ca_file, ssl_ca_path, ssl_ca_data)
             logger.info('Connected with TLS on #{0}'.format(self.ID))
         elif scheme == 'ldapi':
-            self.sockPath = None
+            self.sock_path = None
             self._sock = socket(AF_UNIX)
             self.host = 'localhost'
 
@@ -95,23 +95,23 @@ class LDAPSocket(object):
                     fn = fn[0]
                     try:
                         self._connect(fn)
-                        self.sockPath = fn
+                        self.sock_path = fn
                         break
                     except SocketError:
                         continue
-                if self.sockPath is None:
+                if self.sock_path is None:
                     raise LDAPConnectionError('Could not find any local LDAPI unix socket - full '
                                               'socket path must be supplied in URI')
             else:
                 try:
                     self._connect(netloc)
-                    self.sockPath = netloc
+                    self.sock_path = netloc
                 except SocketError as e:
                     raise LDAPConnectionError('failed connect to unix socket {0} - {1} ({2})'.format(
                         netloc, e.strerror, e.errno
                     ))
 
-            logger.debug('Connected to unix socket {0} on #{1}'.format(self.sockPath, self.ID))
+            logger.debug('Connected to unix socket {0} on #{1}'.format(self.sock_path, self.ID))
         else:
             raise LDAPError('Unsupported scheme "{0}"'.format(scheme))
 
@@ -132,8 +132,7 @@ class LDAPSocket(object):
             logger.debug('Connected to {0}:{1} on #{2}'.format(self.host, port, self.ID))
         except SocketError as e:
             raise LDAPConnectionError('failed connect to {0}:{1} - {2} ({3})'.format(
-                self.host, port, e.strerror, e.errno
-            ))
+                                      self.host, port, e.strerror, e.errno))
 
     def start_tls(self, verify=True, ca_file=None, ca_path=None, ca_data=None):
         """Install TLS layer on this socket connection"""
@@ -153,7 +152,7 @@ class LDAPSocket(object):
         try:
             ctx = ssl.SSLContext(proto)
             ctx.verify_mode = verify_mode
-            ctx.check_hostname = False # we do this ourselves
+            ctx.check_hostname = False  # we do this ourselves
             if verify:
                 ctx.load_default_certs()
             if ca_file or ca_path or ca_data:
@@ -185,7 +184,8 @@ class LDAPSocket(object):
                         logger.debug('Matched server identity to cert {0} subjectAltName'.format(type))
                         break
                 if not valid:
-                    raise LDAPConnectionError('Server identity "{0}" does not match any cert names: {1}'.format(self.host, ', '.join(tried)))
+                    raise LDAPConnectionError('Server identity "{0}" does not match any cert names: {1}'.format(
+                                              self.host, ', '.join(tried)))
         else:
             logger.debug('Skipping hostname validation')
         self.started_tls = True

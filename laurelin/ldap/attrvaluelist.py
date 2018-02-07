@@ -1,5 +1,6 @@
 from __future__ import absolute_import
-from .attributetype import getAttributeType
+from .attributetype import get_attribute_type
+
 
 class AttrValueList(list):
     """
@@ -8,7 +9,7 @@ class AttrValueList(list):
     """
 
     def __init__(self, attr, values):
-        self.attrType = getAttributeType(attr)
+        self.attr_type = get_attribute_type(attr)
         list.__init__(self, values)
 
     def __contains__(self, value):
@@ -23,7 +24,7 @@ class AttrValueList(list):
          The stock start/end arguments are ignored since a list of attribute
          values is defined to have exactly zero or one unique matching values.
         """
-        return self.attrType.index(self, value)
+        return self.attr_type.index(self, value)
 
     def count(self, value):
         try:

@@ -64,12 +64,12 @@ class TestGets(object):
         assert self.testobj[self.k.upper()] is self.v
 
     def test_getAttr_notexists(self):
-        v = self.testobj.getAttr('foo')
+        v = self.testobj.get_attr('foo')
         assert isinstance(v, list)
         assert (len(v) == 0)
 
     def test_getAttr_exists(self):
-        assert self.testobj.getAttr(self.k) is self.v
+        assert self.testobj.get_attr(self.k) is self.v
 
     def test_get_default(self):
         expect = 'foobar'

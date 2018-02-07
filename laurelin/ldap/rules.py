@@ -8,13 +8,14 @@ import six
 
 ## Syntax Rules
 
-_oidSyntaxRules = {}
-_oidSyntaxRuleObjects = {}
+_oid_syntax_rules = {}
+_oid_syntax_rule_objects = {}
 
-def getSyntaxRule(oid):
-    obj = _oidSyntaxRuleObjects.get(oid)
+
+def get_syntax_rule(oid):
+    obj = _oid_syntax_rule_objects.get(oid)
     if not obj:
-        obj = _oidSyntaxRules[oid]()
+        obj = _oid_syntax_rules[oid]()
     return obj
 
 
@@ -24,9 +25,9 @@ class MetaSyntaxRule(type):
         oid = dct.get('OID')
         cls = type.__new__(meta, name, bases, dct)
         if oid:
-            if oid in _oidSyntaxRules:
+            if oid in _oid_syntax_rules:
                 raise LDAPSchemaError('Duplicate OID in syntax rule declaration')
-            _oidSyntaxRules[oid] = cls
+            _oid_syntax_rules[oid] = cls
         return cls
 
 
@@ -36,9 +37,9 @@ class SyntaxRule(object):
     def __init__(self):
         oid = getattr(self, 'OID', None)
         if oid:
-            if oid in _oidSyntaxRuleObjects:
+            if oid in _oid_syntax_rule_objects:
                 raise LDAPSchemaError('Multiple instantiations of syntax rule with OID {0}'.format(oid))
-            _oidSyntaxRuleObjects[oid] = self
+            _oid_syntax_rule_objects[oid] = self
 
     def validate(self, s):
         raise NotImplementedError()
@@ -63,22 +64,23 @@ class RegexSyntaxRule(SyntaxRule):
 ## Matching Rules
 
 
-_oidMatchingRules = {}
-_nameMatchingRules = {}
-_oidMatchingRuleObjects = {}
-_nameMatchingRuleObjects = {}
+_oid_matching_rules = {}
+_name_matching_rules = {}
+_oid_matching_rule_objects = {}
+_name_matching_rule_objects = {}
 
-def getMatchingRule(ident):
+
+def get_matching_rule(ident):
     """Obtains matching rule instance for name or OID"""
     if ident[0].isdigit():
-        clsDict = _oidMatchingRules
-        objDict = _oidMatchingRuleObjects
+        cls_dict = _oid_matching_rules
+        obj_dict = _oid_matching_rule_objects
     else:
-        clsDict = _nameMatchingRules
-        objDict = _nameMatchingRuleObjects
-    obj = objDict.get(ident)
+        cls_dict = _name_matching_rules
+        obj_dict = _name_matching_rule_objects
+    obj = obj_dict.get(ident)
     if not obj:
-        obj = clsDict[ident]()
+        obj = cls_dict[ident]()
     return obj
 
 
@@ -92,13 +94,13 @@ class MetaMatchingRule(type):
             dct['NAME'] = names
         cls = type.__new__(meta, clsname, bases, dct)
         if oid:
-            if oid in _oidMatchingRules:
+            if oid in _oid_matching_rules:
                 raise LDAPSchemaError('Duplicate OID {0} in matching rule declaration'.format(oid))
-            _oidMatchingRules[oid] = cls
+            _oid_matching_rules[oid] = cls
         for name in names:
-            if name in _nameMatchingRules:
+            if name in _name_matching_rules:
                 raise LDAPSchemaError('Duplicate name {0} in matching rule declaration'.format(name))
-            _nameMatchingRules[name] = cls
+            _name_matching_rules[name] = cls
         return cls
 
 
@@ -109,18 +111,18 @@ class MatchingRule(object):
     def __init__(self):
         oid = getattr(self, 'OID', None)
         if oid:
-            if oid in _oidMatchingRuleObjects:
+            if oid in _oid_matching_rule_objects:
                 raise LDAPSchemaError('Multiple instantiations of matching rule with OID {0}'.format(oid))
-            _oidMatchingRuleObjects[oid] = self
+            _oid_matching_rule_objects[oid] = self
         names = getattr(self, 'NAME', ())
         for name in names:
-            if name in _nameMatchingRuleObjects:
+            if name in _name_matching_rule_objects:
                 raise LDAPSchemaError('Multiple instantiations of matching rule with name {0}'.format(name))
-            _nameMatchingRuleObjects[name] = self
+            _name_matching_rule_objects[name] = self
 
     def validate(self, value):
         """Perform validation according to the matching rule's syntax"""
-        return getSyntaxRule(self.SYNTAX).validate(value)
+        return get_syntax_rule(self.SYNTAX).validate(value)
 
     def prepare(self, value):
         """Prepare a string for matching"""
@@ -128,17 +130,17 @@ class MatchingRule(object):
             value = method(value)
         return value
 
-    def do_match(self, attributeValue, assertionValue):
+    def do_match(self, attribute_value, assertion_value):
         """Perform the match operation"""
         raise NotImplementedError()
 
-    def match(self, attributeValue, assertionValue):
+    def match(self, attribute_value, assertion_value):
         """Prepare values and perform the match operation. Assumes values have
          already been validated.
         """
-        attributeValue = self.prepare(attributeValue)
-        assertionValue = self.prepare(assertionValue)
-        return self.do_match(attributeValue, assertionValue)
+        attribute_value = self.prepare(attribute_value)
+        assertion_value = self.prepare(assertion_value)
+        return self.do_match(attribute_value, assertion_value)
 
 
 # Note: currently only implementing equality matching rules since there is no
@@ -149,6 +151,6 @@ class MatchingRule(object):
 class EqualityMatchingRule(MatchingRule):
     """Base class for all EQUALITY matching rules"""
 
-    def do_match(self, attributeValue, assertionValue):
+    def do_match(self, attribute_value, assertion_value):
         """Perform equality matching"""
-        return (attributeValue == assertionValue)
+        return (attribute_value == assertion_value)

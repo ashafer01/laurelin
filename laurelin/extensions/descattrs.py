@@ -12,7 +12,7 @@ def descAttrs(self):
     self.refresh_missing(['description'])
     ret = AttrsDict()
     self._unstructuredDesc = set()
-    for desc in self.getAttr('description'):
+    for desc in self.get_attr('description'):
         if DESC_ATTR_DELIM in desc:
             key, value = desc.split(DESC_ATTR_DELIM, 1)
             vals = ret.setdefault(key, [])

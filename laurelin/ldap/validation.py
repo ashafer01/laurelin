@@ -3,7 +3,7 @@ from six.moves import range
 
 _validators = []
 
-def getValidators():
+def get_validators():
     return _validators
 
 

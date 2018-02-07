@@ -3,12 +3,12 @@ from laurelin.ldap import rules
 from laurelin.ldap.exceptions import InvalidSyntaxError
 
 def reset_registrations():
-    rules._oidSyntaxRules.clear()
-    rules._oidSyntaxRuleObjects.clear()
-    rules._oidMatchingRules.clear()
-    rules._nameMatchingRules.clear()
-    rules._oidMatchingRuleObjects.clear()
-    rules._nameMatchingRuleObjects.clear()
+    rules._oid_syntax_rules.clear()
+    rules._oid_syntax_rule_objects.clear()
+    rules._oid_matching_rules.clear()
+    rules._name_matching_rules.clear()
+    rules._oid_matching_rule_objects.clear()
+    rules._name_matching_rule_objects.clear()
 
 def setup():
     reset_registrations()

@@ -1,15 +1,15 @@
 from laurelin.ldap.attributetype import (
     AttributeType,
-    _oidAttributeTypes,
-    _nameAttributeTypes,
+    _oid_attribute_types,
+    _name_attribute_types,
     DefaultAttributeType,
-    getAttributeType,
+    get_attribute_type,
 )
 from laurelin.ldap.exceptions import LDAPSchemaError
 
 def reset_registrations():
-    _oidAttributeTypes.clear()
-    _nameAttributeTypes.clear()
+    _oid_attribute_types.clear()
+    _name_attribute_types.clear()
 
 
 def setup():
@@ -120,8 +120,8 @@ def test_supertype_inhertiance():
         assert t1.oid != t2.oid
         assert t1.names != t2.names
 
-        assert t1.equalityOID == t2.equalityOID
-        assert t1.syntaxOID == t2.syntaxOID
+        assert t1.equality_oid == t2.equality_oid
+        assert t1.syntax_oid == t2.syntax_oid
         assert t1.singleValue == t2.singleValue
     finally:
         reset_registrations()
@@ -163,8 +163,8 @@ def test_getAttributeType():
     '''
     t1 = AttributeType(spec)
 
-    t2 = getAttributeType('testing')
-    t3 = getAttributeType('1.2.3.4')
+    t2 = get_attribute_type('testing')
+    t3 = get_attribute_type('1.2.3.4')
 
     try:
         assert t1 is t2
@@ -174,7 +174,7 @@ def test_getAttributeType():
 
 
 def test_default():
-    test = getAttributeType('foo')
+    test = get_attribute_type('foo')
     try:
         assert isinstance(test, DefaultAttributeType)
     finally:

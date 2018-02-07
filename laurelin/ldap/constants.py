@@ -4,6 +4,7 @@ from .rfc4511 import (
     DerefAliases as _DerefAliases,
 )
 
+
 class Scope:
     """Scope constants
 

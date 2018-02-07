@@ -26,7 +26,7 @@ from .rfc4511 import (
     DnAttributes,
 )
 from .exceptions import LDAPError
-from .utils import findClosingParen
+from .utils import find_closing_paren
 
 escapeMap = [
     ('(', '\\28'),
@@ -41,21 +41,24 @@ escapeMap = [
     ('*', '\\2a'),
     ('/', '\\2f')
 ]
+
+
 def escape(text):
     """Escape special characters"""
     for rep in escapeMap:
         text = text.replace(*rep)
     return text
 
-def parse(filterStr):
+
+def parse(filter_str):
     """Parse a filter string to a protocol-level object"""
 
     fil = Filter()
-    chunk = filterStr[1:findClosingParen(filterStr)]
+    chunk = filter_str[1:find_closing_paren(filter_str)]
     if chunk[0] == '&':
-        fil.setComponentByName('and', _parseSet(chunk[1:], And))
+        fil.setComponentByName('and', _parse_set(chunk[1:], And))
     elif chunk[0] == '|':
-        fil.setComponentByName('or', _parseSet(chunk[1:], Or))
+        fil.setComponentByName('or', _parse_set(chunk[1:], Or))
     elif chunk[0] == '!':
         notFilter = Not()
         notFilter.setComponentByName('innerNotFilter', parse(chunk[1:]))
@@ -91,7 +94,6 @@ def parse(filterStr):
             params = attr[0:-1].split(':')
             n = len(params)
 
-            attr = None
             dnattrs = False
             rule = None
 
@@ -160,12 +162,13 @@ def parse(filterStr):
             fil.setComponentByName('equalityMatch', ava)
     return fil
 
-def _parseSet(filterStr, cls):
+
+def _parse_set(filter_str, cls):
     fset = cls()
     i = 0
-    while len(filterStr) > 0:
-        end = findClosingParen(filterStr)+1
-        fset.setComponentByPosition(i, parse(filterStr[0:end]))
-        filterStr = filterStr[end:]
+    while len(filter_str) > 0:
+        end = find_closing_paren(filter_str) + 1
+        fset.setComponentByPosition(i, parse(filter_str[0:end]))
+        filter_str = filter_str[end:]
         i += 1
     return fset

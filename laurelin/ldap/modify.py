@@ -1,9 +1,10 @@
 """Contains utilities for performing object modification"""
 
 from __future__ import absolute_import
-from .attributetype import getAttributeType
+from .attributetype import get_attribute_type
 from .rfc4511 import Operation
 import six
+
 
 class Mod(object):
     """Describes a single modify operation"""
@@ -12,7 +13,7 @@ class Mod(object):
     DELETE = Operation('delete')
 
     @staticmethod
-    def opToString(op):
+    def op_to_string(op):
         if op == Mod.ADD:
             return 'ADD'
         elif op == Mod.REPLACE:
@@ -50,11 +51,11 @@ class Mod(object):
             vals = '<all values>'
         else:
             vals = str(self.vals)
-        return 'Mod({0}, {1}, {2})'.format(Mod.opToString(self.op), self.attr, vals)
+        return 'Mod({0}, {1}, {2})'.format(Mod.op_to_string(self.op), self.attr, vals)
 
     def __repr__(self):
-        return 'Mod(Mod.{0}, {1}, {2})'.format(Mod.opToString(self.op), repr(self.attr),
-            repr(self.vals))
+        return 'Mod(Mod.{0}, {1}, {2})'.format(Mod.op_to_string(self.op), repr(self.attr), repr(self.vals))
+
 
 def Modlist(op, attrsDict):
     """Generate a modlist from a dictionary"""
@@ -66,7 +67,9 @@ def Modlist(op, attrsDict):
         modlist.append(Mod(op, attr, vals))
     return modlist
 
+
 ## Smart modlist functions which will prevent errors
+
 
 def AddModlist(curAttrs, newAttrs):
     """Generate a modlist to add only new attribute values that are not known to exist"""
@@ -78,7 +81,7 @@ def AddModlist(curAttrs, newAttrs):
     addAttrs = {}
     for attr, vals in six.iteritems(newAttrs):
         if attr in curAttrs:
-            attrType = getAttributeType(attr)
+            attrType = get_attribute_type(attr)
             for val in vals:
                 try:
                     attrType.index(curAttrs[attr], val)
@@ -91,6 +94,7 @@ def AddModlist(curAttrs, newAttrs):
         else:
             addAttrs[attr] = vals
     return Modlist(Mod.ADD, addAttrs)
+
 
 def DeleteModlist(curAttrs, delAttrs):
     """Generate a modlist to delete only attribute values that are known to exist"""
@@ -105,7 +109,7 @@ def DeleteModlist(curAttrs, delAttrs):
             if not vals:
                 _delAttrs[attr] = vals
             else:
-                attrType = getAttributeType(attr)
+                attrType = get_attribute_type(attr)
                 for val in vals:
                     try:
                         attrType.index(curAttrs[attr], val)

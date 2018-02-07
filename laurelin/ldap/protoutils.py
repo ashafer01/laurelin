@@ -23,15 +23,15 @@ RESULT_referral = ResultCode('referral')
 logger = logging.getLogger(__name__)
 
 
-def unpack(op, ldapMessage):
+def unpack(op, ldap_message):
     """Unpack an object from an LDAPMessage envelope"""
-    mID = ldapMessage.getComponentByName('messageID')
-    po = ldapMessage.getComponentByName('protocolOp')
-    controls = ldapMessage.getComponentByName('controls')
+    mid = ldap_message.getComponentByName('messageID')
+    po = ldap_message.getComponentByName('protocolOp')
+    controls = ldap_message.getComponentByName('controls')
     if po.getName() == op:
         ret = po.getComponent()
         if ret.isValue:
-            return mID, ret, controls
+            return mid, ret, controls
     raise UnexpectedResponseType()
 
 
@@ -43,14 +43,14 @@ def seq_to_list(seq):
     return ret
 
 
-def parseQdescrs(spec):
+def parse_qdescrs(spec):
     """Parse an rfc4512.qdescrs to a tuple"""
     if spec is None:
         return ()
     return tuple(qdescr.strip("'") for qdescr in spec.strip('( )').split(' '))
 
 
-def getStringComponent(obj, name):
+def get_string_component(obj, name):
     """Try to get a string component from a PyASN1 object, or an empty string on error"""
     try:
         comp = obj.getComponentByName(name)

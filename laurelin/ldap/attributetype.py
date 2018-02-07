@@ -3,51 +3,53 @@ from . import rfc4512
 from . import rules
 from . import utils
 from .exceptions import LDAPSchemaError
-from .protoutils import parseQdescrs
+from .protoutils import parse_qdescrs
 
 import re
 
-_reAttrType = re.compile(utils.reAnchor(rfc4512.AttributeTypeDescription))
+_re_attr_type = re.compile(utils.re_anchor(rfc4512.AttributeTypeDescription))
 
-_oidAttributeTypes = {}
-_nameAttributeTypes = {}
+_oid_attribute_types = {}
+_name_attribute_types = {}
 
-def getAttributeType(ident):
+
+def get_attribute_type(ident):
     if ident[0].isdigit():
-        return _oidAttributeTypes[ident]
+        return _oid_attribute_types[ident]
     else:
         try:
-            return _nameAttributeTypes[ident]
+            return _name_attribute_types[ident]
         except KeyError:
-            return _nameAttributeTypes.setdefault(ident, DefaultAttributeType(ident))
+            return _name_attribute_types.setdefault(ident, DefaultAttributeType(ident))
+
 
 class AttributeType(object):
     def __init__(self, spec):
-        spec = utils.collapseWhitespace(spec).strip()
-        m = _reAttrType.match(spec)
+        spec = utils.collapse_whitespace(spec).strip()
+        m = _re_attr_type.match(spec)
         if not m:
             raise LDAPSchemaError('Invalid attribute type specification')
 
         # register OID
         self.oid = m.group('oid')
-        if self.oid in _oidAttributeTypes:
+        if self.oid in _oid_attribute_types:
             raise LDAPSchemaError('Duplicate attribute type OID {0}'.format(self.oid))
-        _oidAttributeTypes[self.oid] = self
+        _oid_attribute_types[self.oid] = self
 
         # register name(s)
-        self.names = parseQdescrs(m.group('name'))
+        self.names = parse_qdescrs(m.group('name'))
         for name in self.names:
-            if name in _nameAttributeTypes:
+            if name in _name_attribute_types:
                 raise LDAPSchemaError('Duplicate attribute type name {0}'.format(name))
-            _nameAttributeTypes[name] = self
+            _name_attribute_types[name] = self
 
         self.supertype = m.group('supertype')
 
         equality = m.group('equality')
         if equality is not None:
-            self.equalityOID = equality
+            self.equality_oid = equality
         elif not self.supertype:
-            self.equalityOID = None
+            self.equality_oid = None
 
         # Note: ordering and substring matching not currently implemented
         # specs stored in m.group('ordering') and m.group('substr')
@@ -55,13 +57,13 @@ class AttributeType(object):
         syntax = m.group('syntax')
         if syntax is not None:
             syntax_noidlen = syntax.split('{')
-            self.syntaxOID = syntax_noidlen[0]
+            self.syntax_oid = syntax_noidlen[0]
             if len(syntax_noidlen) > 1:
                 self.syntaxLength = int(syntax_noidlen[1].strip('}'))
             else:
                 self.syntaxLength = -1
         elif not self.supertype:
-            self.syntaxOID = None
+            self.syntax_oid = None
             self.syntaxLength = -1
 
         obsolete = m.group('obsolete')
@@ -70,9 +72,9 @@ class AttributeType(object):
         elif not self.supertype:
             self.obsolete = False
 
-        singleValue = m.group('single_value')
-        if singleValue is not None:
-            self.singleValue = bool(singleValue)
+        single_value = m.group('single_value')
+        if single_value is not None:
+            self.singleValue = bool(single_value)
         elif not self.supertype:
             self.singleValue = False
 
@@ -82,11 +84,11 @@ class AttributeType(object):
         elif not self.supertype:
             self.collective = False
 
-        noUserMod = m.group('no_user_mod')
-        if noUserMod is not None:
-            self.noUserMod = bool(noUserMod)
+        no_user_mod = m.group('no_user_mod')
+        if no_user_mod is not None:
+            self.no_user_mod = bool(no_user_mod)
         elif not self.supertype:
-            self.noUserMod = False
+            self.no_user_mod = False
 
         usage = m.group('usage')
         if usage:
@@ -96,15 +98,15 @@ class AttributeType(object):
 
     @property
     def syntax(self):
-        return rules.getSyntaxRule(self.syntaxOID)
+        return rules.get_syntax_rule(self.syntax_oid)
 
     @property
     def equality(self):
-        return rules.getMatchingRule(self.equalityOID)
+        return rules.get_matching_rule(self.equality_oid)
 
     def __getattr__(self, name):
         if self.supertype:
-            return getattr(getAttributeType(self.supertype), name)
+            return getattr(get_attribute_type(self.supertype), name)
         else:
             raise AttributeError("No attribute named '{0}' and no supertype specified".format(name))
 
@@ -112,20 +114,20 @@ class AttributeType(object):
         """Validate a value according to the attribute type's syntax rule"""
         return self.syntax.validate(value)
 
-    def index(self, valueList, assertionValue):
+    def index(self, value_list, assertion_value):
         """Finds the index of a value in a list of attribute values. Raises a
          ValueError if the value is not found in the list. Assumes values in
-         valueList are already validated.
+         value_list are already validated.
         """
-        if not valueList:
-            raise ValueError('empty valueList')
-        self.validate(assertionValue)
-        assertionValue = self.equality.prepare(assertionValue)
-        for i, val in enumerate(valueList):
+        if not value_list:
+            raise ValueError('empty value_list')
+        self.validate(assertion_value)
+        assertion_value = self.equality.prepare(assertion_value)
+        for i, val in enumerate(value_list):
             val = self.equality.prepare(val)
-            if self.equality.do_match(val, assertionValue):
+            if self.equality.do_match(val, assertion_value):
                 return i
-        raise ValueError('assertionValue not found')
+        raise ValueError('assertion_value not found')
 
 
 ## Defaults used when an attribute type is undefined
@@ -170,5 +172,5 @@ class DefaultAttributeType(AttributeType):
     def equality(self):
         return self._equality
 
-    def index(self, valueList, assertionValue):
-        return list.index(valueList, assertionValue)
+    def index(self, value_list, assertion_value):
+        return list.index(value_list, assertion_value)

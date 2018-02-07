@@ -17,7 +17,7 @@ _responseControls = {}
 _reservedKwds = set(['attr', 'attrs', 'attrsDict', 'attrs_dict', 'attrs_only', 'base_dn', 'clean_attr', 'current', 'deref_aliases', 'dn', 'fetch_result_refs', 'filter', 'follow_referrals', 'ldapConn', 'ldap_conn', 'limit', 'mech', 'mid', 'modlist', 'new_parent', 'new_rdn', 'oid', 'password', 'rdnAttr', 'relativeSearchScope', 'require_success', 'scope', 'search_timeout', 'self', 'tag', 'username', 'value'])
 
 
-def processKwds(method, kwds, supportedCtrls, defaultCriticality, final=False):
+def process_kwds(method, kwds, supported_ctrls, default_criticality, final=False):
     """Process keyword arguments for registered controls, returning a protocol-level Controls
 
      Removes entries from kwds as they are used, allowing the same dictionary to be passed on
@@ -31,18 +31,18 @@ def processKwds(method, kwds, supportedCtrls, defaultCriticality, final=False):
             ctrl = _requestControls[kwd]
             if method not in ctrl.method:
                 raise LDAPError('Control keyword {0} not allowed for method "{1}"'.format(kwd, method))
-            ctrlValue = kwds.pop(kwd)
-            if isinstance(ctrlValue, critical):
+            ctrl_value = kwds.pop(kwd)
+            if isinstance(ctrl_value, critical):
                 criticality = True
-                ctrlValue = ctrlValue.value
-            elif isinstance(ctrlValue, optional):
+                ctrl_value = ctrl_value.value
+            elif isinstance(ctrl_value, optional):
                 criticality = False
-                ctrlValue = ctrlValue.value
+                ctrl_value = ctrl_value.value
             else:
-                criticality = defaultCriticality
-            if criticality and (ctrl.REQUEST_OID not in supportedCtrls):
+                criticality = default_criticality
+            if criticality and (ctrl.REQUEST_OID not in supported_ctrls):
                 raise LDAPSupportError('Critical control keyword {0} is not supported by the server'.format(kwd))
-            ctrls.setComponentByPosition(i, ctrl.prepare(ctrlValue, criticality))
+            ctrls.setComponentByPosition(i, ctrl.prepare(ctrl_value, criticality))
             i += 1
     if final and (len(kwds) > 0):
         raise TypeError('Unhandled keyword arguments: {0}'.format(', '.join(kwds.keys())))
@@ -52,7 +52,7 @@ def processKwds(method, kwds, supportedCtrls, defaultCriticality, final=False):
         return None
 
 
-def handleResponse(obj, controls):
+def handle_response(obj, controls):
     """Handle response control values and set attributes on the given object.
 
      Accepts any object to set attributes on, and an rfc4511.Controls instance
@@ -63,11 +63,11 @@ def handleResponse(obj, controls):
     if controls:
         for i in range(len(controls)):
             control = controls.getComponentByPosition(i)
-            ctrlOID = six.text_type(control.getComponentByName('controlType'))
+            ctrl_oid = six.text_type(control.getComponentByName('controlType'))
             try:
-                ctrl = _responseControls[ctrlOID]
+                ctrl = _responseControls[ctrl_oid]
             except KeyError:
-                raise LDAPExtensionError('No response control defined for {0}'.format(ctrlOID))
+                raise LDAPExtensionError('No response control defined for {0}'.format(ctrl_oid))
             value = ctrl.handle(control.getComponentByName('controlValue'))
             if not hasattr(obj, ctrl.responseAttr):
                 setattr(obj, ctrl.responseAttr, value)
@@ -93,7 +93,7 @@ class MetaControl(type):
 
         if cls.RESPONSE_OID:
             if not cls.responseAttr:
-                raise ValueError('Missing responseAttr on control {0}'.format(name))
+                raise ValueError('Missing response_attr on control {0}'.format(name))
             if cls.RESPONSE_OID in _responseControls:
                 raise LDAPExtensionError('Response control OID {0} is already defined'.format(cls.RESPONSE_OID))
             _responseControls[cls.RESPONSE_OID] = instance
@@ -113,26 +113,26 @@ class Control(object):
      controlValue is passed to the handle() method, and any appropriate value
      may be returned.
 
-     Leave the RESPONSE_OID and responseAttr attributes as a False value if
+     Leave the RESPONSE_OID and response_attr attributes as a False value if
      there is no response control specified.
     """
 
-    method = ()       # name(s) of the method which this control is used with
-    keyword = ''      # keyword argument name
-    responseAttr = '' # Name of the attribute where return of handle() will be stored
-    REQUEST_OID = ''  # Request OID of the control
-    RESPONSE_OID = '' # Response OID of the control (may be equal to REQUEST_OID; may be left empty)
+    method = ()         # name(s) of the method which this control is used with
+    keyword = ''        # keyword argument name
+    response_attr = ''  # Name of the attribute where return of handle() will be stored
+    REQUEST_OID = ''    # Request OID of the control
+    RESPONSE_OID = ''   # Response OID of the control (may be equal to REQUEST_OID; may be left empty)
 
-    def prepare(self, ctrlValue, criticality):
+    def prepare(self, ctrl_value, criticality):
         """Accepts string controlValue and returns an rfc4511.Control instance"""
         c = _Control()
         c.setComponentByName('controlType', LDAPOID(self.REQUEST_OID))
         c.setComponentByName('criticality', Criticality(criticality))
-        if ctrlValue:
-            c.setComponentByName('controlValue', ControlValue(ctrlValue))
+        if ctrl_value:
+            c.setComponentByName('controlValue', ControlValue(ctrl_value))
         return c
 
-    def handle(self, ctrlValue):
+    def handle(self, ctrl_value):
         """Accepts raw response ctrlValue and may return any useful value"""
         raise NotImplementedError()
 

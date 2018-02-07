@@ -10,7 +10,7 @@ def test_findClosingParen():
     )
 
     for test, expected in test_good:
-        actual = utils.findClosingParen(test)
+        actual = utils.find_closing_paren(test)
         assert actual == expected
 
     test_bad = (
@@ -20,7 +20,7 @@ def test_findClosingParen():
 
     for test in test_bad:
         try:
-            utils.findClosingParen(test)
+            utils.find_closing_paren(test)
             assert False
         except ValueError:
             pass
@@ -37,7 +37,7 @@ def test_validatePhoneNumber():
     )
 
     for test in test_good:
-        assert utils.validatePhoneNumber(test)
+        assert utils.validate_phone_number(test)
 
     test_bad = (
         '123456',
@@ -45,4 +45,4 @@ def test_validatePhoneNumber():
     )
 
     for test in test_bad:
-        assert utils.validatePhoneNumber(test) is False
+        assert utils.validate_phone_number(test) is False

@@ -26,9 +26,9 @@ from .protoutils import (
     RESULT_referral,
     unpack,
     seq_to_list,
-    getStringComponent,
+    get_string_component,
 )
-from .validation import getValidators
+from .validation import get_validators
 
 import logging
 import re
@@ -215,7 +215,7 @@ class LDAP(Extensible):
             if 'defaultNamingContext' in self.root_dse:
                 base_dn = self.root_dse['defaultNamingContext'][0]
             else:
-                ncs = self.root_dse.getAttr('namingContexts')
+                ncs = self.root_dse.get_attr('namingContexts')
                 n = len(ncs)
                 if n == 0:
                     raise LDAPError('base_dn must be provided - no namingContexts')
@@ -234,7 +234,7 @@ class LDAP(Extensible):
         # Validation setup
         self.validators = []
         if not skip_validation:
-            for validator in getValidators():
+            for validator in get_validators():
                 skip = False
                 for validatorSpec in skip_validators:
                     if isinstance(validatorSpec, six.string_types):
@@ -250,12 +250,12 @@ class LDAP(Extensible):
 
     def refresh_root_dse(self):
         self.root_dse = self.get('', ['*', '+'])
-        self._sasl_mechs = self.root_dse.getAttr('supportedSASLMechanisms')
+        self._sasl_mechs = self.root_dse.get_attr('supportedSASLMechanisms')
 
     def _process_ctrl_kwds(self, method, kwds, final=False):
-        supported_ctrls = self.root_dse.getAttr('supportedControl')
+        supported_ctrls = self.root_dse.get_attr('supportedControl')
         default_crit = self.default_criticality
-        return controls.processKwds(method, kwds, supported_ctrls, default_crit, final)
+        return controls.process_kwds(method, kwds, supported_ctrls, default_crit, final)
 
     def _success_result(self, message_id, operation):
         """Receive an object from the socket and raise an LDAPError if its not a success result"""
@@ -264,7 +264,7 @@ class LDAP(Extensible):
         if res == RESULT_success:
             logger.debug('LDAP operation (ID {0}) was successful'.format(mid))
             ret = LDAPResponse()
-            controls.handleResponse(ret, res_ctrls)
+            controls.handle_response(ret, res_ctrls)
             return ret
         else:
             msg = obj.getComponentByName('diagnosticMessage')
@@ -302,7 +302,7 @@ class LDAP(Extensible):
         if self._sasl_mechs is None:
             logger.debug('Querying server to find supported SASL mechs')
             o = self.get('', ['supportedSASLMechanisms'])
-            self._sasl_mechs = o.getAttr('supportedSASLMechanisms')
+            self._sasl_mechs = o.get_attr('supportedSASLMechanisms')
             logger.debug('Server supported SASL mechs = {0}'.format(','.join(self._sasl_mechs)))
         return self._sasl_mechs
 
@@ -379,7 +379,7 @@ class LDAP(Extensible):
                 self.recheck_sasl_mechs()
 
                 ret = LDAPResponse()
-                controls.handleResponse(ret, res_ctrls)
+                controls.handle_response(ret, res_ctrls)
                 return ret
             else:
                 msg = res.getComponentByName('diagnosticMessage')
@@ -528,7 +528,7 @@ class LDAP(Extensible):
         else:
             raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mid))
         ret = CompareResponse(compare_result)
-        controls.handleResponse(ret, res_ctrls)
+        controls.handle_response(ret, res_ctrls)
         return ret
 
     def add(self, dn, attrs_dict, **kwds):
@@ -572,7 +572,7 @@ class LDAP(Extensible):
         res = res.getComponentByName('resultCode')
         if res == RESULT_success:
             logger.debug('LDAP operation (ID {0}) was successful'.format(mid))
-            controls.handleResponse(obj, res_ctrls)
+            controls.handle_response(obj, res_ctrls)
             return obj
         else:
             raise LDAPError('Got {0} for add (ID {1})'.format(repr(res), mid))
@@ -755,7 +755,7 @@ class LDAP(Extensible):
          This is mainly meant to be called by other built-in methods and client extensions. Requires
          handling of raw pyasn1 protocol objects
         """
-        if oid not in self.root_dse.getAttr('supportedExtension'):
+        if oid not in self.root_dse.get_attr('supportedExtension'):
             raise LDAPSupportError('Extended operation is not supported by the server')
         xr = rfc4511.ExtendedRequest()
         xr.setComponentByName('requestName', rfc4511.RequestName(oid))
@@ -906,7 +906,7 @@ class SearchResultHandle(ResponseHandle):
         for msg in self.ldap_conn.sock.recv_messages(self.message_id):
             try:
                 mid, entry, res_ctrls = unpack('searchResEntry', msg)
-                dn = getStringComponent(entry, 'objectName')
+                dn = get_string_component(entry, 'objectName')
                 attrs = {}
                 _attrs = entry.getComponentByName('attributes')
                 for i in range(0, len(_attrs)):
@@ -916,7 +916,7 @@ class SearchResultHandle(ResponseHandle):
                     attrs[attr_type] = seq_to_list(vals)
                 logger.debug('Got search result entry (ID {0}) {1}'.format(mid, dn))
                 ret = self.ldap_conn.obj(dn, attrs, **self.obj_kwds)
-                controls.handleResponse(ret, res_ctrls)
+                controls.handle_response(ret, res_ctrls)
                 yield ret
             except UnexpectedResponseType:
                 try:
@@ -927,7 +927,7 @@ class SearchResultHandle(ResponseHandle):
                         logger.debug('Got all search results for ID={0}, result is {1}'.format(
                             mid, repr(res)
                         ))
-                        controls.handleResponse(self, res_ctrls)
+                        controls.handle_response(self, res_ctrls)
                         raise StopIteration()
                     elif res == RESULT_referral:
                         if self.follow_referrals:
@@ -952,7 +952,7 @@ class SearchResultHandle(ResponseHandle):
                         for obj in ref.fetch():
                             yield obj
                     else:
-                        controls.handleResponse(ref, res_ctrls)
+                        controls.handle_response(ref, res_ctrls)
                         yield ref
 
 
@@ -978,7 +978,7 @@ class ExtendedResponseHandle(ResponseHandle):
         except UnexpectedResponseType:
             mid, xr, res_ctrls = unpack('extendedResp', lm)
             self.done = True
-            res_name = getStringComponent(xr, 'responseName')
+            res_name = get_string_component(xr, 'responseName')
             logger.debug('Got name={0} extended response for ID={1}'.format(res_name, mid))
             if self.require_success:
                 res = xr.getComponentByName('resultCode')

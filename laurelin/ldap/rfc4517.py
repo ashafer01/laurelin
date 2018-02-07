@@ -32,7 +32,7 @@ _BitString = r"'[01]*'B"
 class BitString(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.6'
     DESC = 'Bit String'
-    regex = utils.reAnchor(_BitString)
+    regex = utils.re_anchor(_BitString)
 
 
 class Boolean(SyntaxRule):
@@ -65,26 +65,27 @@ class DirectoryString(SyntaxRule):
         if not isinstance(s, six.string_types) or (len(s) == 0):
             raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
 
+
 class DITContentRuleDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.16'
     DESC = 'DIT Content Rule Description'
-    regex = utils.reAnchor(rfc4512.DITContentRuleDescription)
+    regex = utils.re_anchor(rfc4512.DITContentRuleDescription)
 
 
 class DITStructureRuleDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.17'
     DESC = 'DIT Structure Rule Description'
-    regex = utils.reAnchor(rfc4512.DITStructureRuleDescription)
+    regex = utils.re_anchor(rfc4512.DITStructureRuleDescription)
 
 
 class DistinguishedName(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.12'
     DESC = 'DN'
-    regex = utils.reAnchor(rfc4514.distinguishedName)
+    regex = utils.re_anchor(rfc4514.distinguishedName)
 
 
 class EnhancedGuide(SyntaxRule):
-    #3.3.10.  Enhanced Guide
+    # 3.3.10.  Enhanced Guide
     #
     #   A value of the Enhanced Guide syntax suggests criteria, which consist
     #   of combinations of attribute types and filter operators, to be used
@@ -152,7 +153,7 @@ class EnhancedGuide(SyntaxRule):
         while i < len(criteria):
             c = criteria[i]
             if c == '(':
-                e = utils.findClosingParen(criteria[i:])
+                e = utils.find_closing_paren(criteria[i:])
                 pterm = criteria[i+1:i+e]
                 self._validate_criteria(pterm)
                 i += e+1
@@ -205,7 +206,7 @@ class FacsimilieTelephoneNumber(SyntaxRule):
 
     def validate(self, s):
         params = s.split('$')
-        if not utils.validatePhoneNumber(params[0]):
+        if not utils.validate_phone_number(params[0]):
             raise InvalidSyntaxError('Not a valid {0} - invalid phone number'.format(self.DESC))
         for param in params[1:]:
             if param not in self._fax_parameters:
@@ -274,7 +275,7 @@ class GeneralizedTime(RegexSyntaxRule):
 class IA5String(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.26'
     DESC = 'IA5 String'
-    regex = utils.reAnchor(_IA5String)
+    regex = utils.re_anchor(_IA5String)
 
 
 class Integer(RegexSyntaxRule):
@@ -296,19 +297,19 @@ class JPEG(SyntaxRule):
 class LDAPSyntaxDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.54'
     DESC = 'LDAP Syntax Description'
-    regex = utils.reAnchor(rfc4512.SyntaxDescription)
+    regex = utils.re_anchor(rfc4512.SyntaxDescription)
 
 
 class MatchingRuleDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.30'
     DESC = 'Matching Rule Description'
-    regex = utils.reAnchor(rfc4512.MatchingRuleDescription)
+    regex = utils.re_anchor(rfc4512.MatchingRuleDescription)
 
 
 class MatchingRuleUseDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.31'
     DESC = 'Matching Rule Use Description'
-    regex = utils.reAnchor(rfc4512.MatchingRuleUseDescription)
+    regex = utils.re_anchor(rfc4512.MatchingRuleUseDescription)
 
 
 class NameAndOptionalUID(RegexSyntaxRule):
@@ -320,7 +321,7 @@ class NameAndOptionalUID(RegexSyntaxRule):
 class NameFormDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.35'
     DESC = 'Name Form Description'
-    regex = utils.reAnchor(rfc4512.NameFormDescription)
+    regex = utils.re_anchor(rfc4512.NameFormDescription)
 
 
 class NumericString(RegexSyntaxRule):
@@ -332,7 +333,7 @@ class NumericString(RegexSyntaxRule):
 class ObjectClassDescription(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.37'
     DESC = 'Object Class Description'
-    regex = utils.reAnchor(rfc4512.ObjectClassDescription)
+    regex = utils.re_anchor(rfc4512.ObjectClassDescription)
 
 
 class OctetString(SyntaxRule):
@@ -347,7 +348,7 @@ class OctetString(SyntaxRule):
 class OID(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.38'
     DESC = 'OID'
-    regex = utils.reAnchor(rfc4512.oid)
+    regex = utils.re_anchor(rfc4512.oid)
 
 
 class OtherMailbox(RegexSyntaxRule):
@@ -360,7 +361,7 @@ class PostalAddress(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.41'
     DESC = 'Postal Address'
 
-    _line_char = utils.escapedRegex('\\$')
+    _line_char = utils.escaped_regex('\\$')
     _line = _line_char + r'+'
     regex = r'^' + _line + r'(\$' + _line + r')*$'
 
@@ -368,14 +369,14 @@ class PostalAddress(RegexSyntaxRule):
 class PrintableString(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.44'
     DESC = 'Printable String'
-    regex = utils.reAnchor(_PrintableString)
+    regex = utils.re_anchor(_PrintableString)
 
 
 class SubstringAssertion(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.58'
     DESC = 'Substring Assertion'
 
-    _substring_character = utils.escapedRegex('\\*')
+    _substring_character = utils.escaped_regex('\\*')
     _substring = _substring_character + r'+'
     regex = r'(?:' + _substring + r')?\*(?:' + _substring + r'\*)*(?:' + _substring + r')?'
 
@@ -385,7 +386,7 @@ class TelephoneNumber(SyntaxRule):
     DESC = 'Telephone Number'
 
     def validate(self, s):
-        if not utils.validatePhoneNumber(s):
+        if not utils.validate_phone_number(s):
             raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
 
 
@@ -413,6 +414,7 @@ caseIgnorePrepMethods = (
     rfc4518.Prohibit,
     rfc4518.Insignificant.space,
 )
+
 
 class bitStringMatch(EqualityMatchingRule):
     OID = '2.5.13.16'
@@ -472,32 +474,32 @@ class distinguishedNameMatch(EqualityMatchingRule):
     NAME = 'distinguishedNameMatch'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.12'
 
-    def _parseDN(self, value):
+    def _parse_dn(self, value):
         rdns = re.split(r'(?<!\\),', value)
-        rdnDicts = []
+        rdn_dicts = []
         for rdn in rdns:
-            rdnAVAs = re.split(r'(?<!\\)\+', rdn)
-            rdnDict = {}
-            for rdnAVA in rdnAVAs:
-                attr, val = re.split(r'(?<!\\)=', rdnAVA)
-                rdnDict[attr] = val
-            rdnDicts.append(rdnDict)
-        return rdnDicts
+            rdn_avas = re.split(r'(?<!\\)\+', rdn)
+            rdn_dict = {}
+            for rdn_ava in rdn_avas:
+                attr, val = re.split(r'(?<!\\)=', rdn_ava)
+                rdn_dict[attr] = val
+            rdn_dicts.append(rdn_dict)
+        return rdn_dicts
 
-    def do_match(self, attributeValue, assertionValue):
-        from .attributetype import getAttributeType
-        attributeValue = self._parseDN(attributeValue)
-        assertionValue = self._parseDN(assertionValue)
-        if len(attributeValue) != len(assertionValue):
+    def do_match(self, attribute_value, assertion_value):
+        from .attributetype import get_attribute_type
+        attribute_value = self._parse_dn(attribute_value)
+        assertion_value = self._parse_dn(assertion_value)
+        if len(attribute_value) != len(assertion_value):
             return False
         try:
-            for i in range(len(attributeValue)):
-                attributeRDN = attributeValue[i]
-                assertionRDN = assertionValue[i]
-                for attr in attributeRDN:
-                    attributeValue = attributeRDN[attr]
-                    assertionValue = assertionRDN[attr]
-                    if not getAttributeType(attr).match(attributeValue, assertionValue):
+            for i in range(len(attribute_value)):
+                attribute_rdn = attribute_value[i]
+                assertion_rdn = assertion_value[i]
+                for attr in attribute_rdn:
+                    attribute_value = attribute_rdn[attr]
+                    assertion_value = assertion_rdn[attr]
+                    if not get_attribute_type(attr).match(attribute_value, assertion_value):
                         return False
             return True
         except Exception:
@@ -509,8 +511,8 @@ class generalizedTimeMatch(EqualityMatchingRule):
     NAME = 'generalizedTimeMatch'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.24'
 
-    def do_match(self, attributeValue, assertionValue):
-        m = self.validate(assertionValue)
+    def do_match(self, attribute_value, assertion_value):
+        m = self.validate(assertion_value)
         # TODO
         return True
 
@@ -536,7 +538,7 @@ class numericStringMatch(EqualityMatchingRule):
         rfc4518.Map.characters,
         rfc4518.Normalize,
         rfc4518.Prohibit,
-        rfc4518.Insignificant.numericString,
+        rfc4518.Insignificant.numeric_string,
     )
 
 
@@ -567,7 +569,7 @@ class telephoneNumberMatch(EqualityMatchingRule):
         rfc4518.Map.all,
         rfc4518.Normalize,
         rfc4518.Prohibit,
-        rfc4518.Insignificant.telephoneNumber,
+        rfc4518.Insignificant.telephone_number,
     )
 
 
