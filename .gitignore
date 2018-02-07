@@ -6,3 +6,4 @@
 *.egg*
 .DS_Store
 notes.txt
+.idea
