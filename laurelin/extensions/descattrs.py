@@ -30,7 +30,7 @@ def _modifyDescAttrs(self, method, attrsDict):
     for key, values in six.iteritems(descDict):
         for value in values:
             descStrings.append(key + DESC_ATTR_DELIM + value)
-    self.replaceAttrs({'description':descStrings + list(self._unstructuredDesc)})
+    self.replace_attrs({'description': descStrings + list(self._unstructuredDesc)}, )
 
 def dictModAdd(toDict, attrsDict):
     """Adds attributes from attrsDict to toDict"""

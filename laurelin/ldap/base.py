@@ -6,7 +6,7 @@ from . import rfc4511
 from .constants import Scope, DerefAliases
 from .exceptions import *
 from .extensible import Extensible
-from .filter import parse as parseFilter
+from .filter import parse as parse_filter
 from .ldapobject import LDAPObject
 from .modify import (
     Mod,
@@ -210,12 +210,12 @@ class LDAP(Extensible):
             raise TypeError('Must supply URI string or LDAPSocket for server')
         self.sock.refcount += 1
 
-        self.refreshRootDSE()
+        self.refresh_root_dse()
         if base_dn is None:
-            if 'defaultNamingContext' in self.rootDSE:
-                base_dn = self.rootDSE['defaultNamingContext'][0]
+            if 'defaultNamingContext' in self.root_dse:
+                base_dn = self.root_dse['defaultNamingContext'][0]
             else:
-                ncs = self.rootDSE.getAttr('namingContexts')
+                ncs = self.root_dse.getAttr('namingContexts')
                 n = len(ncs)
                 if n == 0:
                     raise LDAPError('base_dn must be provided - no namingContexts')
@@ -248,29 +248,29 @@ class LDAP(Extensible):
                 if not skip:
                     self.validators.append(validator)
 
-    def refreshRootDSE(self):
-        self.rootDSE = self.get('', ['*', '+'])
-        self._sasl_mechs = self.rootDSE.getAttr('supportedSASLMechanisms')
+    def refresh_root_dse(self):
+        self.root_dse = self.get('', ['*', '+'])
+        self._sasl_mechs = self.root_dse.getAttr('supportedSASLMechanisms')
 
-    def _processCtrlKwds(self, method, kwds, final=False):
-        supportedCtrls = self.rootDSE.getAttr('supportedControl')
-        defaultCrit = self.default_criticality
-        return controls.processKwds(method, kwds, supportedCtrls, defaultCrit, final)
+    def _process_ctrl_kwds(self, method, kwds, final=False):
+        supported_ctrls = self.root_dse.getAttr('supportedControl')
+        default_crit = self.default_criticality
+        return controls.processKwds(method, kwds, supported_ctrls, default_crit, final)
 
-    def _successResult(self, messageID, operation):
+    def _success_result(self, message_id, operation):
         """Receive an object from the socket and raise an LDAPError if its not a success result"""
-        mID, obj, resCtrls = unpack(operation, self.sock.recv_one(messageID))
+        mid, obj, res_ctrls = unpack(operation, self.sock.recv_one(message_id))
         res = obj.getComponentByName('resultCode')
         if res == RESULT_success:
-            logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
+            logger.debug('LDAP operation (ID {0}) was successful'.format(mid))
             ret = LDAPResponse()
-            controls.handleResponse(ret, resCtrls)
+            controls.handleResponse(ret, res_ctrls)
             return ret
         else:
             msg = obj.getComponentByName('diagnosticMessage')
-            raise LDAPError('Got {0} for {1} (ID {2}) ({3})'.format(repr(res), operation, mID, msg))
+            raise LDAPError('Got {0} for {1} (ID {2}) ({3})'.format(repr(res), operation, mid, msg))
 
-    def simpleBind(self, username='', password='', **ctrlKwds):
+    def simple_bind(self, username='', password='', **ctrl_kwds):
         """Performs a simple bind operation
 
          Leave arguments as their default (empty strings) to attempt an anonymous simple bind
@@ -287,18 +287,16 @@ class LDAP(Extensible):
         ac.setComponentByName('simple', rfc4511.Simple(password))
         br.setComponentByName('authentication', ac)
 
-        reqCtrls = self._processCtrlKwds('bind', ctrlKwds, final=True)
+        req_ctrls = self._process_ctrl_kwds('bind', ctrl_kwds, final=True)
 
-        mID = self.sock.send_message('bindRequest', br, reqCtrls)
-        logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mID,
-            self.sock.ID, username))
-        ret = self._successResult(mID, 'bindResponse')
+        mid = self.sock.send_message('bindRequest', br, req_ctrls)
+        logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mid, self.sock.ID, username))
+        ret = self._success_result(mid, 'bindResponse')
         self.sock.bound = True
         logger.info('Simple bind successful')
         return ret
 
-
-    def getSASLMechs(self):
+    def get_sasl_mechs(self):
         """Query root DSE for supported SASL mechanisms"""
 
         if self._sasl_mechs is None:
@@ -308,16 +306,16 @@ class LDAP(Extensible):
             logger.debug('Server supported SASL mechs = {0}'.format(','.join(self._sasl_mechs)))
         return self._sasl_mechs
 
-    def recheckSASLMechs(self):
+    def recheck_sasl_mechs(self):
         """Query the root DSE again after performing a SASL bind to check for a downgrade attack"""
 
         if self._sasl_mechs is None:
             raise LDAPError('SASL mechs have not yet been queried')
         else:
-            origMechs = set(self._sasl_mechs)
+            orig_mechs = set(self._sasl_mechs)
             self._sasl_mechs = None
-            self.getSASLMechs()
-            if origMechs != set(self._sasl_mechs):
+            self.get_sasl_mechs()
+            if orig_mechs != set(self._sasl_mechs):
                 msg = 'Supported SASL mechs differ on recheck, possible downgrade attack'
                 if self.sasl_fatal_downgrade_check:
                     raise LDAPError(msg)
@@ -326,7 +324,7 @@ class LDAP(Extensible):
             else:
                 logger.debug('No evidence of downgrade attack')
 
-    def saslBind(self, mech=None, **props):
+    def sasl_bind(self, mech=None, **props):
         """Perform a SASL bind operation
 
          Specify a single standard mechanism string for mech, or leave it as None to negotiate the
@@ -338,9 +336,9 @@ class LDAP(Extensible):
         if self.sock.bound:
             raise ConnectionAlreadyBound()
 
-        reqCtrls = self._processCtrlKwds('bind', props)
+        req_ctrls = self._process_ctrl_kwds('bind', props)
 
-        mechs = self.getSASLMechs()
+        mechs = self.get_sasl_mechs()
         if mech is None:
             mech = self.default_sasl_mech
         if mech is not None:
@@ -351,7 +349,7 @@ class LDAP(Extensible):
         self.sock.sasl_init(mechs, **props)
         logger.debug('Selected SASL mech = {0}'.format(self.sock.sasl_mech))
 
-        challengeResponse = None
+        challenge_response = None
         while True:
             br = rfc4511.BindRequest()
             br.setComponentByName('version', V3)
@@ -359,30 +357,29 @@ class LDAP(Extensible):
             ac = rfc4511.AuthenticationChoice()
             sasl = rfc4511.SaslCredentials()
             sasl.setComponentByName('mechanism', six.text_type(self.sock.sasl_mech))
-            if challengeResponse is not None:
-                sasl.setComponentByName('credentials', challengeResponse)
-                challengeResponse = None
+            if challenge_response is not None:
+                sasl.setComponentByName('credentials', challenge_response)
+                challenge_response = None
             ac.setComponentByName('sasl', sasl)
             br.setComponentByName('authentication', ac)
 
-            mID = self.sock.send_message('bindRequest', br, reqCtrls)
-            logger.debug('Sent SASL bind request (ID {0}) on connection #{1}'.format(mID,
-                self.sock.ID))
+            mid = self.sock.send_message('bindRequest', br, req_ctrls)
+            logger.debug('Sent SASL bind request (ID {0}) on connection #{1}'.format(mid, self.sock.ID))
 
-            mID, res, resCtrls = unpack('bindResponse', self.sock.recv_one(mID))
+            mid, res, res_ctrls = unpack('bindResponse', self.sock.recv_one(mid))
             status = res.getComponentByName('resultCode')
             if status == RESULT_saslBindInProgress:
-                challengeResponse = self.sock.sasl_process_auth_challenge(
+                challenge_response = self.sock.sasl_process_auth_challenge(
                     six.text_type(res.getComponentByName('serverSaslCreds')))
                 continue
             elif status == RESULT_success:
                 logger.info('SASL bind successful')
                 logger.debug('Negotiated SASL QoP = {0}'.format(self.sock.sasl_qop))
                 self.sock.bound = True
-                self.recheckSASLMechs()
+                self.recheck_sasl_mechs()
 
                 ret = LDAPResponse()
-                controls.handleResponse(ret, resCtrls)
+                controls.handleResponse(ret, res_ctrls)
                 return ret
             else:
                 msg = res.getComponentByName('diagnosticMessage')
@@ -416,9 +413,9 @@ class LDAP(Extensible):
         except KeyError:
             raise TagError('tag {0} does not exist'.format(tag))
 
-    def obj(self, DN, attrsDict=None, tag=None, *args, **kwds):
+    def obj(self, dn, attrs_dict=None, tag=None, *args, **kwds):
         """Factory for LDAPObjects bound to this connection"""
-        obj = LDAPObject(DN, attrsDict=attrsDict, ldapConn=self, *args, **kwds)
+        obj = LDAPObject(dn, attrsDict=attrs_dict, ldapConn=self, *args, **kwds)
         if tag is not None:
             if tag in self._tagged_objects:
                 raise TagError('tag {0} already exists'.format(tag))
@@ -426,11 +423,11 @@ class LDAP(Extensible):
                 self._tagged_objects[tag] = obj
         return obj
 
-    def get(self, DN, attrs=None, **objKwds):
+    def get(self, dn, attrs=None, **obj_kwds):
         """Get a specific object by DN"""
         if self.sock.unbound:
             raise ConnectionUnbound()
-        results = list(self.search(DN, Scope.BASE, attrs=attrs, limit=2, **objKwds))
+        results = list(self.search(dn, Scope.BASE, attrs=attrs, limit=2, **obj_kwds))
         n = len(results)
         if n == 0:
             raise NoSearchResults()
@@ -439,47 +436,46 @@ class LDAP(Extensible):
         else:
             return results[0]
 
-    def exists(self, DN):
+    def exists(self, dn):
         """Simply check if a DN exists"""
         if self.sock.unbound:
             raise ConnectionUnbound()
         try:
-            self.get(DN, [])
+            self.get(dn, [])
             return True
         except NoSearchResults:
             return False
         except MultipleSearchResults:
             return True
 
-    def search(self, baseDN, scope=Scope.SUBTREE, filter=None, attrs=None, searchTimeout=None,
-        limit=0, derefAliases=None, attrsOnly=False, fetchResultRefs=None, followReferrals=None,
-        **kwds):
+    def search(self, base_dn, scope=Scope.SUBTREE, filter=None, attrs=None, search_timeout=None, limit=0,
+               deref_aliases=None, attrs_only=False, fetch_result_refs=None, follow_referrals=None, **kwds):
         """Send search and iterate results until we get a SearchResultDone
 
          Yields instances of LDAPObject and possibly SearchReferenceHandle, if any result
-         references are returned from the server, and the fetchResultRefs keyword arg is False.
+         references are returned from the server, and the fetch_result_refs keyword arg is False.
         """
         if self.sock.unbound:
             raise ConnectionUnbound()
 
         if filter is None:
             filter = LDAP.DEFAULT_FILTER
-        if searchTimeout is None:
-            searchTimeout = self.default_search_timeout
-        if derefAliases is None:
-            derefAliases = self.default_deref_aliases
-        if fetchResultRefs is None:
-            fetchResultRefs = self.default_fetch_result_refs
-        if followReferrals is None:
-            followReferrals = self.default_follow_referrals
+        if search_timeout is None:
+            search_timeout = self.default_search_timeout
+        if deref_aliases is None:
+            deref_aliases = self.default_deref_aliases
+        if fetch_result_refs is None:
+            fetch_result_refs = self.default_fetch_result_refs
+        if follow_referrals is None:
+            follow_referrals = self.default_follow_referrals
         req = rfc4511.SearchRequest()
-        req.setComponentByName('baseObject', rfc4511.LDAPDN(baseDN))
+        req.setComponentByName('baseObject', rfc4511.LDAPDN(base_dn))
         req.setComponentByName('scope', scope)
-        req.setComponentByName('derefAliases', derefAliases)
+        req.setComponentByName('derefAliases', deref_aliases)
         req.setComponentByName('sizeLimit', rfc4511.Integer0ToMax(limit))
-        req.setComponentByName('timeLimit', rfc4511.Integer0ToMax(searchTimeout))
-        req.setComponentByName('typesOnly', rfc4511.TypesOnly(attrsOnly))
-        req.setComponentByName('filter', parseFilter(filter))
+        req.setComponentByName('timeLimit', rfc4511.Integer0ToMax(search_timeout))
+        req.setComponentByName('typesOnly', rfc4511.TypesOnly(attrs_only))
+        req.setComponentByName('filter', parse_filter(filter))
 
         _attrs = rfc4511.AttributeSelection()
         i = 0
@@ -495,71 +491,70 @@ class LDAP(Extensible):
         # check here because we need to do a search to get the root DSE, which is required by
         # _processCtrlKwds, other methods don't need to check
         if kwds:
-            controls = self._processCtrlKwds('search', kwds)
+            ctrls = self._process_ctrl_kwds('search', kwds)
         else:
-            controls = None
+            ctrls = None
 
-        mID = self.sock.send_message('searchRequest', req, controls)
+        mid = self.sock.send_message('searchRequest', req, ctrls)
         logger.info('Sent search request (ID {0}): base_dn={1}, scope={2}, filter={3}'.format(
-            mID, baseDN, scope, filter))
-        return SearchResultHandle(self, mID, fetchResultRefs, followReferrals, kwds)
+                    mid, base_dn, scope, filter))
+        return SearchResultHandle(self, mid, fetch_result_refs, follow_referrals, kwds)
 
-    def compare(self, DN, attr, value, **ctrlKwds):
+    def compare(self, dn, attr, value, **ctrl_kwds):
         """Perform a compare operation, returning boolean"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
         cr = rfc4511.CompareRequest()
-        cr.setComponentByName('entry', rfc4511.LDAPDN(six.text_type(DN)))
+        cr.setComponentByName('entry', rfc4511.LDAPDN(six.text_type(dn)))
         ava = rfc4511.AttributeValueAssertion()
         ava.setComponentByName('attributeDesc', rfc4511.AttributeDescription(six.text_type(attr)))
         ava.setComponentByName('assertionValue', rfc4511.AssertionValue(six.text_type(value)))
         cr.setComponentByName('ava', ava)
 
-        reqCtrls = self._processCtrlKwds('compare', ctrlKwds, final=True)
+        req_ctrls = self._process_ctrl_kwds('compare', ctrl_kwds, final=True)
 
-        messageID = self.sock.send_message('compareRequest', cr, reqCtrls)
-        logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(
-            messageID, DN, attr, value))
-        msg = self.sock.recv_one(messageID)
-        mID, res, resCtrls = unpack('compareResponse', msg)
+        message_id = self.sock.send_message('compareRequest', cr, req_ctrls)
+        logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(message_id, dn, attr, value))
+        msg = self.sock.recv_one(message_id)
+        mid, res, res_ctrls = unpack('compareResponse', msg)
         res = res.getComponentByName('resultCode')
         if res == RESULT_compareTrue:
-            logger.debug('Compared True (ID {0})'.format(mID))
-            compareResult = True
+            logger.debug('Compared True (ID {0})'.format(mid))
+            compare_result = True
         elif res == RESULT_compareFalse:
-            logger.debug('Compared False (ID {0})'.format(mID))
-            compareResult = False
+            logger.debug('Compared False (ID {0})'.format(mid))
+            compare_result = False
         else:
-            raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mID))
-        ret = CompareResponse(compareResult)
-        controls.handleResponse(ret, resCtrls)
+            raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mid))
+        ret = CompareResponse(compare_result)
+        controls.handleResponse(ret, res_ctrls)
         return ret
 
-    def add(self, DN, attrsDict, **kwds):
+    def add(self, dn, attrs_dict, **kwds):
         """Add new object and return corresponding LDAPObject on success"""
         if self.sock.unbound:
             raise ConnectionUnbound()
 
-        if not isinstance(DN, six.string_types):
+        if not isinstance(dn, six.string_types):
             raise TypeError('DN must be string type')
-        if not isinstance(attrsDict, dict):
-            raise TypeError('attrsDict must be dict')
+        if not isinstance(attrs_dict, dict):
+            raise TypeError('attrs_dict must be dict')
 
-        obj = self.obj(DN, attrsDict, **kwds)
+        obj = self.obj(dn, attrs_dict, **kwds)
 
-        self.validateObject(obj)
+        self.validate_object(obj)
 
         ar = rfc4511.AddRequest()
-        ar.setComponentByName('entry', rfc4511.LDAPDN(DN))
+        ar.setComponentByName('entry', rfc4511.LDAPDN(dn))
         al = rfc4511.AttributeList()
         i = 0
-        for attrType, attrVals in six.iteritems(attrsDict):
+        for attr_type, attr_vals in six.iteritems(attrs_dict):
             attr = rfc4511.Attribute()
-            attr.setComponentByName('type', rfc4511.AttributeDescription(attrType))
+            attr.setComponentByName('type', rfc4511.AttributeDescription(attr_type))
             vals = rfc4511.Vals()
             j = 0
-            for val in attrVals:
+            for val in attr_vals:
                 vals.setComponentByPosition(j, rfc4511.AttributeValue(val))
                 j += 1
             attr.setComponentByName('vals', vals)
@@ -567,24 +562,24 @@ class LDAP(Extensible):
             i += 1
         ar.setComponentByName('attributes', al)
 
-        reqCtrls = self._processCtrlKwds('add', kwds)
+        req_ctrls = self._process_ctrl_kwds('add', kwds)
 
-        mID = self.sock.send_message('addRequest', ar, reqCtrls)
-        logger.info('Sent add request (ID {0}) for DN {1}'.format(mID, DN))
+        mid = self.sock.send_message('addRequest', ar, req_ctrls)
+        logger.info('Sent add request (ID {0}) for DN {1}'.format(mid, dn))
 
-        lm = self.sock.recv_one(mID)
-        mID, res, resCtrls = unpack('addResponse', lm)
+        lm = self.sock.recv_one(mid)
+        mid, res, res_ctrls = unpack('addResponse', lm)
         res = res.getComponentByName('resultCode')
         if res == RESULT_success:
-            logger.debug('LDAP operation (ID {0}) was successful'.format(mID))
-            controls.handleResponse(obj, resCtrls)
+            logger.debug('LDAP operation (ID {0}) was successful'.format(mid))
+            controls.handleResponse(obj, res_ctrls)
             return obj
         else:
-            raise LDAPError('Got {0} for add (ID {1})'.format(repr(res), mID))
+            raise LDAPError('Got {0} for add (ID {1})'.format(repr(res), mid))
 
     ## search+add patterns
 
-    def addOrModAddIfExists(self, DN, attrsDict):
+    def add_or_mod_add_if_exists(self, dn, attrs_dict):
         """Add object if it doesn't exist, otherwise addAttrs
 
          * If the object at DN exists, perform an add modification using the attrs dictionary.
@@ -594,13 +589,13 @@ class LDAP(Extensible):
          * Always returns an LDAPObject corresponding to the final state of the DB
         """
         try:
-            cur = self.get(DN)
-            cur.addAttrs(attrsDict)
+            cur = self.get(dn)
+            cur.add_attrs(attrs_dict, )
             return cur
         except NoSearchResults:
-            return self.add(DN, attrsDict)
+            return self.add(dn, attrs_dict)
 
-    def addOrModReplaceIfExists(self, DN, attrsDict):
+    def add_or_mod_replace_if_exists(self, dn, attrs_dict):
         """Add object if it doesn't exist, otherwise replaceAttrs
 
          * If the object at DN exists, perform a replace modification using the attrs dictionary
@@ -610,13 +605,13 @@ class LDAP(Extensible):
          * Always returns an LDAPObject corresponding to the final state of the DB
         """
         try:
-            cur = self.get(DN)
-            cur.replaceAttrs(attrsDict)
+            cur = self.get(dn)
+            cur.replace_attrs(attrs_dict, )
             return cur
         except NoSearchResults:
-            return self.add(DN, attrsDict)
+            return self.add(dn, attrs_dict)
 
-    def addIfNotExists(self, DN, attrsDict):
+    def add_if_not_exists(self, dn, attrs_dict):
         """Add object if it doesn't exist
 
          * Gets and returns the object at DN if it exists, otherwise create the object using the
@@ -624,53 +619,53 @@ class LDAP(Extensible):
          * Always returns an LDAPObject corresponding to the final state of the DB
         """
         try:
-            cur = self.get(DN)
-            logger.debug('Object {0} already exists on addIfNotExists'.format(DN))
+            cur = self.get(dn)
+            logger.debug('Object {0} already exists on addIfNotExists'.format(dn))
             return cur
         except NoSearchResults:
-            return self.add(DN, attrsDict)
+            return self.add(dn, attrs_dict)
 
     ## delete an object
 
-    def delete(self, DN, **ctrlKwds):
+    def delete(self, dn, **ctrl_kwds):
         """Delete an object"""
         if self.sock.unbound:
             raise ConnectionUnbound()
-        controls = self._processCtrlKwds('delete', ctrlKwds, final=True)
-        mID = self.sock.send_message('delRequest', rfc4511.DelRequest(DN), controls)
-        logger.info('Sent delete request (ID {0}) for DN {1}'.format(mID, DN))
-        return self._successResult(mID, 'delResponse')
+        controls = self._process_ctrl_kwds('delete', ctrl_kwds, final=True)
+        mid = self.sock.send_message('delRequest', rfc4511.DelRequest(dn), controls)
+        logger.info('Sent delete request (ID {0}) for DN {1}'.format(mid, dn))
+        return self._success_result(mid, 'delResponse')
 
     ## change object DN
 
-    def modDN(self, DN, newRDN, cleanAttr=True, newParent=None, **ctrlKwds):
+    def mod_dn(self, dn, new_rdn, clean_attr=True, new_parent=None, **ctrl_kwds):
         """Exposes all options of the protocol-level rfc4511.ModifyDNRequest"""
         if self.sock.unbound:
             raise ConnectionUnbound()
         mdr = rfc4511.ModifyDNRequest()
-        mdr.setComponentByName('entry', rfc4511.LDAPDN(DN))
-        mdr.setComponentByName('newrdn', rfc4511.RelativeLDAPDN(newRDN))
-        mdr.setComponentByName('deleteoldrdn', cleanAttr)
-        if newParent is not None:
-            mdr.setComponentByName('newSuperior', rfc4511.NewSuperior(newParent))
-        controls = self._processCtrlKwds('modDN', ctrlKwds, final=True)
-        mID = self.sock.send_message('modDNRequest', mdr, controls)
+        mdr.setComponentByName('entry', rfc4511.LDAPDN(dn))
+        mdr.setComponentByName('newrdn', rfc4511.RelativeLDAPDN(new_rdn))
+        mdr.setComponentByName('deleteoldrdn', clean_attr)
+        if new_parent is not None:
+            mdr.setComponentByName('newSuperior', rfc4511.NewSuperior(new_parent))
+        controls = self._process_ctrl_kwds('modDN', ctrl_kwds, final=True)
+        mid = self.sock.send_message('modDNRequest', mdr, controls)
         logger.info('Sent modDN request (ID {0}) for DN {1} newRDN="{2}" newParent="{3}"'.format(
-            mID, DN, newRDN, newParent))
-        return self._successResult(mID, 'modDNResponse')
+                    mid, dn, new_rdn, new_parent))
+        return self._success_result(mid, 'modDNResponse')
 
-    def rename(self, DN, newRDN, cleanAttr=True, **ctrlKwds):
+    def rename(self, dn, new_rdn, clean_attr=True, **ctrl_kwds):
         """Specify a new RDN for an object without changing its location in the tree"""
-        return self.modDN(DN, newRDN, cleanAttr, **ctrlKwds)
+        return self.mod_dn(dn, new_rdn, clean_attr, **ctrl_kwds)
 
-    def move(self, DN, newDN, cleanAttr=True, **ctrlKwds):
+    def move(self, dn, new_dn, clean_attr=True, **ctrl_kwds):
         """Specify a new absolute DN for an object"""
-        rdn, parent = re.split(r'(?<!\\),', newDN, 1)
-        return self.modDN(DN, rdn, cleanAttr, parent, **ctrlKwds)
+        rdn, parent = re.split(r'(?<!\\),', new_dn, 1)
+        return self.mod_dn(dn, rdn, clean_attr, parent, **ctrl_kwds)
 
     ## change attributes on an object
 
-    def modify(self, DN, modlist, current=None, **ctrlKwds):
+    def modify(self, dn, modlist, current=None, **ctrl_kwds):
         """Perform a series of modify operations on an object
 
          modlist must be a list of laurelin.ldap.modify.Mod instances
@@ -679,13 +674,13 @@ class LDAP(Extensible):
             if self.sock.unbound:
                 raise ConnectionUnbound()
 
-            self.validateModify(DN, modlist, current)
+            self.validate_modify(dn, modlist, current)
 
             mr = rfc4511.ModifyRequest()
-            mr.setComponentByName('object', rfc4511.LDAPDN(DN))
+            mr.setComponentByName('object', rfc4511.LDAPDN(dn))
             cl = rfc4511.Changes()
             i = 0
-            logger.debug('Modifying DN {0}'.format(DN))
+            logger.debug('Modifying DN {0}'.format(dn))
             for mod in modlist:
                 logger.debug('> {0}'.format(mod))
 
@@ -704,40 +699,40 @@ class LDAP(Extensible):
                 cl.setComponentByPosition(i, c)
                 i += 1
             mr.setComponentByName('changes', cl)
-            controls = self._processCtrlKwds('modify', ctrlKwds, final=True)
-            mID = self.sock.send_message('modifyRequest', mr, controls)
-            logger.info('Sent modify request (ID {0}) for DN {1}'.format(mID, DN))
-            return self._successResult(mID, 'modifyResponse')
+            controls = self._process_ctrl_kwds('modify', ctrl_kwds, final=True)
+            mid = self.sock.send_message('modifyRequest', mr, controls)
+            logger.info('Sent modify request (ID {0}) for DN {1}'.format(mid, dn))
+            return self._success_result(mid, 'modifyResponse')
         else:
-            logger.debug('Not sending 0-length modlist for DN {0}'.format(DN))
+            logger.debug('Not sending 0-length modlist for DN {0}'.format(dn))
             return LDAPResponse()
 
-    def addAttrs(self, DN, attrsDict, current=None, **ctrlKwds):
+    def add_attrs(self, dn, attrs_dict, current=None, **ctrl_kwds):
         """Add new attribute values to existing object"""
         if current is not None:
-            modlist = AddModlist(current, attrsDict)
+            modlist = AddModlist(current, attrs_dict)
         elif not self.strict_modify:
-            current = self.get(DN, list(attrsDict.keys()))
-            modlist = AddModlist(current, attrsDict)
+            current = self.get(dn, list(attrs_dict.keys()))
+            modlist = AddModlist(current, attrs_dict)
         else:
-            modlist = Modlist(Mod.ADD, attrsDict)
-        return self.modify(DN, modlist, current, **ctrlKwds)
+            modlist = Modlist(Mod.ADD, attrs_dict)
+        return self.modify(dn, modlist, current, **ctrl_kwds)
 
-    def deleteAttrs(self, DN, attrsDict, current=None, **ctrlKwds):
+    def delete_attrs(self, dn, attrs_dict, current=None, **ctrl_kwds):
         """Delete specific attribute values from dictionary
 
          Specifying a 0-length entry will delete all values
         """
         if current is not None:
-            modlist = DeleteModlist(current, attrsDict)
+            modlist = DeleteModlist(current, attrs_dict)
         elif not self.strict_modify:
-            current = self.get(DN, list(attrsDict.keys()))
-            modlist = DeleteModlist(current, attrsDict)
+            current = self.get(dn, list(attrs_dict.keys()))
+            modlist = DeleteModlist(current, attrs_dict)
         else:
-            modlist = Modlist(Mod.DELETE, attrsDict)
-        return self.modify(DN, modlist, current, **ctrlKwds)
+            modlist = Modlist(Mod.DELETE, attrs_dict)
+        return self.modify(dn, modlist, current, **ctrl_kwds)
 
-    def replaceAttrs(self, DN, attrsDict, current=None, **ctrlKwds):
+    def replace_attrs(self, dn, attrs_dict, current=None, **ctrl_kwds):
         """Replace all values on given attributes with the passed values
 
          * Attributes not mentioned in attrsDict are not touched
@@ -748,114 +743,114 @@ class LDAP(Extensible):
         # Only query for the current object if there are validators present and
         # strict modify is disabled
         if current is None and self.validators and not self.strict_modify:
-            current = self.get(DN, list(attrsDict.keys()))
+            current = self.get(dn, list(attrs_dict.keys()))
 
-        return self.modify(DN, Modlist(Mod.REPLACE, attrsDict), current, **ctrlKwds)
+        return self.modify(dn, Modlist(Mod.REPLACE, attrs_dict), current, **ctrl_kwds)
 
     ## Extension methods
 
-    def sendExtendedRequest(self, OID, value=None, **kwds):
+    def send_extended_request(self, oid, value=None, **kwds):
         """Send an extended request, returns instance of ExtendedResponseHandle
 
          This is mainly meant to be called by other built-in methods and client extensions. Requires
          handling of raw pyasn1 protocol objects
         """
-        if OID not in self.rootDSE.getAttr('supportedExtension'):
+        if oid not in self.root_dse.getAttr('supportedExtension'):
             raise LDAPSupportError('Extended operation is not supported by the server')
         xr = rfc4511.ExtendedRequest()
-        xr.setComponentByName('requestName', rfc4511.RequestName(OID))
+        xr.setComponentByName('requestName', rfc4511.RequestName(oid))
         if value is not None:
             if not isinstance(value, six.string_types):
                 raise TypeError('extendedRequest value must be string')
             xr.setComponentByName('requestValue', rfc4511.RequestValue(value))
-        reqCtrls = self._processCtrlKwds('ext', kwds)
-        mID = self.sock.send_message('extendedReq', xr, reqCtrls)
-        logger.info('Sent extended request ID={0} OID={1}'.format(mID, OID))
-        return ExtendedResponseHandle(ldapConn=self, mID=mID, **kwds)
+        req_ctrls = self._process_ctrl_kwds('ext', kwds)
+        mid = self.sock.send_message('extendedReq', xr, req_ctrls)
+        logger.info('Sent extended request ID={0} OID={1}'.format(mid, oid))
+        return ExtendedResponseHandle(mid=mid, ldap_conn=self)
 
-    def whoAmI(self, **ctrlKwds):
-        handle = self.sendExtendedRequest(LDAP.OID_WHOAMI, requireSuccess=True, **ctrlKwds)
-        xr, resCtrls = handle.recvResponse()
+    def who_am_i(self, **ctrl_kwds):
+        handle = self.send_extended_request(LDAP.OID_WHOAMI, requireSuccess=True, **ctrl_kwds)
+        xr, res_ctrls = handle.recv_response()
         return six.text_type(xr.getComponentByName('responseValue'))
 
-    def startTLS(self, verify=None, caFile=None, caPath=None, caData=None):
+    def start_tls(self, verify=None, ca_file=None, ca_path=None, ca_data=None):
         if self.sock.started_tls:
             raise LDAPError('TLS layer already installed')
         if verify is None:
             verify = self.ssl_verify
-        if caFile is None:
-            caFile = self.ssl_ca_file
-        if caPath is None:
-            caPath = self.ssl_ca_path
-        if caData is None:
-            caData = self.ssl_ca_data
-        handle = self.sendExtendedRequest(LDAP.OID_STARTTLS, requireSuccess=True)
-        xr, resCtrls = handle.recvResponse()
-        self.sock._start_tls(verify, caFile, caPath, caData)
-        self.refreshRootDSE()
+        if ca_file is None:
+            ca_file = self.ssl_ca_file
+        if ca_path is None:
+            ca_path = self.ssl_ca_path
+        if ca_data is None:
+            ca_data = self.ssl_ca_data
+        handle = self.send_extended_request(LDAP.OID_STARTTLS, requireSuccess=True)
+        handle.recv_response()
+        self.sock.start_tls(verify, ca_file, ca_path, ca_data)
+        self.refresh_root_dse()
         logger.info('StartTLS complete')
 
     ## validation methods
 
-    def _runValidation(self, method, *args):
+    def _run_validation(self, method, *args):
         for validator in self.validators:
             try:
                 getattr(validator, method)(*args)
             except AttributeError:
                 pass
 
-    def validateObject(self, obj, write=True):
-        self._runValidation('validateObject', obj, write)
+    def validate_object(self, obj, write=True):
+        self._run_validation('validateObject', obj, write)
 
-    def validateModify(self, dn, modlist, current=None):
-        self._runValidation('validateModify', dn, modlist, current)
+    def validate_modify(self, dn, modlist, current=None):
+        self._run_validation('validateModify', dn, modlist, current)
 
     ## misc
 
-    def processLDIF(self, ldifStr):
+    def process_ldif(self, ldif_str):
         """Process a basic LDIF
 
          TODO: full RFC 2849 implementation
         """
-        ldifLines = ldifStr.splitlines()
-        if not ldifLines[0].startswith('dn:'):
+        ldif_lines = ldif_str.splitlines()
+        if not ldif_lines[0].startswith('dn:'):
             raise ValueError('Missing dn')
-        DN = ldifLines[0][3:].strip()
-        if not ldifLines[1].startswith('changetype:'):
+        dn = ldif_lines[0][3:].strip()
+        if not ldif_lines[1].startswith('changetype:'):
             raise ValueError('Missing changetype')
-        changetype = ldifLines[1][11:].strip()
+        changetype = ldif_lines[1][11:].strip()
 
         if changetype == 'add':
             attrs = {}
-            for line in ldifLines[2:]:
+            for line in ldif_lines[2:]:
                 attr, val = line.split(':', 1)
                 if attr not in attrs:
                     attrs[attr] = []
                 attrs[attr].append(val)
-            return self.add(DN, attrs)
+            return self.add(dn, attrs)
         elif changetype == 'delete':
-            return self.delete(DN)
+            return self.delete(dn)
         elif changetype == 'modify':
-            modOp = None
-            modAttr = None
+            mod_op = None
+            mod_attr = None
             vals = []
             modlist = []
-            for line in ldifLines[2:]:
-                if modOp is None:
-                    _modOp, _modAttr = line.split(':')
-                    modOp = Mod.string(_modOp)
-                    modAttr = _modAttr.strip()
+            for line in ldif_lines[2:]:
+                if mod_op is None:
+                    _mod_op, _mod_attr = line.split(':')
+                    mod_op = Mod.string(_mod_op)
+                    mod_attr = _mod_attr.strip()
                     vals = []
                 elif line == '-':
-                    if modOp == 'add' and len(vals) == 0:
+                    if mod_op == 'add' and len(vals) == 0:
                         raise ValueError('no attribute values to add')
-                    modlist += Modlist(modOp, {modAttr: vals})
+                    modlist += Modlist(mod_op, {mod_attr: vals})
                 else:
-                    if line.startswith(modAttr):
-                        vals.append(line[len(modAttr)+1:].strip())
+                    if line.startswith(mod_attr):
+                        vals.append(line[len(mod_attr)+1:].strip())
                     else:
                         raise ValueError('Unexpected attribute')
-            return self.modify(DN, modlist)
+            return self.modify(dn, modlist)
         else:
             raise ValueError('changetype {0} unknown/not yet implemented'.format(changetype))
 
@@ -866,11 +861,11 @@ class LDAPResponse(object):
 
 
 class CompareResponse(LDAPResponse):
-    def __init__(self, compareResult):
-        self.compareResult = compareResult
+    def __init__(self, compare_result):
+        self.compare_result = compare_result
 
     def __bool__(self):
-        return self.compareResult
+        return self.compare_result
 
 
 class ResponseHandle(object):
@@ -886,82 +881,78 @@ class ResponseHandle(object):
     def abandon(self):
         """Request to abandon an operation in progress"""
         if not self.abandoned:
-            logger.info('Abandoning ID={0}'.format(self.messageID))
-            self.ldapConn.sock.send_message('abandonRequest', rfc4511.AbandonRequest(self.messageID))
+            logger.info('Abandoning ID={0}'.format(self.message_id))
+            self.ldap_conn.sock.send_message('abandonRequest', rfc4511.AbandonRequest(self.message_id))
             self.abandoned = True
-            self.ldapConn.sock.abandonedMIDs.append(self.messageID)
+            self.ldap_conn.sock.abandonedMIDs.append(self.message_id)
         else:
-            logger.debug('ID={0} already abandoned'.format(self.messageID))
+            logger.debug('ID={0} already abandoned'.format(self.message_id))
 
 
 class SearchResultHandle(ResponseHandle):
-    def __init__(self, ldapConn, messageID, fetchResultRefs, followReferrals, objKwds):
-        self.ldapConn = ldapConn
-        self.messageID = messageID
-        self.fetchResultRefs = fetchResultRefs
-        self.followReferrals = followReferrals
-        self.objKwds = objKwds
+    def __init__(self, ldap_conn, message_id, fetch_result_refs, follow_referrals, obj_kwds):
+        self.ldap_conn = ldap_conn
+        self.message_id = message_id
+        self.fetch_result_refs = fetch_result_refs
+        self.follow_referrals = follow_referrals
+        self.obj_kwds = obj_kwds
         self.done = False
         self.abandoned = False
 
     def __iter__(self):
         if self.abandoned:
-            logger.debug('ID={0} has been abandoned'.format(self.messageID))
+            logger.debug('ID={0} has been abandoned'.format(self.message_id))
             raise StopIteration()
-        for msg in self.ldapConn.sock.recv_messages(self.messageID):
+        for msg in self.ldap_conn.sock.recv_messages(self.message_id):
             try:
-                mID, entry, resCtrls = unpack('searchResEntry', msg)
-                DN = getStringComponent(entry, 'objectName')
+                mid, entry, res_ctrls = unpack('searchResEntry', msg)
+                dn = getStringComponent(entry, 'objectName')
                 attrs = {}
                 _attrs = entry.getComponentByName('attributes')
                 for i in range(0, len(_attrs)):
                     _attr = _attrs.getComponentByPosition(i)
-                    attrType = six.text_type(_attr.getComponentByName('type'))
+                    attr_type = six.text_type(_attr.getComponentByName('type'))
                     vals = _attr.getComponentByName('vals')
-                    attrs[attrType] = seq_to_list(vals)
-                logger.debug('Got search result entry (ID {0}) {1}'.format(mID, DN))
-                ret = self.ldapConn.obj(DN, attrs, **self.objKwds)
-                controls.handleResponse(ret, resCtrls)
+                    attrs[attr_type] = seq_to_list(vals)
+                logger.debug('Got search result entry (ID {0}) {1}'.format(mid, dn))
+                ret = self.ldap_conn.obj(dn, attrs, **self.obj_kwds)
+                controls.handleResponse(ret, res_ctrls)
                 yield ret
             except UnexpectedResponseType:
                 try:
-                    mID, resobj, resCtrls = unpack('searchResDone', msg)
+                    mid, resobj, res_ctrls = unpack('searchResDone', msg)
                     self.done = True
                     res = resobj.getComponentByName('resultCode')
                     if res == RESULT_success or res == RESULT_noSuchObject:
                         logger.debug('Got all search results for ID={0}, result is {1}'.format(
-                            mID, repr(res)
+                            mid, repr(res)
                         ))
-                        controls.handleResponse(self, resCtrls)
+                        controls.handleResponse(self, res_ctrls)
                         raise StopIteration()
                     elif res == RESULT_referral:
-                        if self.followReferrals:
-                            logger.info('Following referral for ID={0}'.format(mID))
+                        if self.follow_referrals:
+                            logger.info('Following referral for ID={0}'.format(mid))
                             ref = resobj.getComponentByName('referral')
-                            URIs = seq_to_list(ref)
-                            for obj in SearchReferenceHandle(URIs, self.objKwds).fetch():
+                            uris = seq_to_list(ref)
+                            for obj in SearchReferenceHandle(uris, self.obj_kwds).fetch():
                                 yield obj
                         else:
-                            logger.debug('Ignoring referral for ID={0}'.format(mID))
+                            logger.debug('Ignoring referral for ID={0}'.format(mid))
                             raise StopIteration()
                     else:
-                        raise LDAPError('Got {0} for search results (ID {1})'.format(
-                            repr(res), mID
-                        ))
+                        raise LDAPError('Got {0} for search results (ID {1})'.format(repr(res), mid))
                 except UnexpectedResponseType:
-                    mID, resref, resCtrls = unpack('searchResRef', msg)
-                    URIs = seq_to_list(resref)
-                    logger.debug('Got search result reference (ID {0}) to: {1}'.format(
-                        mID, ' | '.join(URIs)
-                    ))
-                    ref = SearchReferenceHandle(URIs, self.objKwds)
-                    if self.fetchResultRefs:
-                        if resCtrls:
+                    mid, resref, res_ctrls = unpack('searchResRef', msg)
+                    s = seq_to_list(resref)
+                    logger.debug('Got search result reference (ID {0}) to: {1}'.format(mid, ' | '.join(s)))
+                    ref = SearchReferenceHandle(s, self.obj_kwds)
+                    if self.fetch_result_refs:
+                        if res_ctrls:
                             warn('Unhandled response controls on searchResRef message', LDAPWarning)
                         for obj in ref.fetch():
                             yield obj
                     else:
-                        controls.handleResponse(ref, resCtrls)
+                        controls.handleResponse(ref, res_ctrls)
                         yield ref
 
 
@@ -970,39 +961,39 @@ class ExtendedResponseHandle(ResponseHandle):
      for a particular message ID
     """
 
-    def __init__(self, mID, ldapConn, requireSuccess=False):
-        self.messageID = mID
-        self.ldapConn = ldapConn
-        self.requireSuccess = requireSuccess
-        self._recvr = ldapConn.sock.recv_messages(mID)
+    def __init__(self, mid, ldap_conn, require_success=False):
+        self.message_id = mid
+        self.ldap_conn = ldap_conn
+        self.require_success = require_success
+        self._recvr = ldap_conn.sock.recv_messages(mid)
         self.done = False
         self.abandoned = False
 
-    def _handleMsg(self, lm):
+    def _handle_msg(self, lm):
         try:
-            mID, ir, resCtrls = unpack('intermediateResponse', lm)
-            resName = ir.getComponentByName('responseName')
-            logger.debug('Got name={0} intermediate response for ID={1}'.format(resName, mID))
-            return ir, resCtrls
+            mid, ir, res_ctrls = unpack('intermediateResponse', lm)
+            res_name = ir.getComponentByName('responseName')
+            logger.debug('Got name={0} intermediate response for ID={1}'.format(res_name, mid))
+            return ir, res_ctrls
         except UnexpectedResponseType:
-            mID, xr, resCtrls = unpack('extendedResp', lm)
+            mid, xr, res_ctrls = unpack('extendedResp', lm)
             self.done = True
-            resName = getStringComponent(xr, 'responseName')
-            logger.debug('Got name={0} extended response for ID={1}'.format(resName, mID))
-            if self.requireSuccess:
+            res_name = getStringComponent(xr, 'responseName')
+            logger.debug('Got name={0} extended response for ID={1}'.format(res_name, mid))
+            if self.require_success:
                 res = xr.getComponentByName('resultCode')
                 if res != RESULT_success:
-                    raise LDAPError('Got {0} for ID={1}'.format(repr(res), mID))
-            return xr, resCtrls
+                    raise LDAPError('Got {0} for ID={1}'.format(repr(res), mid))
+            return xr, res_ctrls
 
     def __iter__(self):
         for lm in self._recvr:
-            yield self._handleMsg(lm)
+            yield self._handle_msg(lm)
             if self.done:
                 break
 
-    def recvResponse(self):
-        return self._handleMsg(next(self._recvr))
+    def recv_response(self):
+        return self._handle_msg(next(self._recvr))
 
 
 class LDAPURI(object):
@@ -1012,7 +1003,7 @@ class LDAPURI(object):
      * scheme   - urlparse standard
      * netloc   - urlparse standard
      * host_uri  - scheme://netloc for use with LDAPSocket
-     * DN       - string
+     * dn       - string
      * attrs    - list
      * scope    - one of the Scope.* constants
      * filter   - string
@@ -1023,14 +1014,14 @@ class LDAPURI(object):
     """
     def __init__(self, uri):
         self._orig = uri
-        parsedURI = urlparse(uri)
-        self.scheme = parsedURI.scheme
+        parsed_uri = urlparse(uri)
+        self.scheme = parsed_uri.scheme
         if self.scheme == '':
             self.scheme = 'ldap'
-        self.netloc = parsedURI.netloc
-        self.hostURI = '{0}://{1}'.format(self.scheme, self.netloc)
-        self.DN = parsedURI.path
-        params = parsedURI.query.split('?')
+        self.netloc = parsed_uri.netloc
+        self.host_uri = '{0}://{1}'.format(self.scheme, self.netloc)
+        self.dn = parsed_uri.path
+        params = parsed_uri.query.split('?')
         nparams = len(params)
         if (nparams > 0) and (len(params[0]) > 0):
             self.attrs = params[0].split(',')
@@ -1068,10 +1059,10 @@ class LDAPURI(object):
          First opens a new connection with connection reuse disabled, then performs the search, and
          unbinds the connection. Server must allow anonymous read.
         """
-        ldap = LDAP(self.hostURI, reuse_connection=False)
+        ldap = LDAP(self.host_uri, reuse_connection=False)
         if self.starttls:
-            ldap.startTLS()
-        ret = ldap.search(self.DN, self.scope, filter=self.filter, attrs=self.attrs, **kwds)
+            ldap.start_tls()
+        ret = ldap.search(self.dn, self.scope, filter=self.filter, attrs=self.attrs, **kwds)
         ldap.unbind()
         return ret
 

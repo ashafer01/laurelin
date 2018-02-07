@@ -89,7 +89,7 @@ class LDAPObject(AttrsDict, Extensible):
     def obj(self, rdn, attrsDict=None, tag=None, *args, **kwds):
         self._setObjKwdDefaults(kwds)
         if self._hasLDAP():
-            return self.ldapConn.obj(self.RDN(rdn), attrsDict=attrsDict, tag=tag, *args, **kwds)
+            return self.ldapConn.obj(self.RDN(rdn), attrs_dict=attrsDict, tag=tag, *args, **kwds)
         else:
             if tag is not None:
                 raise LDAPError('tagging requires LDAP instance')
@@ -236,7 +236,7 @@ class LDAPObject(AttrsDict, Extensible):
             parent = curParent
         else:
             parent = newParent
-        self.ldapConn.modDN(self.dn, newRDN, cleanAttr, parent, **ctrlKwds)
+        self.ldapConn.mod_dn(self.dn, newRDN, cleanAttr, parent, **ctrlKwds)
         if cleanAttr:
             rdnAttr, rdnVal = curRDN.split('=', 1)
             try:
@@ -261,11 +261,11 @@ class LDAPObject(AttrsDict, Extensible):
 
     def validate(self):
         """Validate the object, assuming all attributes are present locally"""
-        self.ldapConn.validateObject(self, write=False)
+        self.ldapConn.validate_object(self, write=False)
 
     def validateModify(self, modlist):
         """Validate a modification list"""
-        self.ldapConn.validateModify(self.dn, modlist, self)
+        self.ldapConn.validate_modify(self.dn, modlist, self)
 
     ## transactions
 

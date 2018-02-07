@@ -22,15 +22,15 @@ reservedKwds = set()
 reserveFrom = [
     LDAPObject.__init__,
     LDAP.obj,
-    LDAP.simpleBind,
-    LDAP.saslBind,
+    LDAP.simple_bind,
+    LDAP.sasl_bind,
     LDAP.search,
     LDAP.compare,
     LDAP.add,
     LDAP.delete,
     LDAP.modify,
-    LDAP.modDN,
-    LDAP.sendExtendedRequest,
+    LDAP.mod_dn,
+    LDAP.send_extended_request,
     ExtendedResponseHandle.__init__,
 ]
 for f in reserveFrom:

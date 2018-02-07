@@ -76,13 +76,13 @@ def getNetgroupHosts(self, cn, recursive=True):
 def addNetgroupUsers(self, DN, members, domain=''):
     if not isinstance(members, list):
         members = [members]
-    self.addAttrs(DN, _memberUserListToAttrs(members, domain))
+    self.add_attrs(DN, _memberUserListToAttrs(members, domain))
 
 @LDAP.EXTEND()
 def addNetgroupHosts(self, DN, members, domain=''):
     if not isinstance(members, list):
         members = [members]
-    self.addAttrs(DN, _memberHostListToAttrs(members, domain))
+    self.add_attrs(DN, _memberHostListToAttrs(members, domain))
 
 
 ## LDAPObject extension methods

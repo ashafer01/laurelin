@@ -77,7 +77,7 @@ class LDAPSocket(object):
             self._inet_connect(netloc, 389)
         elif scheme == 'ldaps':
             self._inet_connect(netloc, 636)
-            self._start_tls(ssl_verify, ssl_ca_file, ssl_ca_path, ssl_ca_data)
+            self.start_tls(ssl_verify, ssl_ca_file, ssl_ca_path, ssl_ca_data)
             logger.info('Connected with TLS on #{0}'.format(self.ID))
         elif scheme == 'ldapi':
             self.sockPath = None
@@ -135,7 +135,8 @@ class LDAPSocket(object):
                 self.host, port, e.strerror, e.errno
             ))
 
-    def _start_tls(self, verify=True, ca_file=None, ca_path=None, ca_data=None):
+    def start_tls(self, verify=True, ca_file=None, ca_path=None, ca_data=None):
+        """Install TLS layer on this socket connection"""
         if self.started_tls:
             raise LDAPError('TLS layer already installed')
 
