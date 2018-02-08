@@ -14,6 +14,7 @@ from puresasl.client import SASLClient
 
 from .rfc4511 import LDAPMessage, MessageID, ProtocolOp
 from .exceptions import LDAPError, LDAPSASLError, LDAPConnectionError
+from .protoutils import pack
 
 _next_sock_id = 0
 logger = logging.getLogger(__name__)
@@ -224,24 +225,23 @@ class LDAPSocket(object):
         self._require_sasl_client()
         return self._sasl_client.process(challenge)
 
+    def _prep_message(self, op, obj, controls=None):
+        """Prepare a message for transmission"""
+        mid = self._next_message_id
+        self._next_message_id += 1
+        lm = pack(mid, op, obj, controls)
+        raw = ber_encode(lm)
+        if self._has_sasl_client():
+            raw = self._sasl_client.wrap(raw)
+        return mid, raw
+
     def send_message(self, op, obj, controls=None):
         """Create and send an LDAPMessage given an operation name and a corresponding object
 
          Operation names must be defined as component names in laurelin.ldap.rfc4511.ProtocolOp and
          the object must be of the corresponding type
         """
-        mid = self._next_message_id
-        lm = LDAPMessage()
-        lm.setComponentByName('messageID', MessageID(mid))
-        self._next_message_id += 1
-        po = ProtocolOp()
-        po.setComponentByName(op, obj)
-        lm.setComponentByName('protocolOp', po)
-        if controls:
-            lm.setComponentByName('controls', controls)
-        raw = ber_encode(lm)
-        if self._has_sasl_client():
-            raw = self._sasl_client.wrap(raw)
+        mid, raw = self._prep_message(op, obj, controls)
         self._sock.sendall(raw)
         return mid
 

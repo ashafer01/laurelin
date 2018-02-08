@@ -1,9 +1,5 @@
 from __future__ import absolute_import
-from .rfc4511 import (
-    LDAPDN,
-    ResultCode,
-    Version,
-)
+from . import rfc4511
 from .exceptions import UnexpectedResponseType
 from pyasn1.error import PyAsn1Error
 import logging
@@ -11,16 +7,28 @@ import six
 from six.moves import range
 
 # Commonly reused protocol objects
-V3 = Version(3)
-EMPTY_DN = LDAPDN('')
-RESULT_saslBindInProgress = ResultCode('saslBindInProgress')
-RESULT_success = ResultCode('success')
-RESULT_noSuchObject = ResultCode('noSuchObject')
-RESULT_compareTrue = ResultCode('compareTrue')
-RESULT_compareFalse = ResultCode('compareFalse')
-RESULT_referral = ResultCode('referral')
+V3 = rfc4511.Version(3)
+EMPTY_DN = rfc4511.LDAPDN('')
+RESULT_saslBindInProgress = rfc4511.ResultCode('saslBindInProgress')
+RESULT_success = rfc4511.ResultCode('success')
+RESULT_noSuchObject = rfc4511.ResultCode('noSuchObject')
+RESULT_compareTrue = rfc4511.ResultCode('compareTrue')
+RESULT_compareFalse = rfc4511.ResultCode('compareFalse')
+RESULT_referral = rfc4511.ResultCode('referral')
 
 logger = logging.getLogger(__name__)
+
+
+def pack(mid, op, obj, controls=None):
+    """Pack an object into an LDAPMessage envelope"""
+    lm = rfc4511.LDAPMessage()
+    lm.setComponentByName('messageID', rfc4511.MessageID(mid))
+    po = rfc4511.ProtocolOp()
+    po.setComponentByName(op, obj)
+    lm.setComponentByName('protocolOp', po)
+    if controls:
+        lm.setComponentByName('controls', controls)
+    return lm
 
 
 def unpack(op, ldap_message):
@@ -28,11 +36,12 @@ def unpack(op, ldap_message):
     mid = ldap_message.getComponentByName('messageID')
     po = ldap_message.getComponentByName('protocolOp')
     controls = ldap_message.getComponentByName('controls')
-    if po.getName() == op:
+    got_op = po.getName()
+    if got_op == op:
         ret = po.getComponent()
         if ret.isValue:
             return mid, ret, controls
-    raise UnexpectedResponseType()
+    raise UnexpectedResponseType('Got {0} but expected {1}'.format(got_op, op))
 
 
 def seq_to_list(seq):
