@@ -74,9 +74,9 @@ class AttributeType(object):
 
         single_value = m.group('single_value')
         if single_value is not None:
-            self.singleValue = bool(single_value)
+            self.single_value = bool(single_value)
         elif not self.supertype:
-            self.singleValue = False
+            self.single_value = False
 
         collective = m.group('collective')
         if collective is not None:
@@ -158,9 +158,9 @@ class DefaultAttributeType(AttributeType):
         self._equality = DefaultMatchingRule()
         self._syntax = DefaultSyntaxRule()
         self.obsolete = False
-        self.singleValue = False
+        self.single_value = False
         self.collective = False
-        self.noUserMod = False
+        self.no_user_mod = False
         self.usage = 'userApplications'
         self.supertype = None
 

@@ -122,7 +122,7 @@ def test_supertype_inhertiance():
 
         assert t1.equality_oid == t2.equality_oid
         assert t1.syntax_oid == t2.syntax_oid
-        assert t1.singleValue == t2.singleValue
+        assert t1.single_value == t2.single_value
     finally:
         reset_registrations()
 

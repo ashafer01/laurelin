@@ -65,9 +65,9 @@ class SchemaValidator(BaseValidator):
         attr = get_attribute_type(attr_name)
         if attr.obsolete:
             warn('Attribute {0} is obsolete'.format(attr_name), LDAPWarning)
-        if attr.singleValue and len(values) > 1:
+        if attr.single_value and len(values) > 1:
             raise LDAPValidationError('Multiple values for single-value attribute {0}'.format(attr_name))
-        if write and attr.noUserMod:
+        if write and attr.no_user_mod:
             raise LDAPValidationError('Attribute {0} is not user modifiable'.format(attr_name))
         for value in values:
             attr.validate(value)
