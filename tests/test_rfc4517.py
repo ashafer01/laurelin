@@ -1,6 +1,7 @@
-from laurelin.ldap import rfc4517
+from laurelin.ldap import schema
 from laurelin.ldap import rules
 from laurelin.ldap.exceptions import InvalidSyntaxError
+
 
 def reset_registrations():
     rules._oid_syntax_rules.clear()
@@ -10,11 +11,14 @@ def reset_registrations():
     rules._oid_matching_rule_objects.clear()
     rules._name_matching_rule_objects.clear()
 
+
 def setup():
     reset_registrations()
 
+
 def teardown():
     reset_registrations()
+
 
 def run_syntax(testobj, tests_good, tests_bad):
     for test in tests_good:
@@ -30,7 +34,7 @@ def run_syntax(testobj, tests_good, tests_bad):
 
 def test_bit_string():
     run_syntax(
-        testobj = rfc4517.BitString(),
+        testobj = schema.BitString(),
         tests_good = (
             "'01010101'B",
             "'11110000'B",
@@ -49,7 +53,7 @@ def test_bit_string():
 
 def test_boolean():
     run_syntax(
-        testobj = rfc4517.Boolean(),
+        testobj = schema.Boolean(),
         tests_good = ('TRUE', 'FALSE'),
         tests_bad = ('true', 'false', 'foo'),
     )
@@ -57,7 +61,7 @@ def test_boolean():
 
 def test_country_string():
     run_syntax(
-        testobj = rfc4517.CountryString(),
+        testobj = schema.CountryString(),
         tests_good = ('us', 'ca', 'a-'),
         tests_bad = ('abc', 'x\0'),
     )
@@ -65,7 +69,7 @@ def test_country_string():
 
 def test_delivery_method():
     run_syntax(
-        testobj = rfc4517.DeliveryMethod(),
+        testobj = schema.DeliveryMethod(),
         tests_good = (
             'any',
             'mhs $ physical',
@@ -83,7 +87,7 @@ def test_delivery_method():
 
 def test_directory_string():
     run_syntax(
-        testobj = rfc4517.DirectoryString(),
+        testobj = schema.DirectoryString(),
         tests_good = ('abc',),
         tests_bad = (
             ['abc'],
@@ -94,7 +98,7 @@ def test_directory_string():
 
 def test_dit_content_rule_description():
     run_syntax(
-        testobj = rfc4517.DITContentRuleDescription(),
+        testobj = schema.DITContentRuleDescription(),
         tests_good = ("( 2.5.6.4 DESC 'content rule for organization' NOT ( x121Address $ telexNumber ) )",),
         tests_bad = (),
     )
@@ -102,7 +106,7 @@ def test_dit_content_rule_description():
 
 def test_dit_structure_rule_description():
     run_syntax(
-        testobj = rfc4517.DITStructureRuleDescription(),
+        testobj = schema.DITStructureRuleDescription(),
         tests_good = ("( 2 DESC 'organization structure rule' FORM 2.5.15.3 )",),
         tests_bad = (),
     )
@@ -110,7 +114,7 @@ def test_dit_structure_rule_description():
 
 def test_enhanced_guide():
     run_syntax(
-        testobj = rfc4517.EnhancedGuide(),
+        testobj = schema.EnhancedGuide(),
         tests_good = (
             'person#(sn$EQ)#oneLevel',
             '1.234.5678 # ab$EQ|cd$LE&efgh$APPROX # baseobject',
@@ -126,7 +130,7 @@ def test_enhanced_guide():
 def test_distinguished_name():
     import laurelin.ldap.schema
     run_syntax(
-        testobj = rfc4517.DistinguishedName(),
+        testobj = schema.DistinguishedName(),
         tests_good = (
             r'UID=jsmith,DC=example,DC=net',
             r'OU=Sales+CN=J.  Smith,DC=example,DC=net',
@@ -141,7 +145,7 @@ def test_distinguished_name():
 
 def test_generalized_time():
     run_syntax(
-        testobj = rfc4517.GeneralizedTime(),
+        testobj = schema.GeneralizedTime(),
         tests_good = (
             '199412161032Z', # spec example
             '199412160532-0500', # spec example
@@ -173,7 +177,7 @@ def test_generalized_time():
 
 def test_integer():
     run_syntax(
-        testobj = rfc4517.Integer(),
+        testobj = schema.Integer(),
         tests_good = (
             '12345',
             '-12345',
@@ -188,7 +192,7 @@ def test_integer():
 
 def test_ldap_syntax_description():
     run_syntax(
-        testobj = rfc4517.LDAPSyntaxDescription(),
+        testobj = schema.LDAPSyntaxDescription(),
         tests_good = (
             "( 1.3.6.1.4.1.1466.115.121.1.54 DESC 'LDAP Syntax Description' )",
         ),
@@ -198,7 +202,7 @@ def test_ldap_syntax_description():
 
 def test_matching_rule_description():
     run_syntax(
-        testobj = rfc4517.MatchingRuleDescription(),
+        testobj = schema.MatchingRuleDescription(),
         tests_good = (
             "( 2.5.13.2 NAME 'caseIgnoreMatch' SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )",
         ),
@@ -208,7 +212,7 @@ def test_matching_rule_description():
 
 def test_matching_rule_use_description():
     run_syntax(
-        testobj = rfc4517.MatchingRuleUseDescription(),
+        testobj = schema.MatchingRuleUseDescription(),
         tests_good = (
             "( 2.5.13.16 APPLIES ( givenName $ surname ) )",
         ),
@@ -218,7 +222,7 @@ def test_matching_rule_use_description():
 
 def test_name_and_optional_uid():
     run_syntax(
-        testobj = rfc4517.NameAndOptionalUID(),
+        testobj = schema.NameAndOptionalUID(),
         tests_good = (
             "1.3.6.1.4.1.1466.0=#04024869,O=Test,C=GB#'0101'B",
         ),
@@ -228,7 +232,7 @@ def test_name_and_optional_uid():
 
 def test_name_form_description():
     run_syntax(
-        testobj = rfc4517.NameFormDescription(),
+        testobj = schema.NameFormDescription(),
         tests_good = (
             "( 2.5.15.3 NAME 'orgNameForm' OC organization MUST o )",
         ),
@@ -238,7 +242,7 @@ def test_name_form_description():
 
 def test_numeric_string():
     run_syntax(
-        testobj = rfc4517.NumericString(),
+        testobj = schema.NumericString(),
         tests_good = (
             '15 079 672 281',
             '123456',
@@ -251,7 +255,7 @@ def test_numeric_string():
 
 def test_object_class_description():
     run_syntax(
-        testobj = rfc4517.ObjectClassDescription(),
+        testobj = schema.ObjectClassDescription(),
         tests_good = (
             "( 2.5.6.2 NAME 'country' SUP top STRUCTURAL MUST c MAY ( searchGuide $ description ) )",
         ),
@@ -261,7 +265,7 @@ def test_object_class_description():
 
 def test_oid():
     run_syntax(
-        testobj = rfc4517.OID(),
+        testobj = schema.OID(),
         tests_good = (
             '1.2.3.4',
             'cn',
@@ -272,7 +276,7 @@ def test_oid():
 
 def test_postal_address():
     run_syntax(
-        testobj = rfc4517.PostalAddress(),
+        testobj = schema.PostalAddress(),
         tests_good = (
             '1234 Main St.$Anytown, CA 12345$USA',
             r'\241,000,000 Sweepstakes$PO Box 1000000$Anytown, CA 12345$USA',
@@ -283,7 +287,7 @@ def test_postal_address():
 
 def test_telephone_number():
     run_syntax(
-        testobj = rfc4517.TelephoneNumber(),
+        testobj = schema.TelephoneNumber(),
         tests_good = (
             '+1 512 315 0280',
             '+1-512-315-0280',

@@ -1,7 +1,7 @@
 import six
-from six.moves import range
 
 _validators = []
+
 
 def get_validators():
     return _validators
