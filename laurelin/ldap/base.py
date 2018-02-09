@@ -28,7 +28,6 @@ from .protoutils import (
     seq_to_list,
     get_string_component,
 )
-from .validation import get_validators
 
 import logging
 import re
@@ -63,7 +62,40 @@ _sockets = {}
 
 
 class LDAP(Extensible):
-    """Provides the connection to the LDAP DB"""
+    """Provides the connection to the LDAP DB. All constructor parameters have a matching global default as a class
+    property on :class:`LDAP`
+
+    :param server: URI string to connect to or an :class:`LDAPSocket` to reuse
+    :type server: str or LDAPSocket
+    :param str base_dn: The DN of the base object
+    :param bool reuse_connection: Allows the socket connection to be reused and reuse an existing socket if
+                                  possible.
+    :param int connect_timeout: Number of seconds to wait for connection to be accepted.
+    :param int search_timeout: Number of seconds to wait for a search to complete. Partial results will be returned
+                               when the timeout is reached. Can be overridden on a per-search basis by setting the
+                               `search_timeout` keyword on :func:`LDAP.search`.
+    :param DerefAliases deref_aliases: One of the :class:`DerefAliases` constants. Instructs the server how to handle
+                                       alias objects in search results. Can be overridden on a per-search basis by
+                                       setting the `search_timeout` keyword on :func:`LDAP.search`.
+    :param bool strict_modify: Use the strict modify strategy. If set to True, guarantees that another search will not
+                               take place before a modify operation. May potentially produce more server errors.
+    :param bool ssl_verify: Validate the certificate and hostname on an SSL/TLS connection
+    :param str ssl_ca_file: Path to PEM-formatted concatenated CA certficates file
+    :param str ssl_ca_path: Path to directory with CA certs under hashed file names. See
+                            https://www.openssl.org/docs/man1.1.0/ssl/SSL_CTX_load_verify_locations.html for more
+                            information about the format of this directory.
+    :param ssl_ca_data: An ASCII string of one or more PEM-encoded certs or a bytes object containing DER-encoded
+                        certificates.
+    :type ssl_ca_data: str or bytes
+    :param bool fetch_result_refs: Fetch searchResultRef responses in search results. Can be overridden on a per-search
+                                   basis by setting the `fetch_result_refs` keyword on :func:`LDAP.search`.
+    :param str default_sasl_mech: Name of the default SASL mechanism. Bind will fail if the server does not support the
+                                  mechanism. (Examples: DIGEST-MD5, GSSAPI)
+    :param bool sasl_fatal_downgrade_check: Set to False to make potential downgrade attack check non-fatal.
+    :param bool default_criticality: Set to True to make controls critical by default, set to False to make non-critical
+    :param bool follow_referrals: Automatically follow referral results
+    :param list[Validator] validators: A list of :class:`Validator` instances to apply to this connection.
+    """
 
     # global defaults
     DEFAULT_SERVER = 'ldap://localhost'
@@ -83,8 +115,7 @@ class LDAP(Extensible):
     DEFAULT_SASL_MECH = None
     DEFAULT_SASL_FATAL_DOWNGRADE_CHECK = True
     DEFAULT_CRITICALITY = False
-    DEFAULT_SKIP_VALIDATION = False
-    DEFAULT_SKIP_VALIDATORS = []
+    DEFAULT_VALIDATORS = None
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -133,7 +164,7 @@ class LDAP(Extensible):
     def __init__(self, server=None, base_dn=None, reuse_connection=None, connect_timeout=None, search_timeout=None,
                  deref_aliases=None, strict_modify=None, ssl_verify=None, ssl_ca_file=None, ssl_ca_path=None,
                  ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
-                 default_criticality=None, follow_referrals=None, skip_validation=None, skip_validators=None):
+                 default_criticality=None, follow_referrals=None, validators=None):
 
         # setup
         if server is None:
@@ -168,10 +199,8 @@ class LDAP(Extensible):
             default_criticality = LDAP.DEFAULT_CRITICALITY
         if follow_referrals is None:
             follow_referrals = LDAP.DEFAULT_FOLLOW_REFERRALS
-        if skip_validation is None:
-            skip_validation = LDAP.DEFAULT_SKIP_VALIDATION
-        if skip_validators is None:
-            skip_validators = LDAP.DEFAULT_SKIP_VALIDATORS
+        if validators is None:
+            validators = LDAP.DEFAULT_VALIDATORS
 
         self.default_search_timeout = search_timeout
         self.default_deref_aliases = deref_aliases
@@ -232,23 +261,14 @@ class LDAP(Extensible):
         self.base = self.obj(self.base_dn, relative_search_scope=Scope.SUBTREE)
 
         # Validation setup
-        self.validators = []
-        if not skip_validation:
-            for validator in get_validators():
-                skip = False
-                for validatorSpec in skip_validators:
-                    if isinstance(validatorSpec, six.string_types):
-                        if validator.__class__.__name__ == validatorSpec:
-                            skip = True
-                            break
-                    else:
-                        if isinstance(validator, validatorSpec):
-                            skip = True
-                            break
-                if not skip:
-                    self.validators.append(validator)
+        if validators is None:
+            validators = []
+        self.validators = validators
 
     def refresh_root_dse(self):
+        """Update the local copy of the root DSE, containing metadata about the directory server. The root DSE is an
+        :class:`LDAPObject` stored on the `root_dse` attribute.
+        """
         self.root_dse = self.get('', ['*', '+'])
         self._sasl_mechs = self.root_dse.get_attr('supportedSASLMechanisms')
 
@@ -258,7 +278,14 @@ class LDAP(Extensible):
         return controls.process_kwds(method, kwds, supported_ctrls, default_crit, final)
 
     def _success_result(self, message_id, operation):
-        """Receive an object from the socket and raise an LDAPError if its not a success result"""
+        """Receive an object from the socket and raise an LDAPError if its not a success result.
+
+        :param int message_id: The message ID a response is expected for
+        :param str operation: The name of the protocol operation expected, e.g. bindResponse, searchResEntry
+        :return: A response object
+        :rtype: LDAPResponse
+        :raises LDAPError: if the response recieved does not indicate a success
+        """
         mid, obj, res_ctrls = unpack(operation, self.sock.recv_one(message_id))
         res = obj.getComponentByName('resultCode')
         if res == RESULT_success:
@@ -273,7 +300,14 @@ class LDAP(Extensible):
     def simple_bind(self, username='', password='', **ctrl_kwds):
         """Performs a simple bind operation
 
-         Leave arguments as their default (empty strings) to attempt an anonymous simple bind
+        Leave arguments as their default (empty strings) to attempt an anonymous simple bind
+
+        :param str username: Bind DN/username or empty string for anonymous
+        :param str password: Password to bind with or empty string for anonymous
+        :return: A response object
+        :rtype: LDAPResponse
+        :raises ConnectionUnbound: if the connection has been unbound/closed
+        :raises ConnectionAlreadyBound: if the connection has already been bound
         """
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -297,7 +331,11 @@ class LDAP(Extensible):
         return ret
 
     def get_sasl_mechs(self):
-        """Query root DSE for supported SASL mechanisms"""
+        """Query root DSE for supported SASL mechanisms.
+
+        :return: The list of server-supported mechanism names.
+        :rtype: list[str]
+        """
 
         if self._sasl_mechs is None:
             logger.debug('Querying server to find supported SASL mechs')
@@ -307,7 +345,10 @@ class LDAP(Extensible):
         return self._sasl_mechs
 
     def recheck_sasl_mechs(self):
-        """Query the root DSE again after performing a SASL bind to check for a downgrade attack"""
+        """Query the root DSE again after performing a SASL bind to check for a downgrade attack.
+
+        :raises LDAPError: If the downgrade attack check fails and sasl_fatal_downgrade_check has not been set to False.
+        """
 
         if self._sasl_mechs is None:
             raise LDAPError('SASL mechs have not yet been queried')
@@ -325,11 +366,17 @@ class LDAP(Extensible):
                 logger.debug('No evidence of downgrade attack')
 
     def sasl_bind(self, mech=None, **props):
-        """Perform a SASL bind operation
+        """Perform a SASL bind operation.
 
-         Specify a single standard mechanism string for mech, or leave it as None to negotiate the
-         best mutually supported mechanism. Required keyword args are dependent on the mechanism
-         chosen.
+        Required keyword args are dependent on the mechanism chosen.
+
+        :param str mech: The SASL mechanism name to use or None to negotiate best mutually supported mechanism.
+        :return: A response object
+        :rtype: LDAPResponse
+        :raises ConnectionUnbound: if the connection has been unbound/closed
+        :raises ConnectionAlreadyBound: if the connection has already been bound
+        :raises LDAPSupportError: if the given mech is not supported by the server
+        :raises LDAPError: if an error occurs during the bind process
         """
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -387,7 +434,11 @@ class LDAP(Extensible):
         raise LDAPError('Programming error - reached end of saslBind')
 
     def unbind(self, force=False):
-        """Send an unbind request and close the socket"""
+        """Send an unbind request and close the socket.
+
+        :param bool force: Unbind and close the socket even if other objects still hold a reference to it.
+        :raises ConnectionUnbound: if the connection has already been unbound
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
 
@@ -407,14 +458,34 @@ class LDAP(Extensible):
     close = unbind
 
     def tag(self, tag):
-        """Get a tagged object"""
+        """Get a tagged object.
+
+        :param str tag: The tag name to retrieve
+        :return: The object created with the given tag
+        :rtype: LDAPObject
+        :raises TagError: if the given tag is not defined
+        """
         try:
             return self._tagged_objects[tag]
         except KeyError:
             raise TagError('tag {0} does not exist'.format(tag))
 
     def obj(self, dn, attrs_dict=None, tag=None, *args, **kwds):
-        """Factory for LDAPObjects bound to this connection"""
+        """Factory for LDAPObjects bound to this connection.
+
+        Note that this does not query the server. Use :func:`LDAP.get` to query the server for a particular DN.
+
+        :param str dn: The DN of the object.
+        :param attrs_dict: Optional. The object's attributes and values.
+        :type attrs_dict: dict(str, list[str]) or AttrsDict or None
+        :param tag: Optional. The tag for this object. Tagged objects can be retrieved with :func:`LDAP.tag`.
+        :type tag: str or None
+        :return: The new object bound to this connection.
+        :rtype: LDAPObject
+        :raises TagError: if the tag parameter is already defined
+
+        Additional arguments are passed through into the :class:`LDAPObject` constructor.
+        """
         obj = LDAPObject(dn, attrs_dict=attrs_dict, ldap_conn=self, *args, **kwds)
         if tag is not None:
             if tag in self._tagged_objects:
@@ -424,7 +495,21 @@ class LDAP(Extensible):
         return obj
 
     def get(self, dn, attrs=None, **obj_kwds):
-        """Get a specific object by DN"""
+        """Get a specific object by DN.
+
+        Performs a search with :attr:`Scope.BASE` and ensures we get exactly one result.
+
+        :param str dn: The DN of the object to query
+        :param attrs: Optional. A list of attribute names to get, defaults to all user attributes
+        :type attrs: list[str] or None
+        :return: The LDAP object
+        :rtype: LDAPObject
+        :raises ConnectionUnbound: if the connection has been unbound
+        :raises NoSearchResults: if no results are returned
+        :raises MultipleSearchResults: if more than one result is returned
+
+        Additional keyword arguments are passed through into :func:`LDAP.search`.
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
         results = list(self.search(dn, Scope.BASE, attrs=attrs, limit=2, **obj_kwds))
@@ -450,10 +535,50 @@ class LDAP(Extensible):
 
     def search(self, base_dn, scope=Scope.SUBTREE, filter=None, attrs=None, search_timeout=None, limit=0,
                deref_aliases=None, attrs_only=False, fetch_result_refs=None, follow_referrals=None, **kwds):
-        """Send search and iterate results until we get a SearchResultDone
+        """Sends search and return an iterator over results.
 
-         Yields instances of LDAPObject and possibly SearchReferenceHandle, if any result
-         references are returned from the server, and the fetch_result_refs keyword arg is False.
+        :param str base_dn: The DN of the base object of the search
+        :param Scope scope: One of the :class:`Scope` constants, default :attr:`Scope.SUB`. Controls the maximum depth
+                            of the search.
+        :param str filter: A filter string. Objects must match the filter to be included in results. Default includes
+                           all objects.
+        :param list[str] attrs: A list of attribute names to include for each object. Default includes all user
+                                attributes. Use `['*', '+']` to get all user and all operational attributes.
+        :param int search_timeout: The number of seconds the server should spend performing the search. Partial results
+                                   will be returned if the server times out. The default can be set per connection by
+                                   passing the `search_timeout` keyword to the :class:`LDAP` constructor, or set the
+                                   global default by defining :attr:`LDAP.DEFAULT_SEARCH_TIMEOUT`.
+        :param int limit: The maximum number of objects to return.
+        :param DerefAliases deref_aliases: One of the :class:`DerefAliases` constants. This instructs the server what to
+                                           do when it encounters an alias object. The default can be set per connection
+                                           by passing the `deref_aliases` keyword to the :class:`LDAP` constructor, or
+                                           set the global default by defining :attr:`LDAP.DEFAULT_DEREF_ALIASES`.
+        :param bool attrs_only: Default False. Set to True to only obtain attribute names and not any attribute values.
+        :param bool fetch_result_refs: When the server returns a result which is a reference to an object on another
+                                       server, automatically attempt to fetch the remote object and include it in the
+                                       iterated results. The default can be set per connection by passing the
+                                       `fetch_result_refs` keyword to the :class:`LDAP` constructor, or set the global
+                                       default by defining :attr:`LDAP.DEFAULT_FETCH_RESULT_REFS`.
+        :param bool follow_referrals: When the server knows that the base object is present on another server, follow
+                                      the referral and perform the search on the other server. The default can be set
+                                      per connection by passing the `follow_referrals` keyword to the :class:`LDAP`
+                                      constructor, or set the global default by defining
+                                      :attr:`LDAP.DEFAULT_FOLLOW_REFERRALS`.
+        :return: An iterator over the results of the search. May yield :class:`LDAPObject` or possibly
+                 :class:`SearchReferenceHandle` if `fetch_result_refs` is False.
+
+        This method may also be used as a context manager. If all results have not been read, the operation will
+        automatically be abandoned when the context manager exits. You can also raise :exc:`Abandon` to abandon
+        all results immediately and cleanly exit the context manager. You can also call
+        :func:`SearchResultHandle.abandon` to abandon results.
+
+        Example::
+
+            # Dump the whole tree
+            with LDAP() as ldap:
+                with ldap.base.search() as search:
+                    for result in search:
+                        print(result.format_ldif())
         """
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -999,18 +1124,17 @@ class ExtendedResponseHandle(ResponseHandle):
 class LDAPURI(object):
     """Represents a parsed LDAP URI as specified in RFC4516
 
-     Attributes:
-     * scheme   - urlparse standard
-     * netloc   - urlparse standard
-     * host_uri  - scheme://netloc for use with LDAPSocket
-     * dn       - string
-     * attrs    - list
-     * scope    - one of the Scope.* constants
-     * filter   - string
-     * starttls - bool
+    Supported extensions:
+      * "StartTLS"
 
-     Supported extensions:
-     * "StartTLS"
+    :var str scheme: urlparse standard
+    :var str netloc: urlparse standard
+    :var str host_uri: scheme://netloc for use with LDAPSocket
+    :var str dn: Distinguished name
+    :var list[str] attrs: list
+    :var Scope scope: one of the :class:`Scope` constants
+    :var str filter: The filter string
+    :var bool starttls: True if StartTLS was requested
     """
     def __init__(self, uri):
         self._orig = uri
@@ -1058,6 +1182,8 @@ class LDAPURI(object):
 
          First opens a new connection with connection reuse disabled, then performs the search, and
          unbinds the connection. Server must allow anonymous read.
+
+         Additional keyword arguments are passed through into :func:`LDAP.search`.
         """
         ldap = LDAP(self.host_uri, reuse_connection=False)
         if self.starttls:

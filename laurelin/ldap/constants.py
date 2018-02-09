@@ -6,19 +6,18 @@ from .rfc4511 import (
 
 
 class Scope:
-    """Scope constants
-
-     These instruct the server how far to take a search, relative to the base object
-     * Scope.BASE - only search the base object
-     * Scope.ONE  - search the base object and its immediate children
-     * Scope.SUB  - search the base object and all of its descendants
-    """
+    """Scope constants. These instruct the server how far to take a search, relative to the base object"""
 
     BASE = _Scope('baseObject')
+    """Only search the base object"""
+
     ONELEVEL = _Scope('singleLevel')
     ONE = ONELEVEL
+    """Search the base object and its immediate children"""
+
     SUBTREE = _Scope('wholeSubtree')
     SUB = SUBTREE
+    """Search the base object and all of its dscendants"""
 
     @staticmethod
     def string(str):
@@ -34,18 +33,61 @@ class Scope:
             raise ValueError()
 
 
-class DerefAliases:
-    """DerefAliases constants
+def _scope_repr(scope_obj):
+    """Uses laurelin constant name representation for scope"""
+    try:
+        intval = int(scope_obj)
+        name = scope_obj.namedValues.getName(intval)
+        if name == 'wholeSubtree':
+            return 'Scope.SUB'
+        elif name == 'singleLevel':
+            return 'Scope.ONE'
+        elif name == 'baseObject':
+            return 'Scope.BASE'
+        else:
+            return '{0}({1})'.format(scope_obj.__class__.__name__, repr(name))
+    except Exception:
+        return '{0}(<schema object>)'.format(scope_obj.__class__.__name__)
 
-     These instruct the server when to automatically resolve an alias object, rather than return the
-     alias object itself
-     * DerefAliases.NEVER  - always return the alias object
-     * DerefAliases.SEARCH - dereferences search results, but not the base object itself
-     * DerefAliases.BASE   - dereferences the search base object, but not search results
-     * DerefAliases.ALWAYS - dereferences both the search base object and results
+
+_Scope.__repr__ = _scope_repr
+
+
+class DerefAliases:
+    """DerefAliases constants. These instruct the server when to automatically resolve an alias object, rather than
+       return the alias object itself
     """
 
     NEVER = _DerefAliases('neverDerefAliases')
+    """always return the alias object"""
+
     SEARCH = _DerefAliases('derefInSearching')
+    """dereferences search results, but not the base object itself"""
+
     BASE = _DerefAliases('derefFindingBaseObj')
+    """dereferences the search base object, but not search results"""
+
     ALWAYS = _DerefAliases('derefAlways')
+    """dereferences both the search base object and results"""
+
+
+def _deref_repr(deref_obj):
+    """Uses laurelin constant name representation for deref aliases"""
+    try:
+        intval = int(deref_obj)
+        name = deref_obj.namedValues.getName(intval)
+        if name == 'neverDerefAliases':
+            return 'DerefAliases.NEVER'
+        elif name == 'derefInSearching':
+            return 'DerefAliases.SEARCH'
+        elif name == 'derefFindingBaseObj':
+            return 'DerefAliases.BASE'
+        elif name == 'derefAlways':
+            return 'DerefAliases.ALWAYS'
+        else:
+            return '{0}({1})'.format(deref_obj.__class__.__name__, repr(name))
+    except Exception:
+        return '{0}(<schema object>)'.format(deref_obj.__class__.__name__)
+
+
+_DerefAliases.__repr__ = _deref_repr

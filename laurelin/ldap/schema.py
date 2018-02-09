@@ -13,7 +13,7 @@ from .rules import (
 )
 from .attributetype import get_attribute_type, AttributeType
 from .objectclass import get_object_class, ObjectClass, ExtensibleObjectClass
-from .validation import BaseValidator
+from .validation import Validator
 
 import re
 import six
@@ -21,7 +21,7 @@ from six.moves import range
 from warnings import warn
 
 
-class SchemaValidator(BaseValidator):
+class SchemaValidator(Validator):
     """Ensures parameters conform to the available defined schema"""
 
     def validate_object(self, obj, write=True):
@@ -53,13 +53,7 @@ class SchemaValidator(BaseValidator):
             oc_names = ','.join(object_classes)
             raise LDAPValidationError('attributes {0} are not permitted with objectClasses {1}'.format(
                                       disallowed_attrs, oc_names))
-        for attr, values in six.iteritems(obj):
-            self._validate_attribute(attr, values, write)
-
-    def validate_modify(self, dn, modlist, current):
-        for mod in modlist:
-            if mod.vals:
-                self._validate_attribute(mod.attr, mod.vals, True)
+        Validator.validate_object(self, obj, write)
 
     def _validate_attribute(self, attr_name, values, write):
         attr = get_attribute_type(attr_name)
@@ -191,7 +185,6 @@ class EnhancedGuide(SyntaxRule):
 
     OID = '1.3.6.1.4.1.1466.115.121.1.21'
     DESC = 'Enhanced Guide'
-
 
     def __init__(self):
         SyntaxRule.__init__(self)

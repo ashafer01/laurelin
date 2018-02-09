@@ -479,7 +479,10 @@ class DerefAliases(Enumerated):
     #     derefInSearching        (1),
     #     derefFindingBaseObj     (2),
     #     derefAlways             (3) },
-    namedValues = NamedValues(('neverDerefAliases', 0), ('derefInSearching', 1), ('derefFindingBaseObj', 2), ('derefAlways', 3))
+    namedValues = NamedValues(('neverDerefAliases', 0),
+                              ('derefInSearching', 1),
+                              ('derefFindingBaseObj', 2),
+                              ('derefAlways', 3))
 
 
 class TypesOnly(Boolean):
