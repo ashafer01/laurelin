@@ -8,19 +8,19 @@ Once controls have been :ref:`defined <defining-controls>`, they are very easy t
 and optionally a ``response_attr``.
 
 The ``keyword`` can be passed as a keyword argument to specific methods. The value type and format is up to the control
-implementation. Whatever value the control expects can be wrapped in :class:`critical` or :class:`optional` to declare
+implementation. Whatever value the control expects can be wrapped in :class:`.critical` or :class:`.optional` to declare
 the criticality of the control.
 
 The ``response_attr`` will be set as an attribute on the object returned from the method call for most methods.
 
-For search response controls, the control value will be set on the individual :class:`LDAPObject` if it appeared on the
+For search response controls, the control value will be set on the individual :class:`.LDAPObject` if it appeared on the
 associated search result entry. If it appeared on the search results done message, the control value will be set on the
 iterator object.
 
 In the highly unusual case that a response control is set on a search result reference message, the control values will
 be inaccessible if ``fetch_result_refs`` is set to True. A warning will be issued in this case.
 
-If ``fetch_result_refs`` is set to False, the response control values will be set on the :class:`SearchReferenceHandle`
+If ``fetch_result_refs`` is set to False, the response control values will be set on the :class:`.SearchReferenceHandle`
 that is yielded from the results iterator.
 
 .. autoclass:: laurelin.ldap.critical

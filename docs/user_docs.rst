@@ -51,7 +51,31 @@ An empty :class:`.LDAPObject` will be created with the base DN and stored as the
 :class:`.LDAP` instance. More on this later. For now we will briefly cover the basic LDAP interface which may seem
 somewhat familiar if you have used the standard python-ldap client before.
 
------
+This may be a good point to configure logging and warnings::
+
+
+    LDAP.enable_logging()
+    # Enables all log output on stderr
+    # It also accepts an optional log level argument, e.g. logging.ERROR
+    # The function also returns the handler it creates for optional further manual handling
+
+    import logging
+
+    logger = logging.getLogger('laurelin.ldap')
+    # Manually configure the logger and handlers here using the standard logging module
+
+    LDAP.log_warnings()
+    # emit all LDAP warnings as WARN-level log messages on the laurelin.ldap logger
+    # all other warnings will take the default action
+
+    LDAP.disable_warnings()
+    # do not emit any LDAP warnings
+    # all other warnings will take the default action
+
+    LDAP.default_warnings()
+    # take the default action for all warnings
+
+----------
 
 :meth:`.LDAP.search` sends a search request and returns an iterable over instances of :class:`.LDAPObject`. Basic
 arguments are described here (listed in order):
