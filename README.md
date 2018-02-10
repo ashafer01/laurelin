@@ -1,6 +1,8 @@
 # laurelin
 Pure-python LDAP client
 
+View documentation on [ReadTheDocs](http://laurelin-ldap.readthedocs.io/en/latest/index.html).
+
 Named for one of the Two Trees of Valinor in Tolkien lore.
 
 > Laurelin, which means 'Golden-song' in the Quenya tongue, bore shining golden leaves, the Light from which mingled with the Silver Flowers of the Elder Tree to illuminate the land of the Valar.

@@ -1,1 +1,1 @@
-Docs have been moved to Sphinx.
+View documentation on [ReadTheDocs](http://laurelin-ldap.readthedocs.io/en/latest/index.html)
