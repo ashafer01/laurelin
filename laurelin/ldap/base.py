@@ -73,10 +73,10 @@ class LDAP(Extensible):
     :param int connect_timeout: Number of seconds to wait for connection to be accepted.
     :param int search_timeout: Number of seconds to wait for a search to complete. Partial results will be returned
                                when the timeout is reached. Can be overridden on a per-search basis by setting the
-                               `search_timeout` keyword on :func:`LDAP.search`.
+                               ``search_timeout`` keyword on :meth:`LDAP.search`.
     :param DerefAliases deref_aliases: One of the :class:`DerefAliases` constants. Instructs the server how to handle
                                        alias objects in search results. Can be overridden on a per-search basis by
-                                       setting the `search_timeout` keyword on :func:`LDAP.search`.
+                                       setting the ``search_timeout`` keyword on :meth:`LDAP.search`.
     :param bool strict_modify: Use the strict modify strategy. If set to True, guarantees that another search will not
                                take place before a modify operation. May potentially produce more server errors.
     :param bool ssl_verify: Validate the certificate and hostname on an SSL/TLS connection
@@ -88,13 +88,26 @@ class LDAP(Extensible):
                         certificates.
     :type ssl_ca_data: str or bytes
     :param bool fetch_result_refs: Fetch searchResultRef responses in search results. Can be overridden on a per-search
-                                   basis by setting the `fetch_result_refs` keyword on :func:`LDAP.search`.
+                                   basis by setting the ``fetch_result_refs`` keyword on :meth:`LDAP.search`.
     :param str default_sasl_mech: Name of the default SASL mechanism. Bind will fail if the server does not support the
                                   mechanism. (Examples: DIGEST-MD5, GSSAPI)
     :param bool sasl_fatal_downgrade_check: Set to False to make potential downgrade attack check non-fatal.
     :param bool default_criticality: Set to True to make controls critical by default, set to False to make non-critical
     :param bool follow_referrals: Automatically follow referral results
     :param list[Validator] validators: A list of :class:`Validator` instances to apply to this connection.
+
+    The class can be used as a context manager, which will automatically unbind and close the connection when the
+    context manager exits.
+
+    Example::
+
+        with LDAP() as ldap:
+            raise Exception()
+        # ldap is closed and unbound
+
+        with LDAP() as ldap:
+            print('hello')
+        # ldap is closed and unbound
     """
 
     # global defaults
@@ -473,12 +486,12 @@ class LDAP(Extensible):
     def obj(self, dn, attrs_dict=None, tag=None, *args, **kwds):
         """Factory for LDAPObjects bound to this connection.
 
-        Note that this does not query the server. Use :func:`LDAP.get` to query the server for a particular DN.
+        Note that this does not query the server. Use :meth:`LDAP.get` to query the server for a particular DN.
 
         :param str dn: The DN of the object.
         :param attrs_dict: Optional. The object's attributes and values.
         :type attrs_dict: dict(str, list[str]) or AttrsDict or None
-        :param tag: Optional. The tag for this object. Tagged objects can be retrieved with :func:`LDAP.tag`.
+        :param tag: Optional. The tag for this object. Tagged objects can be retrieved with :meth:`LDAP.tag`.
         :type tag: str or None
         :return: The new object bound to this connection.
         :rtype: LDAPObject
@@ -508,7 +521,7 @@ class LDAP(Extensible):
         :raises NoSearchResults: if no results are returned
         :raises MultipleSearchResults: if more than one result is returned
 
-        Additional keyword arguments are passed through into :func:`LDAP.search`.
+        Additional keyword arguments are passed through into :meth:`LDAP.search`.
         """
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -522,7 +535,12 @@ class LDAP(Extensible):
             return results[0]
 
     def exists(self, dn):
-        """Simply check if a DN exists"""
+        """Simply check if a DN exists.
+
+        :param str dn: The DN to check
+        :return: True if the object exists, False if not
+        :rtype: bool
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
         try:
@@ -546,18 +564,18 @@ class LDAP(Extensible):
                                 attributes. Use `['*', '+']` to get all user and all operational attributes.
         :param int search_timeout: The number of seconds the server should spend performing the search. Partial results
                                    will be returned if the server times out. The default can be set per connection by
-                                   passing the `search_timeout` keyword to the :class:`LDAP` constructor, or set the
+                                   passing the ``search_timeout`` keyword to the :class:`LDAP` constructor, or set the
                                    global default by defining :attr:`LDAP.DEFAULT_SEARCH_TIMEOUT`.
         :param int limit: The maximum number of objects to return.
         :param DerefAliases deref_aliases: One of the :class:`DerefAliases` constants. This instructs the server what to
                                            do when it encounters an alias object. The default can be set per connection
-                                           by passing the `deref_aliases` keyword to the :class:`LDAP` constructor, or
+                                           by passing the ``deref_aliases`` keyword to the :class:`LDAP` constructor, or
                                            set the global default by defining :attr:`LDAP.DEFAULT_DEREF_ALIASES`.
         :param bool attrs_only: Default False. Set to True to only obtain attribute names and not any attribute values.
         :param bool fetch_result_refs: When the server returns a result which is a reference to an object on another
                                        server, automatically attempt to fetch the remote object and include it in the
                                        iterated results. The default can be set per connection by passing the
-                                       `fetch_result_refs` keyword to the :class:`LDAP` constructor, or set the global
+                                       ``fetch_result_refs`` keyword to the :class:`LDAP` constructor, or set the global
                                        default by defining :attr:`LDAP.DEFAULT_FETCH_RESULT_REFS`.
         :param bool follow_referrals: When the server knows that the base object is present on another server, follow
                                       the referral and perform the search on the other server. The default can be set
@@ -565,12 +583,14 @@ class LDAP(Extensible):
                                       constructor, or set the global default by defining
                                       :attr:`LDAP.DEFAULT_FOLLOW_REFERRALS`.
         :return: An iterator over the results of the search. May yield :class:`LDAPObject` or possibly
-                 :class:`SearchReferenceHandle` if `fetch_result_refs` is False.
+                 :class:`SearchReferenceHandle` if ``fetch_result_refs`` is False.
+
+        Additional keywords are passed through into the :class:`LDAPObject` constructor or handled as :doc:`/controls`.
 
         This method may also be used as a context manager. If all results have not been read, the operation will
         automatically be abandoned when the context manager exits. You can also raise :exc:`Abandon` to abandon
         all results immediately and cleanly exit the context manager. You can also call
-        :func:`SearchResultHandle.abandon` to abandon results.
+        :meth:`SearchResultHandle.abandon` to abandon results.
 
         Example::
 
@@ -614,7 +634,7 @@ class LDAP(Extensible):
         req.setComponentByName('attributes', _attrs)
 
         # check here because we need to do a search to get the root DSE, which is required by
-        # _processCtrlKwds, other methods don't need to check
+        # _process_ctrl_kwds, other methods don't need to check
         if kwds:
             ctrls = self._process_ctrl_kwds('search', kwds)
         else:
@@ -626,7 +646,19 @@ class LDAP(Extensible):
         return SearchResultHandle(self, mid, fetch_result_refs, follow_referrals, kwds)
 
     def compare(self, dn, attr, value, **ctrl_kwds):
-        """Perform a compare operation, returning boolean"""
+        """Ask the server if a particular DN has a matching attribute value. The comparison will take place following
+        the schema-defined matching rules and syntax rules.
+
+        :param str dn: The DN of the object
+        :param str attr: The attribute name
+        :param str value: The assertion value
+        :return: A response object, :func:`bool` evaluating to the result of the comparison
+        :rtype: CompareResponse
+        :raises ConnectionUnbound: if the connection has been unbound
+        :raises LDAPError: if we got a result other than compareTrue or compareFalse
+
+        Additional keyword arguments are handled as :doc:`/controls`.
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
 
@@ -657,7 +689,21 @@ class LDAP(Extensible):
         return ret
 
     def add(self, dn, attrs_dict, **kwds):
-        """Add new object and return corresponding LDAPObject on success"""
+        """Add new object and return corresponding LDAPObject on success.
+
+        :param str dn: The new object's DN
+        :param attrs_dict: The new attributes for the object
+        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :return: The new object
+        :rtype: LDAPObject
+        :raises ConnectionUnbound: if the connection has been unbound
+        :raises TypeError: if arguments are of invalid type
+        :raises LDAPValidationError: if the object fails any configured validator
+        :raises LDAPError: if we get a non-success result
+
+        Additional keyword arguments are passed through into the :class:`LDAPObject` constructor and then handled as
+        :doc:`/controls`.
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
 
@@ -711,7 +757,13 @@ class LDAP(Extensible):
            Otherwise, create the object using the attrs dictionary.
          * This ensures that, for the attributes mentioned in attrs, AT LEAST those values will
            exist on the given DN, regardless of prior state of the DB.
-         * Always returns an LDAPObject corresponding to the final state of the DB
+         * Always returns an :class:`LDAPObject` corresponding to the final state of the DB
+
+        :param str dn: The object DN
+        :param attrs_dict: The objects minimum attributes
+        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :return: The new or modified object
+        :rtype: LDAPObject
         """
         try:
             cur = self.get(dn)
@@ -727,7 +779,13 @@ class LDAP(Extensible):
            Otherwise, create the object using the attrs dictionary
          * This ensures that, for the attributes mentioned in attrs, ONLY those values will exist on
            the given DN regardless of prior state of the DB.
-         * Always returns an LDAPObject corresponding to the final state of the DB
+         * Always returns an :class:`LDAPObject` corresponding to the final state of the DB
+
+        :param str dn: The object DN
+        :param attrs_dict: The objects new required attributes
+        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :return: The new or modified object
+        :rtype: LDAPObject
         """
         try:
             cur = self.get(dn)
@@ -742,6 +800,12 @@ class LDAP(Extensible):
          * Gets and returns the object at DN if it exists, otherwise create the object using the
            attrs dictionary
          * Always returns an LDAPObject corresponding to the final state of the DB
+
+        :param str dn: The object DN
+        :param attrs_dict: The attributes to use if adding the object
+        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :return: The new or existing object
+        :rtype: LDAPObject
         """
         try:
             cur = self.get(dn)
@@ -753,7 +817,15 @@ class LDAP(Extensible):
     ## delete an object
 
     def delete(self, dn, **ctrl_kwds):
-        """Delete an object"""
+        """Delete an object.
+
+        :param str dn: The DN of the object to delete
+        :return: A response object
+        :rtype: LDAPResponse
+        :raises ConnectionUnbound: if the connection has been unbound
+
+        Additional keyword arguments are handled as :doc:`/controls`.
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
         controls = self._process_ctrl_kwds('delete', ctrl_kwds, final=True)
@@ -764,7 +836,20 @@ class LDAP(Extensible):
     ## change object DN
 
     def mod_dn(self, dn, new_rdn, clean_attr=True, new_parent=None, **ctrl_kwds):
-        """Exposes all options of the protocol-level rfc4511.ModifyDNRequest"""
+        """Change the DN and possibly the location of an object in the tree. Exposes all options of the protocol-level
+        rfc4511.ModifyDNRequest
+
+        :param str dn: The current DN of the object
+        :param str new_rdn: The new RDN of the object, e.g. cn=foo
+        :param bool clean_attr: Remove the old RDN attribute from the object when changing
+        :param new_parent: The DN of the new parent object, or None to leave the location unchanged
+        :type new_parent: str or None
+        :return: A response object
+        :rtype: LDAPResponse
+        :raises ConnectionUnbound: if the connection has been unbound
+
+        Additional keyword arguments are handled as :doc:`/controls`.
+        """
         if self.sock.unbound:
             raise ConnectionUnbound()
         mdr = rfc4511.ModifyDNRequest()
@@ -780,20 +865,48 @@ class LDAP(Extensible):
         return self._success_result(mid, 'modDNResponse')
 
     def rename(self, dn, new_rdn, clean_attr=True, **ctrl_kwds):
-        """Specify a new RDN for an object without changing its location in the tree"""
+        """Specify a new RDN for an object without changing its location in the tree.
+
+        :param str dn: The current DN of the object
+        :param str new_rdn: The new RDN of the object, e.g. cn=foo
+        :param bool clean_attr: Remove the old RDN attribute from the object when changing
+        :return: A response object
+        :rtype: LDAPResponse
+
+        Additional keyword arguments are handled as :doc:`/controls`.
+        """
         return self.mod_dn(dn, new_rdn, clean_attr, **ctrl_kwds)
 
     def move(self, dn, new_dn, clean_attr=True, **ctrl_kwds):
-        """Specify a new absolute DN for an object"""
+        """Specify a new absolute DN for an object.
+
+        :param str dn: The current DN of the object
+        :param str new_dn: The new absolute DN of the object, e.g. cn=foo,dc=example,dc=org
+        :param bool clean_attr: Remove the old RDN attribute from the object when changing
+        :return: A response object
+        :rtype: LDAPResponse
+
+        Additional keyword arguments are handled as :doc:`/controls`.
+        """
         rdn, parent = re.split(r'(?<!\\),', new_dn, 1)
         return self.mod_dn(dn, rdn, clean_attr, parent, **ctrl_kwds)
 
     ## change attributes on an object
 
     def modify(self, dn, modlist, current=None, **ctrl_kwds):
-        """Perform a series of modify operations on an object
+        """Perform a series of modify operations on an object atomically
 
-         modlist must be a list of laurelin.ldap.modify.Mod instances
+        :param str dn: The DN of the object to modify
+        :param list[Mod] modlist: A list of :class:`Mod` instances,
+                                  e.g. [Mod(Mod.ADD, 'someAttr', ['value1', 'value2'])]
+        :param current: The current known state of the object for use in validation
+        :type current: LDAPObject or None
+        :return: A response object
+        :rtype: LDAPResponse
+        :raises ConnectionUnbound: if the connection has been unbound
+        :raises LDAPValidationError: if the operation fails and configured validator
+
+        Additional keyword arguments are handled as :doc:`/controls`.
         """
         if len(modlist) > 0:
             if self.sock.unbound:
@@ -833,7 +946,18 @@ class LDAP(Extensible):
             return LDAPResponse()
 
     def add_attrs(self, dn, attrs_dict, current=None, **ctrl_kwds):
-        """Add new attribute values to existing object"""
+        """Add new attribute values to existing object.
+
+        :param str dn: The DN of the object to modify
+        :param attrs_dict: The new attributes to add to the object
+        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :param current: The current known state of the object for use in validation
+        :type current: LDAPObject or None
+        :return: A response object
+        :rtype: LDAPResponse
+
+        Additional keyword arguments are handled as :doc:`/controls`.
+        """
         if current is not None:
             modlist = AddModlist(current, attrs_dict)
         elif not self.strict_modify:
@@ -844,9 +968,20 @@ class LDAP(Extensible):
         return self.modify(dn, modlist, current, **ctrl_kwds)
 
     def delete_attrs(self, dn, attrs_dict, current=None, **ctrl_kwds):
-        """Delete specific attribute values from dictionary
+        """Delete specific attribute values from dictionary.
 
-         Specifying a 0-length entry will delete all values
+        Specifying a 0-length entry will delete all values.
+
+        :param str dn: The DN of the object to modify
+        :param attrs_dict: The attributes to remove from the object. Specify an empty list for a value to delete all
+                           values.
+        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :param current: The current known state of the object for use in validation
+        :type current: LDAPObject or None
+        :return: A response object
+        :rtype: LDAPResponse
+
+        Additional keyword arguments are handled as :doc:`/controls`.
         """
         if current is not None:
             modlist = DeleteModlist(current, attrs_dict)
@@ -863,6 +998,16 @@ class LDAP(Extensible):
          * Attributes not mentioned in attrsDict are not touched
          * Attributes will be created if they do not exist
          * Specifying a 0-length entry will delete all values for that attribute
+
+        :param str dn: The DN of the object to modify
+        :param attrs_dict: The new attributes to set on the object
+        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :param current: The current known state of the object for use in validation
+        :type current: LDAPObject or None
+        :return: A response object
+        :rtype: LDAPResponse
+
+        Additional keyword arguments are handled as :doc:`/controls`.
         """
 
         # Only query for the current object if there are validators present and
@@ -875,10 +1020,21 @@ class LDAP(Extensible):
     ## Extension methods
 
     def send_extended_request(self, oid, value=None, **kwds):
-        """Send an extended request, returns instance of ExtendedResponseHandle
+        """Send an extended request, returns instance of :class:`ExtendedResponseHandle`
 
-         This is mainly meant to be called by other built-in methods and client extensions. Requires
-         handling of raw pyasn1 protocol objects
+        This is mainly meant to be called by other built-in methods and client extensions. Requires
+        handling of raw pyasn1 protocol objects.
+
+        :param str oid: The OID of the extension. Must be declared as supported by the server in the root DSE.
+        :param value: The request value (optional)
+        :type value: str or None
+        :return: An iterator yielding tuples of the form (:class:`rfc4511.IntermediateResponse`,
+                 :class:`rfc4511.Controls`) or (:class:`rfc4511.ExtendedResponse`, :class:`rfc4511.Controls`).
+        :rtype: ExtendedResponseHandle
+        :raises LDAPSupportError: if the OID is not listed in the supportedExtension attribute of the root DSE
+        :raises TypeError: if the `value` parameter is not a string or None
+
+        Additional keyword arguments are handled as :doc:`/controls`.
         """
         if oid not in self.root_dse.get_attr('supportedExtension'):
             raise LDAPSupportError('Extended operation is not supported by the server')
@@ -888,17 +1044,46 @@ class LDAP(Extensible):
             if not isinstance(value, six.string_types):
                 raise TypeError('extendedRequest value must be string')
             xr.setComponentByName('requestValue', rfc4511.RequestValue(value))
-        req_ctrls = self._process_ctrl_kwds('ext', kwds)
+        req_ctrls = self._process_ctrl_kwds('ext', kwds, final=True)
         mid = self.sock.send_message('extendedReq', xr, req_ctrls)
         logger.info('Sent extended request ID={0} OID={1}'.format(mid, oid))
         return ExtendedResponseHandle(mid=mid, ldap_conn=self)
 
     def who_am_i(self, **ctrl_kwds):
+        """Perform the "Who Am I?" extended operation. This will confirm the identity that the connection is bound to.
+
+        :return: A string describing the bound identity. One common form is "dn:cn=foo,dc=example,dc=org" but this will
+                 vary by server configuration and bind type/parameters.
+        :rtype: str
+
+        Additional keyword arguments are handled as :doc:`/controls`.
+        """
         handle = self.send_extended_request(LDAP.OID_WHOAMI, requireSuccess=True, **ctrl_kwds)
         xr, res_ctrls = handle.recv_response()
         return six.text_type(xr.getComponentByName('responseValue'))
 
     def start_tls(self, verify=None, ca_file=None, ca_path=None, ca_data=None):
+        """Perform the StartTLS extended operation. This will instruct the server to begin encrypting this socket
+        connection with TLS/SSL.
+
+        :param bool verify: Set to False to disable verification of the remote certificate. You can set the default
+                            per-connection by passing the `ssl_verify` keyword to the :class:`LDAP` constructor, or set
+                            the global default by defining :attr:`LDAP.DEFAULT_SSL_VERIFY`.
+        :param str ca_file: Path to PEM-formatted concatenated CA certficates file. You can set the default
+                            per-connection by passing the `ssl_ca_file` keyword to the :class:`LDAP` constructor, or set
+                            the global default by defining :attr:`LDAP.DEFAULT_SSL_CA_FILE`.
+        :param str ca_path: Path to directory with CA certs under hashed file names. See
+                            https://www.openssl.org/docs/man1.1.0/ssl/SSL_CTX_load_verify_locations.html for more
+                            information about the format of this directory. You can set the default per-connection by
+                            passing the `ssl_ca_path` keyword to the :class:`LDAP` constructor, or set the global
+                            default by defining :attr:`LDAP.DEFAULT_SSL_CA_PATH`.
+        :param ca_data: An ASCII string of one or more PEM-encoded certs or a bytes object containing DER-encoded
+                        certificates. You can set the default per-connection by passing the `ssl_ca_data` keyword to the
+                        :class:`LDAP` constructor, or set the global default by defining
+                        :attr:`LDAP_DEFAULT_SSL_CA_DATA`.
+        :type ca_data: str or bytes
+        :rtype: None
+        """
         if self.sock.started_tls:
             raise LDAPError('TLS layer already installed')
         if verify is None:
@@ -925,9 +1110,24 @@ class LDAP(Extensible):
                 pass
 
     def validate_object(self, obj, write=True):
+        """Run all configured validators for the given object.
+
+        :param LDAPObject obj: The object to validate
+        :param bool write: True if this is for a write operation (e.g. an add)
+        :rtype: None
+        :raises LDAPValidationError: if any validator fails the object
+        """
         self._run_validation('validate_object', obj, write)
 
     def validate_modify(self, dn, modlist, current=None):
+        """Run all configured validators for the given modify operation
+
+        :param str dn: The DN of the object being modified
+        :param list[Mod] modlist: The sequence of changes to be performed
+        :param LDAPObject current: The current known state of the object
+        :rtype: None
+        :raises LDAPValidationError: if any validator fails the operation
+        """
         self._run_validation('validate_modify', dn, modlist, current)
 
     ## misc
@@ -935,7 +1135,12 @@ class LDAP(Extensible):
     def process_ldif(self, ldif_str):
         """Process a basic LDIF
 
-         TODO: full RFC 2849 implementation
+        TODO: full RFC 2849 implementation
+
+        :param str ldif_str: A single LDIF-formatted operation
+        :return: The return of the operation
+        :rtype: LDAPResponse or LDAPObject
+        :raises ValueError: if the LDIF is malformed or contains an unsupported operation
         """
         ldif_lines = ldif_str.splitlines()
         if not ldif_lines[0].startswith('dn:'):
@@ -986,6 +1191,9 @@ class LDAPResponse(object):
 
 
 class CompareResponse(LDAPResponse):
+    """Stores boolean compare result and any response control values. The :func:`bool` of this object gives the
+    compare result.
+    """
     def __init__(self, compare_result):
         self.compare_result = compare_result
 
@@ -994,6 +1202,7 @@ class CompareResponse(LDAPResponse):
 
 
 class ResponseHandle(object):
+    """Base for return from methods with multiple response messages."""
     def __enter__(self):
         return self
 
@@ -1183,7 +1392,7 @@ class LDAPURI(object):
          First opens a new connection with connection reuse disabled, then performs the search, and
          unbinds the connection. Server must allow anonymous read.
 
-         Additional keyword arguments are passed through into :func:`LDAP.search`.
+         Additional keyword arguments are passed through into :meth:`LDAP.search`.
         """
         ldap = LDAP(self.host_uri, reuse_connection=False)
         if self.starttls:
@@ -1201,20 +1410,20 @@ class LDAPURI(object):
 
 class SearchReferenceHandle(object):
     """Returned when the server returns a SearchResultReference"""
-    def __init__(self, URIs, objKwds):
-        self.URIs = []
-        self.objKwds = objKwds
-        for uri in URIs:
-            self.URIs.append(LDAPURI(uri))
+    def __init__(self, uris, obj_kwds):
+        self.uris = []
+        self.obj_kwds = obj_kwds
+        for uri in uris:
+            self.uris.append(LDAPURI(uri))
 
     def fetch(self):
         """Perform the reference search and return an iterator over results"""
 
         # If multiple URIs are present, the client assumes that any supported URI
         # may be used to progress the operation. ~ RFC4511 sec 4.5.3 p28
-        for uri in self.URIs:
+        for uri in self.uris:
             try:
-                return uri.search(**self.objKwds)
+                return uri.search(**self.obj_kwds)
             except LDAPConnectionError as e:
                 warn('Error connecting to URI {0} ({1})'.format(uri, e.message), LDAPWarning)
         raise LDAPError('Could not complete reference URI search with any supplied URIs')

@@ -117,14 +117,34 @@ class Control(object):
      there is no response control specified.
     """
 
-    method = ()         # name(s) of the method which this control is used with
-    keyword = ''        # keyword argument name
-    response_attr = ''  # Name of the attribute where return of handle() will be stored
-    REQUEST_OID = ''    # Request OID of the control
-    RESPONSE_OID = ''   # Response OID of the control (may be equal to REQUEST_OID; may be left empty)
+    method = ()
+    """name(s) of the method which this control is used with"""
+
+    keyword = ''
+    """keyword argument name"""
+
+    response_attr = ''
+    """Name of the attribute where return of handle() will be stored"""
+
+    REQUEST_OID = ''
+    """Request OID of the control"""
+
+    RESPONSE_OID = ''
+    """Response OID of the control (may be equal to REQUEST_OID; may be left empty)"""
 
     def prepare(self, ctrl_value, criticality):
-        """Accepts string controlValue and returns an rfc4511.Control instance"""
+        """Accepts string controlValue and returns an rfc4511.Control instance
+
+        When overriding this function, you must always call and return this base function.
+
+        :param str ctrl_value: The string request control value to send to the server
+        :param bool criticality: True if the control has criticality. This is indicated by wrapping the keyword
+                                 argument in :class:`critical` or :class:`optional`, and by the `default_criticality`
+                                 keyword passed to the :class:`LDAP` constructor, and global default
+                                 :attr:`LDAP.DEFAULT_CRITICALITY`.
+        :return: The protocol-level control object ready for transmission to the server
+        :rtype: rfc4511.Control
+        """
         c = _Control()
         c.setComponentByName('controlType', LDAPOID(self.REQUEST_OID))
         c.setComponentByName('criticality', Criticality(criticality))
@@ -133,8 +153,15 @@ class Control(object):
         return c
 
     def handle(self, ctrl_value):
-        """Accepts raw response ctrlValue and may return any useful value"""
-        raise NotImplementedError()
+        """Accepts raw response ctrl_value and may return any useful value.
+
+        There is no need to call this base function when overriding.
+
+        :param str ctrl_value: The string response control value received from the server.
+        :return: The string `ctrl_value` unchanged by default. May be overridden to return any relevant
+                 value/type/structure.
+        """
+        return six.text_type(ctrl_value)
 
 
 class critical(object):

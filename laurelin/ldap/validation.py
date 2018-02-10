@@ -26,7 +26,8 @@ class Validator(object):
 
         :param str dn: The DN of the object being modified
         :param list[Mod] modlist: The list of modify operations to be performed this transaction
-        :param LDAPObject current: The known state of the object prior to modification
+        :param current: The known state of the object prior to modification
+        :type current: LDAPObject or None
         :return: None
         :raises LDAPValidationError: if any modify operation is invalid
         """

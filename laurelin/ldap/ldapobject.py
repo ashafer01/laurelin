@@ -19,12 +19,27 @@ from .modify import (
 
 
 class LDAPObject(AttrsDict, Extensible):
-    """Represents a single object with optional server affinity
+    """Represents a single object with optional server affinity.
 
-     Many methods will raise an exception if used without a server connection. To instantiate an
-     LDAPObject bound to a server connection, use LDAP.obj()
+    Many methods will raise an exception if used without a server connection. To instantiate an :class:`LDAPObject`
+    bound to a server connection, use :meth:`LDAP.obj`.
 
-     Attributes and values are stored using the mapping interface inherited from AttrsDict.
+    Attributes and values are stored using the mapping interface inherited from AttrsDict, where dict keys are
+    case-insensitive attribute names, and dict values are a list of attribute values.
+
+    :param str dn: The DN of the object
+    :param attrs_dict: The object's attributes
+    :type attrs_dict: dict(str, list[str]) or AttrsDict or None
+    :param ldap_conn: The optional LDAP connection to use
+    :type ldap_conn: LDAP or None
+    :param Scope relative_search_scope: One of the :class:`Scope` constants, this is the default scope used when using
+                                        this object's :meth:`LDAPObject.search` method. New objects created below this
+                                        one will inherit this attribute by default.
+    :param rdn_attr: The default attribute name used in RDN's for descendents of this object. If specified, this
+                     allows you to only specify the value for methods that have an `rdn` argument. You can always
+                     specify a full attr=value for `rdn` arguments as well to override this behavior. New objects
+                     created below this one will inherit this attribute by default.
+    :type rdn_attr: str or None
     """
 
     def __init__(self, dn, attrs_dict=None, ldap_conn=None, relative_search_scope=Scope.SUBTREE, rdn_attr=None):
@@ -73,6 +88,12 @@ class LDAPObject(AttrsDict, Extensible):
             return rdn
 
     def rdn(self, rdn):
+        """Return an absolute DN from an RDN or RDN value
+
+        :param str rdn: The RDN, or RDN value if `rdn_attr` is defined for this object
+        :return: The absolute DN
+        :rtype: str
+        """
         rdn = self._rdn_attr(rdn)
         return '{0},{1}'.format(rdn, self.dn)
 
@@ -82,6 +103,19 @@ class LDAPObject(AttrsDict, Extensible):
         obj_kwds.setdefault('rdn_attr', self.rdn_attr)
 
     def obj(self, rdn, attrs_dict=None, tag=None, *args, **kwds):
+        """Create a new object below this one.
+
+        :param str rdn: The RDN, or RDN value if `rdn_attr` is defined for this object
+        :param attrs_dict: The attributes for the object
+        :type attrs_dict: dict(str, list[str]) or AttrsDict or None
+        :param tag: Optional tag for the object
+        :type tag: str or None
+        :return: The new object
+        :rtype: LDAPObject
+        :raises LDAPError: if a `tag` is specified but this object is not bound to an LDAP connection
+
+        Additional arguments are passed through into the :class:`LDAPObject` constructor.
+        """
         self._set_obj_kwd_defaults(kwds)
         if self._has_ldap():
             return self.ldap_conn.obj(self.rdn(rdn), attrs_dict=attrs_dict, tag=tag, *args, **kwds)
@@ -91,11 +125,32 @@ class LDAPObject(AttrsDict, Extensible):
             return LDAPObject(self.rdn(rdn), attrs_dict=attrs_dict, *args, **kwds)
 
     def get_child(self, rdn, attrs=None, **kwds):
+        """Query the server for a child object.
+
+        :param str rdn: The RDN, or RDN value if `rdn_attr` is defined for this object
+        :param attrs: The list of attributes to query
+        :type attrs: list[str] or None
+        :return: The object populated with data from the server
+        :rtype: LDAPObject
+        :raises RuntimeError: if this object is not bound to an LDAP connection
+
+        Additional keywords are passed through into :meth:`LDAP.search` and :class:`LDAPObject`
+        """
         self._require_ldap()
         self._set_obj_kwd_defaults(kwds)
         return self.ldap_conn.get(self.rdn(rdn), attrs, **kwds)
 
     def add_child(self, rdn, attrs_dict, **kwds):
+        """Create a new object below this one.
+
+        :param str rdn: The RDN, or RDN value if `rdn_attr` is defined for this object
+        :param attrs_dict: The attributes for the object
+        :type attrs_dict: dict(str, list[str]) or AttrsDict or None
+        :return: The new object
+        :rtype: LDAPObject
+
+        Additional arguments are passed through into :meth:`LDAP.add`
+        """
         self._require_ldap()
         self._set_obj_kwd_defaults(kwds)
         return self.ldap_conn.add(self.rdn(rdn), attrs_dict, **kwds)
