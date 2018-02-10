@@ -7,3 +7,6 @@
 .DS_Store
 notes.txt
 .idea
+docs/_build
+docs/_static
+docs/_templates
