@@ -25,11 +25,11 @@ The following features have not yet been implemented or are incomplete:
 
  * Docs
 
-   * Minimal so far pending some confidence in API stability
+   * In progress
 
  * Testing
 
-   * Only ad-hoc functional testing
+   * In progress
 
 Please feel free to open a github ticket if you spot anything else missing, or have any thoughts regarding naming,
 default settings, etc.
@@ -37,7 +37,7 @@ default settings, etc.
 Walkthrough
 -----------
 
-Begin by initializing a connection to an LDAP server. Pass a URI string to the `LDAP` constructor::
+Begin by initializing a connection to an LDAP server. Pass a URI string to the :class:`.LDAP` constructor::
 
     from laurelin.ldap import LDAP
     ldap = LDAP('ldap://dir.example.org:389')
