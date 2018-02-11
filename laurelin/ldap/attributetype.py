@@ -14,6 +14,12 @@ _name_attribute_types = {}
 
 
 def get_attribute_type(ident):
+    """Get an instance of :class:`AttributeType` associated with either a name or OID.
+
+    :param str ident: Either the numeric OID of the desired attribute type spec or any one of its specified names
+    :return: The AttributeType containing a parsed specification
+    :rtype: AttributeType
+    """
     if ident[0].isdigit():
         return _oid_attribute_types[ident]
     else:
@@ -24,6 +30,36 @@ def get_attribute_type(ident):
 
 
 class AttributeType(object):
+    """Parses an LDAP attribute type specification and implements supertype inheritance.
+
+    Each instantiation registers the names and OIDs specified so that the spec can be accessed using
+    :func:`get_attribute_type`.
+
+    See the :mod:`laurelin.ldap.schema` module source for example usages.
+
+    :param str spec: The LDAP specification for an Attribute Type.
+    :raises: LDAPSchemaError: if
+                               * The specification is invalid
+                               * The OID has already been defined
+                               * One of the names has already been defined
+
+    :var str oid: The OID of the attribute type
+    :var tuple(str) names: A tuple containing all possible names for the attribute type
+    :var str supertype: The specified supertype. If the spec does not define optional properties, they will pass through
+                        into the supertype.
+    :var str equality_oid: The OID of the equality matching rule
+    :var str syntax_oid: The OID of the syntax matching rule
+    :var int syntax_length: The suggested maximum length of a value
+    :var bool obsolete: The type has been flagged as obsolete. Will cause a warning from the :class:`SchemaValidator` if
+                        an obsolete attribute type is used.
+    :var bool single_value: The attribute may only have one value.
+    :var bool collective: The attribute has been marked collective.
+    :var bool no_user_mod: The attribute may not be modified by users (e.g., for operational attributes). Will cause a
+                           validation failure from the :class:`SchemaValidator` if a write operation is attempted on
+                           attribute types with this property set to True.
+    :var str usage: A string describing the attribute's usage. May be one of `userApplications`, `directoryOperation`,
+                    `distributedOperation`, or `dSAOperation`.
+    """
     def __init__(self, spec):
         spec = utils.collapse_whitespace(spec).strip()
         m = _re_attr_type.match(spec)
@@ -59,12 +95,12 @@ class AttributeType(object):
             syntax_noidlen = syntax.split('{')
             self.syntax_oid = syntax_noidlen[0]
             if len(syntax_noidlen) > 1:
-                self.syntaxLength = int(syntax_noidlen[1].strip('}'))
+                self.syntax_length = int(syntax_noidlen[1].strip('}'))
             else:
-                self.syntaxLength = -1
+                self.syntax_length = -1
         elif not self.supertype:
             self.syntax_oid = None
-            self.syntaxLength = -1
+            self.syntax_length = -1
 
         obsolete = m.group('obsolete')
         if obsolete is not None:
@@ -98,10 +134,12 @@ class AttributeType(object):
 
     @property
     def syntax(self):
+        """Gets the :class:`SyntaxRule` for this attribute type."""
         return rules.get_syntax_rule(self.syntax_oid)
 
     @property
     def equality(self):
+        """Gets the :class:`EqualityMatchingRule` for this attribute type."""
         return rules.get_matching_rule(self.equality_oid)
 
     def __getattr__(self, name):
@@ -111,13 +149,25 @@ class AttributeType(object):
             raise AttributeError("No attribute named '{0}' and no supertype specified".format(name))
 
     def validate(self, value):
-        """Validate a value according to the attribute type's syntax rule"""
+        """Validate a value according to the attribute type's syntax rule.
+
+        :param str value: The potential attribute value
+        :return: A truthy value.
+        :raises InvalidSyntaxError: if the value is invalid.
+        """
         return self.syntax.validate(value)
 
     def index(self, value_list, assertion_value):
         """Finds the index of a value in a list of attribute values. Raises a
          ValueError if the value is not found in the list. Assumes values in
          value_list are already validated.
+
+         :param list[str] value_list: The list of attribute values. Assumes values are already validated.
+         :param str assertion_value: The value to look for in ``value_list``.
+         :return: The index of ``assertion_value`` in ``value_list``.
+         :rtype: int
+         :raises ValueError: if ``assertion_value`` is not found or if ``value_list`` is empty.
+         :raises InvalidSyntaxError: if ``assertion_value`` does not meet the syntax requirements of this attribute type
         """
         if not value_list:
             raise ValueError('empty value_list')
@@ -133,25 +183,45 @@ class AttributeType(object):
 ## Defaults used when an attribute type is undefined
 
 class DefaultSyntaxRule(object):
+    """The default syntax rule to use for undefined attribute types.
+
+    Users should probably never instantiate this.
+    """
     def validate(self, s):
+        """Allow all values"""
         pass
 
 
 class DefaultMatchingRule(object):
+    """The default matching rule to use for undefined attribute types.
+
+    Users should probably never instantiate this.
+    """
     def validate(self, value):
+        """Allow all values"""
         return True
 
     def prepare(self, a):
+        """Do nothing to prepare"""
         return a
 
     def do_match(self, a, b):
+        """Require strict equality"""
         return (a == b)
 
     def match(self, a, b):
+        """Do the match"""
         return self.do_match(a, b)
 
 
 class DefaultAttributeType(AttributeType):
+    """The default attribute type returned by :func:`get_attribute_type` when the requested attribute type is
+    undefined.
+
+    Essentially behaves as an unrestricted case-sensitive attribute type.
+
+    Users should probably never instantiate this.
+    """
     def __init__(self, name=None):
         self.oid = None
         self.names = (name,)

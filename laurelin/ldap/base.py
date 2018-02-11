@@ -33,6 +33,7 @@ import logging
 import re
 import six
 import warnings
+from importlib import import_module
 from six.moves import range
 from six.moves.urllib.parse import urlparse
 from warnings import warn
@@ -165,6 +166,20 @@ class LDAP(Extensible):
     def default_warnings():
         """Always take the default action for warnings"""
         warnings.showwarning = _showwarning_default
+
+    @staticmethod
+    def activate_extension(module_name):
+        """Import the module name and call the ``activate_extension`` function on the module.
+
+        :param str module_name: The name of the module to import and activate
+        :return: The imported module
+        :rtype: module
+        """
+        mod = import_module(module_name)
+        if hasattr(mod, 'activate_extension'):
+            mod.activate_extension()
+        logger.info("Activated extension {0} (File: {1})".format(module_name, mod.__file__))
+        return mod
 
     ## basic methods
 
@@ -1034,7 +1049,8 @@ class LDAP(Extensible):
         :raises LDAPSupportError: if the OID is not listed in the supportedExtension attribute of the root DSE
         :raises TypeError: if the `value` parameter is not a string or None
 
-        Additional keyword arguments are handled as :doc:`/controls`.
+        Additional keyword arguments are handled as :doc:`/controls` and then passed through into the
+        :class:`ExtendedResponseHandle` constructor.
         """
         if oid not in self.root_dse.get_attr('supportedExtension'):
             raise LDAPSupportError('Extended operation is not supported by the server')
@@ -1044,10 +1060,10 @@ class LDAP(Extensible):
             if not isinstance(value, six.string_types):
                 raise TypeError('extendedRequest value must be string')
             xr.setComponentByName('requestValue', rfc4511.RequestValue(value))
-        req_ctrls = self._process_ctrl_kwds('ext', kwds, final=True)
+        req_ctrls = self._process_ctrl_kwds('ext', kwds)
         mid = self.sock.send_message('extendedReq', xr, req_ctrls)
         logger.info('Sent extended request ID={0} OID={1}'.format(mid, oid))
-        return ExtendedResponseHandle(mid=mid, ldap_conn=self)
+        return ExtendedResponseHandle(mid=mid, ldap_conn=self, **kwds)
 
     def who_am_i(self, **ctrl_kwds):
         """Perform the "Who Am I?" extended operation. This will confirm the identity that the connection is bound to.
@@ -1058,7 +1074,7 @@ class LDAP(Extensible):
 
         Additional keyword arguments are handled as :doc:`/controls`.
         """
-        handle = self.send_extended_request(LDAP.OID_WHOAMI, requireSuccess=True, **ctrl_kwds)
+        handle = self.send_extended_request(LDAP.OID_WHOAMI, require_success=True, **ctrl_kwds)
         xr, res_ctrls = handle.recv_response()
         return six.text_type(xr.getComponentByName('responseValue'))
 
@@ -1094,7 +1110,7 @@ class LDAP(Extensible):
             ca_path = self.ssl_ca_path
         if ca_data is None:
             ca_data = self.ssl_ca_data
-        handle = self.send_extended_request(LDAP.OID_STARTTLS, requireSuccess=True)
+        handle = self.send_extended_request(LDAP.OID_STARTTLS, require_success=True)
         handle.recv_response()
         self.sock.start_tls(verify, ca_file, ca_path, ca_data)
         self.refresh_root_dse()

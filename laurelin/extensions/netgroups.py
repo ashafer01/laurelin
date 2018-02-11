@@ -1,3 +1,71 @@
+"""Extension adding netgroup support to laurelin.
+
+You should begin by tagging the base object which all netgroups are below, and defining the RDN attribute and scope. If
+the structure is flat there is a performance advantage by setting ``relative_search_scope=Scope.ONE``::
+
+    from laurelin.ldap import LDAP, Scope
+    netgroups_extension = LDAP.activate_extension('laurelin.extensions.netgroups')
+
+    with LDAP() as ldap:
+        netgroups = ldap.base.obj('ou=netgroups',
+                                  tag=netgroups_extension.TAG,
+                                  relative_search_scope=Scope.ONE,
+                                  rdn_attr='cn')
+
+Member Lists
+^^^^^^^^^^^^
+
+This extension module allows a shortcut to specify members of netgroups. Any function with a ``members`` argument uses
+this feature.
+
+The function name will tell you whether it expects users (e.g., :func:`add_netgroup_users`) or hosts (e.g.
+:func:`add_netgroup_hosts`). If you just specify a string in your member list, it will be assumed to be either a user
+or a host accordingly.
+
+You can also specify a tuple with up to 3 elements for any member list entry. These fields must correspond to the
+``nisNetgroupTriple`` fields: host, user, and domain. For user functions, at least the first 2 tuple elements must be
+specified. For host functions, only the first is required, the 2nd (user) field will be assumed as an empty string. In
+all cases, the domain can be specified for all members by passing the ``domain`` argument to the function (it defaults
+to an empty string).
+
+The third option for member list entries is to specify the full ``nisNetgroupTriple`` yourself in a string.
+
+Finally, you can specify a ``memberNisNetgroup`` by prefixing the entry with a ``+`` symbol. For example: ``+users``.
+
+Examples::
+
+    users = [
+       'alice',
+       'bob',
+       ('dir.example.org', 'admin'),
+       '(dir.example.org,manager,example.org)',
+    ]
+
+    ldap.add_netgroup_users('cn=managers,ou=netgroups,dc=example,dc=org', users, domain='example.org')
+    # Adds the following nisNetgroupTriples:
+    #  (,alice,example.org)
+    #  (,bob,example.org)
+    #  (dir.example.org,admin,example.org)
+    #  (dir.example.org,manager,example.org)
+    # Does not add any memberNisNetgroups
+
+    hosts = [
+        'dir1.example.org',
+        'dir2.example.org',
+        '(dir3.example.org,,)',
+        ('dir4.example.org',),
+        '+aws_backup_dir_servers',
+    ]
+
+    ldap.add_netgroup_hosts('cn=dir_servers,ou=netgroups,dc=example,dc=org', hosts)
+    # Adds the following nisNetgroupTriples:
+    #  (dir1.example.org,,)
+    #  (dir2.example.org,,)
+    #  (dir3.example.org,,)
+    #  (dir4.example.org,,)
+    # Adds the following memberNisNetgroup:
+    #  aws_backup_dir_servers
+"""
 from __future__ import absolute_import
 import re
 from laurelin.ldap import LDAP, LDAPObject, LDAPError
@@ -45,75 +113,218 @@ class nisNetgroupTripleSytnax(RegexSyntaxRule):
 
 ## LDAP extension methods
 
-
-@LDAP.EXTEND()
-def getNetgroup(self, cn, attrs=NETGROUP_ATTRS):
-    return self.tag(TAG).get(cn, attrs)
+LDAP_methods = []
 
 
-@LDAP.EXTEND()
-def netgroupSearch(self, filter, attrs=NETGROUP_ATTRS):
-    return self.tag(TAG).search(_netgroupFilter(filter), attrs)
+def get_netgroup(self, cn, attrs=NETGROUP_ATTRS):
+    """Find a specific netgroup object. This method gets bound to :class:`LDAP`.
+
+    This depends on the base object having been tagged and configured properly. See :mod:`laurelin.extensions.netgroup`.
+
+    :param str cn: The name of the group or an RDN
+    :param list[str] attrs: List of attribute names to get. Defaults to all netgroup attributes.
+    :return: The netgroup object
+    :rtype: LDAPObject
+    :raises TagError: if the base object has not been tagged.
+    """
+    return self.tag(TAG).find(cn, attrs)
 
 
-@LDAP.EXTEND()
-def getNetgroupUsers(self, cn, recursive=True):
-    ng = self.getNetgroup(cn)
-    users = _extractTripleField(ng, 2)
-    if recursive and ('memberNisNetgroup' in ng):
-        for member in ng['memberNisNetgroup']:
-            users += self.getNetgroupUsers(member, True)
+LDAP_methods.append(get_netgroup)
+
+
+def netgroup_search(self, filter, attrs=NETGROUP_ATTRS):
+    """Search for netgroups. This method gets bound to :class:`LDAP`.
+
+    This depends on the base object having been tagged and configured properly. See :mod:`laurelin.extensions.netgroup`.
+
+    :param str filter: A partial filter string. The nisNetgroup objectClass will automatically be included in the
+                       filter sent to the server.
+    :param list[str] attrs: List of attribute names to get. Defaults to all netgroup attributes.
+    :return: An iterator over matching netgroup objects, yielding instances of :class:`LDAPObject`.
+    :rtype: SearchResultHandle
+    :raises TagError: if the base object has not been tagged.
+    """
+    return self.tag(TAG).search(_netgroup_filter(filter), attrs)
+
+
+LDAP_methods.append(netgroup_search)
+
+
+def get_netgroup_obj_users(self, ng_obj, recursive=True):
+    """Get a list of netgroup users from an already queried object, possibly querying for memberNisNetgroups if
+    ``recursive=True`` (the default).
+
+    :param LDAPObject ng_obj: A netgroup LDAP object
+    :param bool recursive: Set to False to only consider members of this group directly
+    :return: A list of usernames
+    :rtype: list[str]
+    """
+    users = _extract_triple_field(ng_obj, 2)
+    if recursive and ('memberNisNetgroup' in ng_obj):
+        for member in ng_obj['memberNisNetgroup']:
+            users += self.get_netgroup_users(member, True)
     return users
 
 
-@LDAP.EXTEND()
-def getNetgroupHosts(self, cn, recursive=True):
-    ng = self.getNetgroup(cn)
-    users = _extractTripleField(ng, 1)
-    if recursive and ('memberNisNetgroup' in ng):
-        for member in ng['memberNisNetgroup']:
-            users += self.getNetgroupHosts(member, True)
-    return users
+LDAP_methods.append(get_netgroup_obj_users)
 
 
-@LDAP.EXTEND()
-def addNetgroupUsers(self, DN, members, domain=''):
+def get_netgroup_users(self, cn, recursive=True):
+    """Get a list of all user entries for a netgroup. This method gets bound to :class:`LDAP`.
+
+    This depends on the base object having been tagged and configured properly. See :mod:`laurelin.extensions.netgroup`.
+
+    :param str cn: The name of the group or an RDN
+    :param bool recursive: Recursively get users by following memberNisNetgroups
+    :return: A list of usernames
+    :rtype: list[str]
+    :raises TagError: if the base object has not been tagged.
+    """
+    ng = self.get_netgroup(cn)
+    return self.get_netgroup_obj_users(ng, recursive)
+
+
+LDAP_methods.append(get_netgroup_users)
+
+
+def get_netgroup_obj_hosts(self, ng_obj, recursive=True):
+    """Get a list of netgroup hosts from an already queried object, possibly querying for memberNisNetgroups if
+    ``recursive=True`` (the default).
+
+    :param LDAPObject ng_obj: A netgroup LDAP object
+    :param bool recursive: Set to False to only consider members of this group directly
+    :return: A list of hostnames
+    :rtype: list[str]
+    """
+    hosts = _extract_triple_field(ng_obj, 1)
+    if recursive and ('memberNisNetgroup' in ng_obj):
+        for member in ng_obj['memberNisNetgroup']:
+            hosts += self.get_netgroup_hosts(member, True)
+    return hosts
+
+
+LDAP_methods.append(get_netgroup_obj_hosts)
+
+
+def get_netgroup_hosts(self, cn, recursive=True):
+    """Get a list of all host entries for a netgroup. This method gets bound to :class:`LDAP`.
+
+    This depends on the base object having been tagged and configured properly. See :mod:`laurelin.extensions.netgroup`.
+
+    :param str cn: The name of the group or an RDN
+    :param bool recursive: Recursively get hosts by following memberNisNetgroups
+    :return: A list of hostnames
+    :rtype: list[str]
+    :raises TagError: if the base object has not been tagged.
+    """
+    ng = self.get_netgroup(cn)
+    return self.get_netgroup_obj_hosts(ng, recursive)
+
+
+LDAP_methods.append(get_netgroup_hosts)
+
+
+def add_netgroup_users(self, dn, members, domain=''):
+    """Add new users to a netgroup. This method gets bound to :class:`LDAP`.
+
+    :param str dn: The absolute DN of the netgroup object
+    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc)
+    :type members: list or str
+    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+    :rtype: None
+    """
     if not isinstance(members, list):
         members = [members]
-    self.add_attrs(DN, _memberUserListToAttrs(members, domain))
+    self.add_attrs(dn, _member_user_list_to_attrs(members, domain))
 
 
-@LDAP.EXTEND()
-def addNetgroupHosts(self, DN, members, domain=''):
+LDAP_methods.append(add_netgroup_users)
+
+
+def add_netgroup_hosts(self, dn, members, domain=''):
+    """Add new hosts to a netgroup. This method gets bound to :class:`LDAP`.
+
+    :param str dn: The absolute DN of the netgroup object
+    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc)
+    :type members: list or str
+    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+    :rtype: None
+    """
     if not isinstance(members, list):
         members = [members]
-    self.add_attrs(DN, _memberHostListToAttrs(members, domain))
+    self.add_attrs(dn, _member_host_list_to_attrs(members, domain))
+
+
+LDAP_methods.append(add_netgroup_hosts)
 
 
 ## LDAPObject extension methods
 
+LDAPObject_methods = []
 
-@LDAPObject.EXTEND()
-def _requireNetgroup(self):
+
+def _require_netgroup(self):
+    """Requires that this :class:`LDAPObject` has the required netgroup object class.
+
+    :raises RuntimeError: if the object is missing the netgroup object class
+    """
     if not self.has_object_class(OBJECT_CLASS):
         raise RuntimeError('objectClass {0} is required'.format(OBJECT_CLASS))
 
 
-@LDAPObject.EXTEND('getNetgroupUsers')
-def obj_getNetgroupUsers(self):
-    self._requireNetgroup()
+LDAPObject_methods.append(_require_netgroup)
 
 
-@LDAPObject.EXTEND('addNetgroupUsers')
-def obj_addNetgroupUsers(self, members, domain=''):
-    self._requireNetgroup()
-    self.ldapConn.addNetgroupUsers(self.dn, members, domain)
+def obj_get_netgroup_users(self, recursive=True):
+    """Get all users in this netgroup object. This method gets bound to :class:`LDAPObject` as ``get_netgroup_users``.
+
+    :param recursive: Set to False to ignore any memberNisNetgroups defined for this object.
+    :return: A list of usernames
+    :rtype: list[str]
+    :raises RuntimeError: if this object is missing the netgroup object class
+    """
+    self._require_netgroup()
+    return self.ldap_conn.get_netgroup_obj_users(self, recursive)
 
 
-@LDAPObject.EXTEND('addNetgroupHosts')
-def obj_addNetgroupHosts(self, members, domain=''):
-    self._requireNetgroup()
-    self.ldapConn.addNetgroupHosts(self.dn, members, domain)
+LDAPObject_methods.append(('get_netgroup_users', obj_get_netgroup_users))
+
+
+def obj_get_netgroup_hosts(self, recursive=True):
+    """Get all hosts in this netgroup object. This method gets bound to :class:`LDAPObject` as ``get_netgroup_hosts``.
+
+    :param recursive: Set to False to ignore any memberNisNetgroups defined for this object.
+    :return: A list of hostnames
+    :rtype: list[str]
+    :raises RuntimeError: if this object is missing the netgroup object class
+    """
+    self._require_netgroup()
+    return self.ldap_conn.get_netgroup_obj_hosts(self, recursive)
+
+
+LDAPObject_methods.append(('get_netgroup_hosts', obj_get_netgroup_hosts))
+
+
+def obj_add_netgroup_users(self, members, domain=''):
+    self._require_netgroup()
+    self.ldap_conn.add_netgroup_users(self.dn, members, domain)
+    # TODO modify local object
+
+
+def obj_add_netgroup_hosts(self, members, domain=''):
+    self._require_netgroup()
+    self.ldap_conn.add_netgroup_hosts(self.dn, members, domain)
+    # TODO modify local object
+
+
+## Extension activation function
+
+
+def activate_extension():
+    """Extension activation function. Installs extension methods to :class:`LDAP` and :class:`LDAPObject`"""
+    LDAP.EXTEND(LDAP_methods)
+    LDAPObject.EXTEND(LDAPObject_methods)
 
 
 ## private functions
@@ -122,21 +333,21 @@ def obj_addNetgroupHosts(self, members, domain=''):
 TRIPLE_RE = re.compile(_TRIPLE_RE)
 
 
-def _netgroupFilter(filter):
+def _netgroup_filter(filter):
     return '(&(objectClass={0}){1})'.format(OBJECT_CLASS, filter)
 
 
-def _isTriple(val):
+def _is_triple(val):
     return (TRIPLE_RE.match(val) is not None)
 
 
-def _nisNetgroupTriple(host, user, domain):
+def _nis_netgroup_triple(host, user, domain):
     return '({0},{1},{2})'.format(host, user, domain)
 
 
-def _extractTripleField(ngObj, index):
+def _extract_triple_field(ng_obj, index):
     ret = []
-    for triple in ngObj.get('nisNetgroupTriple', []):
+    for triple in ng_obj.get('nisNetgroupTriple', []):
         m = TRIPLE_RE.match(triple)
         if m is None:
             raise LDAPError('Invalid nisNetgroupTriple: {0}'.format(triple))
@@ -145,56 +356,56 @@ def _extractTripleField(ngObj, index):
     return ret
 
 
-def _memberUserListToAttrs(memberList, domain=''):
+def _member_user_list_to_attrs(member_list, domain=''):
     attrs = {}
-    for member in memberList:
+    for member in member_list:
         attr = 'nisNetgroupTriple'
         if isinstance(member, six.string_types):
             if member[0] == '+':
                 attr = 'memberNisNetgroup'
                 member = member[1:]
             else:
-                if not _isTriple(member):
-                    member = _nisNetgroupTriple('', member, domain)
+                if not _is_triple(member):
+                    member = _nis_netgroup_triple('', member, domain)
         elif isinstance(member, tuple):
             if len(member) == 1:
                 raise ValueError('At least first 2 triple values (host,user) must be specified for users')
             elif len(member) == 2:
-                member = _nisNetgroupTriple(member[0], member[1], domain)
+                member = _nis_netgroup_triple(member[0], member[1], domain)
             elif len(member) == 3:
-                member = _nisNetgroupTriple(*member)
+                member = _nis_netgroup_triple(*member)
             else:
                 raise ValueError('tuple must have 2 or 3 elements')
         else:
-            raise TypeError('memberList elements must be string or tuple')
+            raise TypeError('member_list elements must be string or tuple')
         if attr not in attrs:
             attrs[attr] = []
         attrs[attr].append(member)
     return attrs
 
 
-def _memberHostListToAttrs(memberList, domain=''):
+def _member_host_list_to_attrs(member_list, domain=''):
     attrs = {}
-    for member in memberList:
+    for member in member_list:
         attr = 'nisNetgroupTriple'
         if isinstance(member, six.string_types):
             if member[0] == '+':
                 attr = 'memberNisNetgroup'
                 member = member[1:]
             else:
-                if not _isTriple(member):
-                    member = _nisNetgroupTriple(member, '', domain)
+                if not _is_triple(member):
+                    member = _nis_netgroup_triple(member, '', domain)
         elif isinstance(member, tuple):
             if len(member) == 1:
-                member = _nisNetgroupTriple(member[0], '', domain)
+                member = _nis_netgroup_triple(member[0], '', domain)
             elif len(member) == 2:
-                member = _nisNetgroupTriple(member[0], member[1], domain)
+                member = _nis_netgroup_triple(member[0], member[1], domain)
             elif len(member) == 3:
-                member = _nisNetgroupTriple(*member)
+                member = _nis_netgroup_triple(*member)
             else:
                 raise ValueError('tuple must have 1-3 elements')
         else:
-            raise TypeError('memberList elements must be string or tuple')
+            raise TypeError('member_list elements must be string or tuple')
         if attr not in attrs:
             attrs[attr] = []
         attrs[attr].append(member)
