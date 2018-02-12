@@ -40,9 +40,9 @@ Defining Controls
 -----------------
 
 Controls must subclass Control and define at least:
- * :attr:`.Control.keyword`, the keyword argument to be used for the request control
  * :attr:`.Control.method`, a tuple of method names that this control supports. Current method names are `bind`,
    `search`, `compare`, `add`, `delete`, `modDN`, `modify`, and `ext` (extended request).
+ * :attr:`.Control.keyword`, the keyword argument to be used for the request control
  * :attr:`.Control.REQUEST_OID` the OID of the reuqest control. If the control has criticality, the OID must be listed
    in the supportedControl attribute of the root DSE of the server at runtime.
 

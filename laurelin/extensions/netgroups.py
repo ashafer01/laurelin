@@ -1,5 +1,7 @@
 """Extension adding netgroup support to laurelin.
 
+Includes schema definitions.
+
 You should begin by tagging the base object which all netgroups are below, and defining the RDN attribute and scope. If
 the structure is flat there is a performance advantage by setting ``relative_search_scope=Scope.ONE``::
 

@@ -17,3 +17,17 @@ with LDAP('ldap://localhost:10389',
 
     for obj in ldap.base.search():
         print(obj.format_ldif())
+
+    testobj = ldap.base.add_child('ou=functest', {
+        'objectClass': ['organizationalUnit'],
+        'ou': ['functest'],
+        'description': ['unstructured desc'],
+    })
+    testobj.add_desc_attrs({'foo': ['one', 'two']})
+    print(testobj.desc_attrs())
+    testobj.replace_desc_attrs({'foo': ['three', 'four']})
+    testobj.delete_desc_attrs({'foo': ['three']})
+    assert testobj.desc_attrs().get_attr('foo') == ['four']
+    assert set(testobj.get_attr('description')) == set(('unstructured desc', 'foo=four'))
+    print(testobj.format_ldif())
+    testobj.delete()
