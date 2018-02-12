@@ -1,5 +1,40 @@
-"""structured description field methods
- this implements the common pattern of storing arbitrary key=value data in description fields
+"""Support for structured description fields.
+
+This implements the common pattern of storing arbitrary key=value data in description fields, but presents an
+attribute-like interface to access and change them.
+
+Example::
+
+    from laurelin.ldap import LDAP
+    LDAP.activate_extension('laurelin.extensions.descattrs')
+
+    with LDAP() as ldap:
+        result = ldap.base.get_child('cn=someObject')
+
+        result.add_desc_attrs({'foo':['one', 'two']})
+        print(result.format_ldif())
+        # ...
+        # description: foo=one
+        # description: foo=two
+        # ...
+
+        attr_vals = result.desc_attrs().get_attr('foo')
+        print(attr_vals)
+        # ['one', 'two']
+
+        result.replace_desc_attrs({'foo':['one','two','three']})
+        result.delete_desc_attrs({'foo':['two']})
+
+        attr_vals = result.desc_attrs().get_attr('foo')
+        print(attr_vals)
+        # ['one', 'three']
+
+        print(result.format_ldif())
+        # ...
+        # description: foo=one
+        # description: foo=three
+        # ...
+
 """
 
 from laurelin.ldap import LDAPObject
@@ -15,10 +50,10 @@ LDAPObject_methods = []
 
 
 def desc_attrs(self):
-    """Query the description attribute if unknown and return an :class:`AttrsDict` representing the data stored in the
-    description. This method gets bound to :class:`LDAPObject`
+    """Query the description attribute if unknown and return an :class:`.AttrsDict` representing the data stored in the
+    description. This method gets bound to :class:`.LDAPObject`
 
-    :return: An :class:`AttrsDict` representing the data stored in the description.
+    :return: An :class:`.AttrsDict` representing the data stored in the description.
     :rtype: AttrsDict
     """
     self.refresh_missing(['description'])
@@ -38,13 +73,13 @@ LDAPObject_methods.append(desc_attrs)
 
 
 def _modify_desc_attrs(self, method, attrs_dict):
-    """Perform modification to the object's description attributes. This method gets bound to :class:`LDAPObject`.
+    """Perform modification to the object's description attributes. This method gets bound to :class:`.LDAPObject`.
 
     :param callable method: The method to call to modify the description attributes dictionary
     :param attrs_dict: Will be passed as the 2nd argument to ``method``.
     :type attrs_dict: dict(str, list[str]) or AttrsDict
     :rtype: None
-    :raises RuntimeError: if there is no :class:`LDAP` connection associated with this :class:`LDAPObject`.
+    :raises RuntimeError: if there is no :class:`.LDAP` connection associated with this :class:`.LDAPObject`.
     """
     self._require_ldap()
     desc_dict = self.desc_attrs()
@@ -115,7 +150,7 @@ def _dict_mod_delete(to_dict, attrs_dict):
 
 
 def add_desc_attrs(self, attrs_dict):
-    """Add new description attributes. This method gets bound to :class:`LDAPObject`.
+    """Add new description attributes. This method gets bound to :class:`.LDAPObject`.
 
     :param attrs_dict: Dictionary of description attributes to add
     :type attrs_dict: dict(str, list[str]) or AttrsDict
@@ -128,7 +163,7 @@ LDAPObject_methods.append(add_desc_attrs)
 
 
 def replace_desc_attrs(self, attrs_dict):
-    """Replace description attributes. This method gets bound to :class:`LDAPObject`.
+    """Replace description attributes. This method gets bound to :class:`.LDAPObject`.
 
     :param attrs_dict: Dictionary of description attributes to set
     :type attrs_dict: dict(str, list[str]) or AttrsDict
@@ -141,7 +176,7 @@ LDAPObject_methods.append(replace_desc_attrs)
 
 
 def delete_desc_attrs(self, attrs_dict):
-    """Delete description attributes. This method gets bound to :class:`LDAPObject`.
+    """Delete description attributes. This method gets bound to :class:`.LDAPObject`.
 
     :param attrs_dict: Dictionary of description attributes to delete
     :type attrs_dict: dict(str, list[str]) or AttrsDict
@@ -154,5 +189,5 @@ LDAPObject_methods.append(delete_desc_attrs)
 
 
 def activate_extension():
-    """Extension activation function. Installs extension methods on :class:`LDAPObject`."""
+    """Extension activation function. Installs extension methods on :class:`.LDAPObject`."""
     LDAPObject.EXTEND(LDAPObject_methods)

@@ -117,9 +117,10 @@ LDAP_methods = []
 
 
 def get_netgroup(self, cn, attrs=NETGROUP_ATTRS):
-    """Find a specific netgroup object. This method gets bound to :class:`LDAP`.
+    """Find a specific netgroup object. This method gets bound to :class:`.LDAP`.
 
-    This depends on the base object having been tagged and configured properly. See :mod:`laurelin.extensions.netgroup`.
+    This depends on the base object having been tagged and configured properly. See
+    :mod:`laurelin.extensions.netgroups`.
 
     :param str cn: The name of the group or an RDN
     :param list[str] attrs: List of attribute names to get. Defaults to all netgroup attributes.
@@ -134,14 +135,15 @@ LDAP_methods.append(get_netgroup)
 
 
 def netgroup_search(self, filter, attrs=NETGROUP_ATTRS):
-    """Search for netgroups. This method gets bound to :class:`LDAP`.
+    """Search for netgroups. This method gets bound to :class:`.LDAP`.
 
-    This depends on the base object having been tagged and configured properly. See :mod:`laurelin.extensions.netgroup`.
+    This depends on the base object having been tagged and configured properly. See
+    :mod:`laurelin.extensions.netgroups`.
 
     :param str filter: A partial filter string. The nisNetgroup objectClass will automatically be included in the
                        filter sent to the server.
     :param list[str] attrs: List of attribute names to get. Defaults to all netgroup attributes.
-    :return: An iterator over matching netgroup objects, yielding instances of :class:`LDAPObject`.
+    :return: An iterator over matching netgroup objects, yielding instances of :class:`.LDAPObject`.
     :rtype: SearchResultHandle
     :raises TagError: if the base object has not been tagged.
     """
@@ -153,7 +155,7 @@ LDAP_methods.append(netgroup_search)
 
 def get_netgroup_obj_users(self, ng_obj, recursive=True):
     """Get a list of netgroup users from an already queried object, possibly querying for memberNisNetgroups if
-    ``recursive=True`` (the default).
+    ``recursive=True`` (the default). This method gets bound to :class:`.LDAP`.
 
     :param LDAPObject ng_obj: A netgroup LDAP object
     :param bool recursive: Set to False to only consider members of this group directly
@@ -171,9 +173,10 @@ LDAP_methods.append(get_netgroup_obj_users)
 
 
 def get_netgroup_users(self, cn, recursive=True):
-    """Get a list of all user entries for a netgroup. This method gets bound to :class:`LDAP`.
+    """Get a list of all user entries for a netgroup. This method gets bound to :class:`.LDAP`.
 
-    This depends on the base object having been tagged and configured properly. See :mod:`laurelin.extensions.netgroup`.
+    This depends on the base object having been tagged and configured properly. See
+    :mod:`laurelin.extensions.netgroups`.
 
     :param str cn: The name of the group or an RDN
     :param bool recursive: Recursively get users by following memberNisNetgroups
@@ -190,7 +193,7 @@ LDAP_methods.append(get_netgroup_users)
 
 def get_netgroup_obj_hosts(self, ng_obj, recursive=True):
     """Get a list of netgroup hosts from an already queried object, possibly querying for memberNisNetgroups if
-    ``recursive=True`` (the default).
+    ``recursive=True`` (the default). This method gets bound to :class:`.LDAP`.
 
     :param LDAPObject ng_obj: A netgroup LDAP object
     :param bool recursive: Set to False to only consider members of this group directly
@@ -208,9 +211,10 @@ LDAP_methods.append(get_netgroup_obj_hosts)
 
 
 def get_netgroup_hosts(self, cn, recursive=True):
-    """Get a list of all host entries for a netgroup. This method gets bound to :class:`LDAP`.
+    """Get a list of all host entries for a netgroup. This method gets bound to :class:`.LDAP`.
 
-    This depends on the base object having been tagged and configured properly. See :mod:`laurelin.extensions.netgroup`.
+    This depends on the base object having been tagged and configured properly. See
+    :mod:`laurelin.extensions.netgroups`.
 
     :param str cn: The name of the group or an RDN
     :param bool recursive: Recursively get hosts by following memberNisNetgroups
@@ -226,7 +230,7 @@ LDAP_methods.append(get_netgroup_hosts)
 
 
 def add_netgroup_users(self, dn, members, domain=''):
-    """Add new users to a netgroup. This method gets bound to :class:`LDAP`.
+    """Add new users to a netgroup. This method gets bound to :class:`.LDAP`.
 
     :param str dn: The absolute DN of the netgroup object
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc)
@@ -243,7 +247,7 @@ LDAP_methods.append(add_netgroup_users)
 
 
 def add_netgroup_hosts(self, dn, members, domain=''):
-    """Add new hosts to a netgroup. This method gets bound to :class:`LDAP`.
+    """Add new hosts to a netgroup. This method gets bound to :class:`.LDAP`.
 
     :param str dn: The absolute DN of the netgroup object
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc)
@@ -265,7 +269,7 @@ LDAPObject_methods = []
 
 
 def _require_netgroup(self):
-    """Requires that this :class:`LDAPObject` has the required netgroup object class.
+    """Requires that this :class:`.LDAPObject` has the required netgroup object class.
 
     :raises RuntimeError: if the object is missing the netgroup object class
     """
@@ -277,7 +281,7 @@ LDAPObject_methods.append(_require_netgroup)
 
 
 def obj_get_netgroup_users(self, recursive=True):
-    """Get all users in this netgroup object. This method gets bound to :class:`LDAPObject` as ``get_netgroup_users``.
+    """Get all users in this netgroup object. This method gets bound to :class:`.LDAPObject` as ``get_netgroup_users``.
 
     :param recursive: Set to False to ignore any memberNisNetgroups defined for this object.
     :return: A list of usernames
@@ -292,7 +296,7 @@ LDAPObject_methods.append(('get_netgroup_users', obj_get_netgroup_users))
 
 
 def obj_get_netgroup_hosts(self, recursive=True):
-    """Get all hosts in this netgroup object. This method gets bound to :class:`LDAPObject` as ``get_netgroup_hosts``.
+    """Get all hosts in this netgroup object. This method gets bound to :class:`.LDAPObject` as ``get_netgroup_hosts``.
 
     :param recursive: Set to False to ignore any memberNisNetgroups defined for this object.
     :return: A list of hostnames
@@ -322,7 +326,7 @@ def obj_add_netgroup_hosts(self, members, domain=''):
 
 
 def activate_extension():
-    """Extension activation function. Installs extension methods to :class:`LDAP` and :class:`LDAPObject`"""
+    """Extension activation function. Installs extension methods to :class:`.LDAP` and :class:`.LDAPObject`"""
     LDAP.EXTEND(LDAP_methods)
     LDAPObject.EXTEND(LDAPObject_methods)
 

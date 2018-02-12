@@ -14,6 +14,7 @@ Welcome to laurelin's documentation!
    :caption: Contents:
 
    user_docs
+   built_in_extensions
    controls
    reference
    testing_setup
