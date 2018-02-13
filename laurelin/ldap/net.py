@@ -12,7 +12,7 @@ from pyasn1.codec.ber.decoder import decode as ber_decode
 from pyasn1.error import SubstrateUnderrunError
 from puresasl.client import SASLClient
 
-from .rfc4511 import LDAPMessage, MessageID, ProtocolOp
+from .rfc4511 import LDAPMessage
 from .exceptions import LDAPError, LDAPSASLError, LDAPConnectionError
 from .protoutils import pack
 
@@ -21,7 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 class LDAPSocket(object):
-    """Holds a connection to an LDAP server"""
+    """Holds a connection to an LDAP server.
+
+    :param str host_uri: "scheme://netloc" to connect to
+    :param int connect_timeout: Number of seconds to wait for connection to be accepted
+    :param bool ssl_verify: Validate the certificate and hostname on an SSL/TLS connection
+    :param str ssl_ca_file: Path to PEM-formatted concatenated CA certficates file
+    :param str ssl_ca_path: Path to directory with CA certs under hashed file names. See
+                            https://www.openssl.org/docs/man1.1.0/ssl/SSL_CTX_load_verify_locations.html for more
+                            information about the format of this directory.
+    :param ssl_ca_data: An ASCII string of one or more PEM-encoded certs or a bytes object containing DER-encoded
+                        certificates.
+    :type ssl_ca_data: str or bytes
+    """
 
     RECV_BUFFER = 4096
 
@@ -136,7 +148,17 @@ class LDAPSocket(object):
                                       self.host, port, e.strerror, e.errno))
 
     def start_tls(self, verify=True, ca_file=None, ca_path=None, ca_data=None):
-        """Install TLS layer on this socket connection"""
+        """Install TLS layer on this socket connection.
+
+        :param bool verify: Validate the certificate and hostname on an SSL/TLS connection
+        :param str ca_file: Path to PEM-formatted concatenated CA certficates file
+        :param str ca_path: Path to directory with CA certs under hashed file names. See
+                            https://www.openssl.org/docs/man1.1.0/ssl/SSL_CTX_load_verify_locations.html for more
+                            information about the format of this directory.
+        :param ca_data: An ASCII string of one or more PEM-encoded certs or a bytes object containing DER-encoded
+                        certificates.
+        :type ca_data: str or bytes
+        """
         if self.started_tls:
             raise LDAPError('TLS layer already installed')
 
@@ -193,7 +215,7 @@ class LDAPSocket(object):
         logger.debug('Installed TLS layer on #{0}'.format(self.ID))
 
     def sasl_init(self, mechs, **props):
-        """Initialize a puresasl.client.SASLClient"""
+        """Initialize a :class:`.puresasl.client.SASLClient`"""
         self._sasl_client = SASLClient(self.host, 'ldap', **props)
         self._sasl_client.choose_mechanism(mechs)
 
@@ -236,19 +258,37 @@ class LDAPSocket(object):
         return mid, raw
 
     def send_message(self, op, obj, controls=None):
-        """Create and send an LDAPMessage given an operation name and a corresponding object
+        """Create and send an LDAPMessage given an operation name and a corresponding object.
 
-         Operation names must be defined as component names in laurelin.ldap.rfc4511.ProtocolOp and
-         the object must be of the corresponding type
+        Operation names must be defined as component names in laurelin.ldap.rfc4511.ProtocolOp and
+        the object must be of the corresponding type.
+
+        :param str op: The protocol operation name
+        :param object obj: The associated protocol object (see :class:`.rfc4511.ProtocolOp` for mapping.
+        :param controls: Any request controls for the message
+        :type rfc4511.Controls or None
+        :return: The message ID for this message
+        :rtype: int
         """
         mid, raw = self._prep_message(op, obj, controls)
         self._sock.sendall(raw)
         return mid
 
     def recv_one(self, want_message_id):
+        """Get the next message with ``want_message_id`` being sent by the server
+
+        :param int want_message_id: The desired message ID.
+        :return: The LDAP message
+        :rtype: rfc4511.LDAPMessage
+        """
         return next(self.recv_messages(want_message_id))
 
     def recv_messages(self, want_message_id):
+        """Iterate all messages with ``want_message_id` being sent by the server.
+
+        :param int want_message_id: The desired message ID.
+        :return: An iterator over :class:`.rfc4511.LDAPMessage`.
+        """
         flush_queue = True
         raw = b''
         while True:
@@ -287,5 +327,5 @@ class LDAPSocket(object):
                 continue
 
     def close(self):
-        """Close the low-level socket connection"""
+        """Close the low-level socket connection."""
         return self._sock.close()

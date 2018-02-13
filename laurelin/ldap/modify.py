@@ -14,6 +14,7 @@ class Mod(object):
 
     @staticmethod
     def op_to_string(op):
+        """Convert one of the :class:`Mod` constants to a string, e.g. "ADD", "REPLACE", "DELETE"."""
         if op == Mod.ADD:
             return 'ADD'
         elif op == Mod.REPLACE:
@@ -25,7 +26,7 @@ class Mod(object):
 
     @staticmethod
     def string(op):
-        """Translte LDIF changetype strings to constant"""
+        """Translte LDIF changetype strings to constant. e.g. "replace" -> :attr:`.Mod.REPLACE`"""
         if op == 'add':
             return Mod.ADD
         elif op == 'replace':
@@ -57,13 +58,13 @@ class Mod(object):
         return 'Mod(Mod.{0}, {1}, {2})'.format(Mod.op_to_string(self.op), repr(self.attr), repr(self.vals))
 
 
-def Modlist(op, attrsDict):
+def Modlist(op, attrs_dict):
     """Generate a modlist from a dictionary"""
 
-    if not isinstance(attrsDict, dict):
-        raise TypeError('attrsDict must be dict')
+    if not isinstance(attrs_dict, dict):
+        raise TypeError('attrs_dict must be dict')
     modlist = []
-    for attr, vals in six.iteritems(attrsDict):
+    for attr, vals in six.iteritems(attrs_dict):
         modlist.append(Mod(op, attr, vals))
     return modlist
 
@@ -71,53 +72,53 @@ def Modlist(op, attrsDict):
 ## Smart modlist functions which will prevent errors
 
 
-def AddModlist(curAttrs, newAttrs):
+def AddModlist(cur_attrs, new_attrs):
     """Generate a modlist to add only new attribute values that are not known to exist"""
 
-    if not isinstance(curAttrs, dict):
-        raise TypeError('curAttrs must be dict')
-    if not isinstance(newAttrs, dict):
-        raise TypeError('newAttrs must be dict')
-    addAttrs = {}
-    for attr, vals in six.iteritems(newAttrs):
-        if attr in curAttrs:
-            attrType = get_attribute_type(attr)
+    if not isinstance(cur_attrs, dict):
+        raise TypeError('cur_attrs must be dict')
+    if not isinstance(new_attrs, dict):
+        raise TypeError('new_attrs must be dict')
+    add_attrs = {}
+    for attr, vals in six.iteritems(new_attrs):
+        if attr in cur_attrs:
+            attr_type = get_attribute_type(attr)
             for val in vals:
                 try:
-                    attrType.index(curAttrs[attr], val)
+                    attr_type.index(cur_attrs[attr], val)
                     # attribute value already exists, do nothing
                 except ValueError:
                     # attribute value does not exist, add it
-                    if attr not in addAttrs:
-                        addAttrs[attr] = []
-                    addAttrs[attr].append(val)
+                    if attr not in add_attrs:
+                        add_attrs[attr] = []
+                    add_attrs[attr].append(val)
         else:
-            addAttrs[attr] = vals
-    return Modlist(Mod.ADD, addAttrs)
+            add_attrs[attr] = vals
+    return Modlist(Mod.ADD, add_attrs)
 
 
-def DeleteModlist(curAttrs, delAttrs):
+def DeleteModlist(cur_attrs, del_attrs):
     """Generate a modlist to delete only attribute values that are known to exist"""
 
-    if not isinstance(delAttrs, dict):
-        raise TypeError('curAttrs must be dict')
-    if not isinstance(delAttrs, dict):
-        raise TypeError('delAttrs must be dict')
-    _delAttrs = {}
-    for attr, vals in six.iteritems(delAttrs):
-        if attr in curAttrs:
+    if not isinstance(del_attrs, dict):
+        raise TypeError('cur_attrs must be dict')
+    if not isinstance(del_attrs, dict):
+        raise TypeError('del_attrs must be dict')
+    _del_attrs = {}
+    for attr, vals in six.iteritems(del_attrs):
+        if attr in cur_attrs:
             if not vals:
-                _delAttrs[attr] = vals
+                _del_attrs[attr] = vals
             else:
-                attrType = get_attribute_type(attr)
+                attr_type = get_attribute_type(attr)
                 for val in vals:
                     try:
-                        attrType.index(curAttrs[attr], val)
+                        attr_type.index(cur_attrs[attr], val)
                         # attribute value exists, delete it
-                        if attr not in _delAttrs:
-                            _delAttrs[attr] = []
-                        _delAttrs[attr].append(val)
+                        if attr not in _del_attrs:
+                            _del_attrs[attr] = []
+                        _del_attrs[attr].append(val)
                     except ValueError:
                         # attribute value does not exist, do nothing
                         pass
-    return Modlist(Mod.DELETE, _delAttrs)
+    return Modlist(Mod.DELETE, _del_attrs)

@@ -86,7 +86,7 @@ class MetaControl(type):
                 raise ValueError('no method set on control {0}'.format(name))
             if not cls.keyword:
                 raise ValueError('no keyword set on control {0}'.format(name))
-            if cls.keyword in _reservedKwds:
+            if cls.keyword in _reserved_kwds:
                 raise LDAPExtensionError('Control keyword "{0}" is reserved'.format(cls.keyword))
             if cls.keyword in _request_controls:
                 raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(cls.keyword))

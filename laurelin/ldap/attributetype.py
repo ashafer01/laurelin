@@ -41,10 +41,10 @@ class AttributeType(object):
     See the :mod:`laurelin.ldap.schema` module source for example usages.
 
     :param str spec: The LDAP specification for an Attribute Type.
-    :raises: LDAPSchemaError: if
-                               * The specification is invalid
-                               * The OID has already been defined
-                               * One of the names has already been defined
+    :raises: LDAPSchemaError:
+     * if the specification is invalid
+     * if the OID has already been defined
+     * if one of the names has already been defined
 
     :var str oid: The OID of the attribute type
     :var tuple(str) names: A tuple containing all possible names for the attribute type

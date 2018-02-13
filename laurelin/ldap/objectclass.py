@@ -5,6 +5,7 @@ from .attributetype import get_attribute_type
 from .exceptions import LDAPSchemaError, LDAPWarning
 from .protoutils import parse_qdescrs
 
+import logging
 import re
 from warnings import warn
 
@@ -13,8 +14,16 @@ _re_object_class = re.compile(utils.re_anchor(rfc4512.ObjectClassDescription))
 _oid_object_classes = {}
 _name_object_classes = {}
 
+logger = logging.getLogger(__name__)
+
 
 def get_object_class(ident):
+    """Get an instance of :class:`ObjectClass` associated with either a name or an OID
+
+    :param str ident: Either the numeric OID of the desired object class spec or one of its specified names
+    :return: The ObjectClass associated with the name/OID
+    :rtype: ObjectClass
+    """
     if ident[0].isdigit():
         return _oid_object_classes[ident]
     else:
@@ -49,6 +58,27 @@ def _parse_attr_list(spec):
 
 
 class ObjectClass(object):
+    """Parses an LDAP object class specification and implements superclass inheritance.
+
+    Each instantiation registers the names and OID specified so that they can later be access with
+    :func:`get_object_class`.
+
+    See the :mod:`laurelin.ldap.schema` module source for example usages.
+
+    :param str spec: The LDAP specification for an object class
+    :raises LDAPSchemaError:
+         * if the schema is syntactically invalid
+         * if the OID specified has already been registered
+         * if one of the names specified has already been registered
+
+    :var str oid: The specified OID
+    :var tuple(str) names: All specified names
+    :var list[str] superclasses: The list of all specified superclass names/OIDs.
+    :var str kind: One of `ABSTRACT`, `STRUCTURAL`, or `AUXILIARY`
+    :var bool obsolete: True if the objectClass has been marked obsolete.
+    :var list[str] my_must: The list of required attribute types for this class
+    :var list[str] my_may: The list of allowed attribute types for this class
+    """
     def __init__(self, spec):
         spec = utils.collapse_whitespace(spec).strip()
         m = _re_object_class.match(spec)
@@ -90,6 +120,7 @@ class ObjectClass(object):
 
     @property
     def must(self):
+        """Obtains all required attribute types after ascending the superclass specifications"""
         if self._must is not None:
             return self._must
         elif self.superclasses:
@@ -103,6 +134,7 @@ class ObjectClass(object):
 
     @property
     def may(self):
+        """Obtains all allowed attribute types after ascending the superclass specifications"""
         if self._may is not None:
             return self._may
         elif self.superclasses:
@@ -115,14 +147,31 @@ class ObjectClass(object):
             return self._may
 
     def allowed_attr(self, name):
+        """Check if the given attribute type name is allowed.
+
+        :param name: The name of the attribute type to check
+        :return: True if the given attribute type is allowed.
+        :rtype: bool
+        """
         return (name in self.may or name in self.must)
 
     def required_attr(self, name):
+        """Check if the given attribute type name is required.
+
+        :param name: The name of the attribute type to check
+        :return: True if the given attribute type is required.
+        :rtype: bool
+        """
         return (name in self.must)
 
 
 class DefaultObjectClass(ObjectClass):
+    """The default ObjectClass returned by :func:`get_object_class` when the requested object class is undefined.
+
+    Users should probably never instantiate this.
+    """
     def __init__(self, name):
+        logger.debug('Using DefaultObjectClass for name={0}'.format(name))
         self.oid = None
         self.names = (name,)
         self.supertype = None
@@ -136,9 +185,8 @@ class DefaultObjectClass(ObjectClass):
 
 ## RFC 4512 4.3 extensibleObject
 
-# The 'extensibleObject' auxiliary object class allows entries that
-# belong to it to hold any user attribute.
 
 class ExtensibleObjectClass(ObjectClass):
+    """The `extensibleObject` auxiliary objectClass allows entries that belong to it to hold any user attribute."""
     def allowed_attr(self, name):
         return True
