@@ -18,6 +18,7 @@ with LDAP('ldap://localhost:10389',
     for obj in ldap.base.search():
         print(obj.format_ldif())
 
+    # test descattrs extension
     testobj = ldap.base.add_child('ou=functest', {
         'objectClass': ['organizationalUnit'],
         'ou': ['functest'],

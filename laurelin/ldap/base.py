@@ -983,7 +983,7 @@ class LDAP(Extensible):
         return self.modify(dn, modlist, current, **ctrl_kwds)
 
     def delete_attrs(self, dn, attrs_dict, current=None, **ctrl_kwds):
-        """Delete specific attribute values from dictionary.
+        """Delete specific attribute values from ``attrs_dict``.
 
         Specifying a 0-length entry will delete all values.
 

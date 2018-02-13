@@ -5,7 +5,10 @@ from . import utils
 from .exceptions import LDAPSchemaError
 from .protoutils import parse_qdescrs
 
+import logging
 import re
+
+logger = logging.getLogger(__name__)
 
 _re_attr_type = re.compile(utils.re_anchor(rfc4512.AttributeTypeDescription))
 
@@ -223,6 +226,7 @@ class DefaultAttributeType(AttributeType):
     Users should probably never instantiate this.
     """
     def __init__(self, name=None):
+        logger.debug('Using DefaultAttributeType for name={0}'.format(name))
         self.oid = None
         self.names = (name,)
         self._equality = DefaultMatchingRule()

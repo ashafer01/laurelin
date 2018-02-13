@@ -6,6 +6,8 @@
 Welcome to laurelin's documentation!
 ====================================
 
+View the source on `GitHub <https://github.com/ashafer01/laurelin>`_.
+
 .. note::
    Docs are currently incomplete.
 

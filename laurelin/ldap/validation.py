@@ -3,7 +3,7 @@ import six
 
 class Validator(object):
     """Abstract base class for a validator. All validators must inherit from here and ensure the public interface is
-       fully implemented.
+    fully implemented.
     """
 
     def validate_object(self, obj, write=True):

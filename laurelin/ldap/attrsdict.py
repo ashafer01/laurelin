@@ -9,15 +9,22 @@ class AttrsDict(dict):
     """
 
     def get_attr(self, attr):
+        """Get an attribute's values, or an empty list if the attribute is not defined
+
+        :param attr: The name of the attribute
+        :return: A list of values
+        :rtype: list
+        """
         return self.get(attr, [])
 
     def iterattrs(self):
+        """Iterate all attributes of this object. Yields ``(attr, value)`` tuples."""
         for attr, vals in six.iteritems(self):
             for val in vals:
                 yield (attr, val)
 
     def deepcopy(self):
-        """return a native dict copy of self"""
+        """Return a native dict copy of self."""
         ret = {}
         for attr, vals in six.iteritems(self):
             ret[attr] = []
@@ -85,6 +92,13 @@ class AttrsDict(dict):
 
     @staticmethod
     def validate(attrs_dict):
+        """Validate that ``attrs_dict`` is either already an :class:`.AttrsDict` or that it conforms to the required
+        ``dict(str, list[str])`` typing.
+
+        :param dict attrs_dict: The dictionary to validate for use as an attributes dictionary
+        :rtype: None
+        :raises TypeError: when the dict is invalid
+        """
         if isinstance(attrs_dict, AttrsDict):
             return
         if not isinstance(attrs_dict, dict):
@@ -95,11 +109,23 @@ class AttrsDict(dict):
 
     @staticmethod
     def validate_attr(attr):
+        """Validate that ``attr`` is a valid attribute name.
+
+        :param str attr: The string to validate for use as an attribute name
+        :rtype: None
+        :raises: TypeError: when the string is invalid
+        """
         if not isinstance(attr, six.string_types):
             raise TypeError('attribute name must be string')
 
     @staticmethod
     def validate_values(attr_val_list):
+        """Validate that ``attr_val_list`` conforms to the required ``list[str]`` typing.
+
+        :param list attr_val_list: The list to validate for use as an attribute value list.
+        :rtype: None
+        :raises TypeError: when the list is invalid
+        """
         if not isinstance(attr_val_list, list):
             raise TypeError('must be list')
         for val in attr_val_list:

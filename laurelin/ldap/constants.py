@@ -1,3 +1,5 @@
+"""Global constant classes."""
+
 from __future__ import absolute_import
 from .rfc4511 import (
     Scope as _Scope,

@@ -49,18 +49,23 @@ reservedKwdsStr = 'set({0})'.format(repr(reservedKwds))
 baseDir = path_join(dirname(abspath(stack()[0][1])), '..')
 controlsFn = path_join(baseDir, 'laurelin/ldap/controls.py')
 
-varname = '_reservedKwds'
+varname = '_reserved_kwds'
 
 tmpfd, tmpname = mkstemp()
+found = False
 with fdopen(tmpfd, 'w') as tmpfile:
     with open(controlsFn) as f:
         for line in f:
             # modify the definition in the file
             if line.startswith(varname):
                 line = '{0} = {1}\n'.format(varname, reservedKwdsStr)
+                found = True
 
             # copy to the tmp file
             tmpfile.write(line)
+
+if not found:
+    raise Exception('Did not find the {0} line'.format(varname))
 
 # remove original and replace with tmp file
 remove(controlsFn)
