@@ -37,10 +37,11 @@ class LDAPObject(AttrsDict, Extensible):
     :type ldap_conn: LDAP or None
     :param Scope relative_search_scope: One of the :class:`Scope` constants, this is the default scope used when using
                                         this object's :meth:`LDAPObject.search` method. New objects created below this
-                                        one will inherit this attribute by default.
+                                        one will inherit this attribute by default. This attribute also defines the
+                                        behavior of :meth:`.LDAPObject.find`.
     :param rdn_attr: The default attribute name used in RDN's for descendents of this object. If specified, this
-                     allows you to only specify the value for methods that have an `rdn` argument. You can always
-                     specify a full attr=value for `rdn` arguments as well to override this behavior. New objects
+                     allows you to only specify the value for methods that have an ``rdn`` argument. You can always
+                     specify a full attr=value for ``rdn`` arguments as well to override this behavior. New objects
                      created below this one will inherit this attribute by default.
     :type rdn_attr: str or None
     """
@@ -105,7 +106,7 @@ class LDAPObject(AttrsDict, Extensible):
         obj_kwds.setdefault('relative_search_scope', self.relative_search_scope)
         obj_kwds.setdefault('rdn_attr', self.rdn_attr)
 
-    def obj(self, rdn, attrs_dict=None, tag=None, *args, **kwds):
+    def obj(self, rdn, attrs_dict=None, tag=None, **kwds):
         """Create a new object below this one.
 
         :param str rdn: The RDN, or RDN value if `rdn_attr` is defined for this object
@@ -115,17 +116,17 @@ class LDAPObject(AttrsDict, Extensible):
         :type tag: str or None
         :return: The new object
         :rtype: LDAPObject
-        :raises LDAPError: if a `tag` is specified but this object is not bound to an LDAP connection
+        :raises LDAPError: if a ``tag`` is specified but this object is not bound to an LDAP connection
 
-        Additional arguments are passed through into the :class:`LDAPObject` constructor.
+        Additional keywords are passed through into :meth:`.LDAP.obj`. or the :class:`.LDAPObject` constructor.
         """
         self._set_obj_kwd_defaults(kwds)
         if self._has_ldap():
-            return self.ldap_conn.obj(self.rdn(rdn), attrs_dict=attrs_dict, tag=tag, *args, **kwds)
+            return self.ldap_conn.obj(self.rdn(rdn), attrs_dict=attrs_dict, tag=tag, **kwds)
         else:
             if tag is not None:
                 raise LDAPError('tagging requires LDAP instance')
-            return LDAPObject(self.rdn(rdn), attrs_dict=attrs_dict, *args, **kwds)
+            return LDAPObject(self.rdn(rdn), attrs_dict=attrs_dict, **kwds)
 
     def get_child(self, rdn, attrs=None, **kwds):
         """Query the server for a child object.
@@ -158,7 +159,7 @@ class LDAPObject(AttrsDict, Extensible):
         self._set_obj_kwd_defaults(kwds)
         return self.ldap_conn.add(self.rdn(rdn), attrs_dict, **kwds)
 
-    def search(self, filter=None, attrs=None, *args, **kwds):
+    def search(self, filter=None, attrs=None, **kwds):
         """Perform a search below this object.
 
         :param str filter: Optional. The filter string to use to filter returned objects.
@@ -167,11 +168,11 @@ class LDAPObject(AttrsDict, Extensible):
                  :meth:`.LDAP.search` for more details.
         :rtype: SearchResultHandle
 
-        Additional arguments and keywords are passed through into :meth:`.LDAP.search`.
+        Additional keywords are passed through into :meth:`.LDAP.search`.
         """
         self._require_ldap()
         self._set_obj_kwd_defaults(kwds)
-        return self.ldap_conn.search(self.dn, self.relative_search_scope, filter, attrs, *args, **kwds)
+        return self.ldap_conn.search(self.dn, self.relative_search_scope, filter, attrs, **kwds)
 
     def find(self, rdn, attrs=None, **kwds):
         """Obtain a single object below this one with the most efficient means possible.
@@ -182,6 +183,8 @@ class LDAPObject(AttrsDict, Extensible):
            :attr:`.Scope.BASE` search will be performed to get the object.
          * If it is :attr:`.Scope.SUB`, then a subtree search will be performed below this object, using the RDN as a
            search filter.
+
+        Additional keywords are passed through into :meth:`.LDAPObject.search`.
 
         :param str rdn: The RDN, or RDN value if ``rdn_attr`` is defined for this object
         :param list[str] attrs: Optional. The list of attribute names to obtain.
