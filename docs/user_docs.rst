@@ -131,6 +131,11 @@ DN.
 :meth:`.LDAPObject.search` accepts all the same arguments as :meth:`.LDAP.search` except ``base_dn`` (and ``scope`` -
 more on this in future section). The object's own DN is always used for ``base_dn``.
 
+:meth:`.LDAPObject.find` is more or less a better :meth:`.LDAPObject.get_child`. It looks at the object's
+``relative_search_scope`` property to determine the most efficient way to find a single object below this one. It will
+either do a `BASE` search if ``relative_seach_scope=Scope.ONE`` or a `SUBTREE` search if
+``relative_search_Scope=Scope.SUB``. It is an error to use this method if ``relative_search_scope=Scope.BASE``.
+
 :meth:`.LDAPObject.get_child` is analagous to :meth:`.LDAP.get` but it only needs the RDN, appending the object's own DN
 as mentioned earlier. (Note that :meth:`.LDAPObject.get` inherits from the native :meth:`dict.get`)
 
@@ -254,6 +259,48 @@ attributes that are mentioned in the passed attributes dict.
 The raw ``modify`` functions on both :class:`.LDAP` and :class:`.LDAPObject` are unaffected by the ``strict_modify``
 setting - they will always attempt the modify operation exactly as specified.
 
+Global Defaults, LDAP instance attributes, and LDAP constructor arguments
+-------------------------------------------------------------------------
+
+All of the :class:`.LDAP` constructor arguments are set to None by default. In the constructor, any explicitly
+``is None`` arguments are set to their associated global default. These are attributes of the :class:`.LDAP` class, have
+the same name as the argument, upper-cased, and with a ``DEFAULT_`` prefix (but the prefix wont be repeated).
+
+For example, the ``server`` argument has global default :attr:`.LDAP.DEFAULT_SERVER`, and ``default_criticality`` is
+:attr:`.LDAP.DEFAULT_CRITICALITY`.
+
+*Most* arguments also have an associated instance property. A complete table is below:
+
+================================================ ================================= ==================================
+Global Default                                   :class:`.LDAP` instance attribute :class:`.LDAP` constructor keyword
+================================================ ================================= ==================================
+:attr:`.LDAP.DEFAULT_SERVER`                     ``host_uri``                      ``server``
+:attr:`.LDAP.DEFAULT_BASE_DN`                    ``base_dn``                       ``base_dn``
+:attr:`.LDAP.DEFAULT_FILTER`                     none                              none
+:attr:`.LDAP.DEFAULT_DEREF_ALIASES`              ``default_deref_aliases``         ``deref_aliases``
+:attr:`.LDAP.DEFAULT_SEARCH_TIMEOUT`             ``default_search_timeout``        ``search_timeout``
+:attr:`.LDAP.DEFAULT_CONNECT_TIMEOUT`            ``sock_params[0]``                ``connect_timeout``
+:attr:`.LDAP.DEFAULT_STRICT_MODIFY`              ``strict_modify``                 ``strict_modify``
+:attr:`.LDAP.DEFAULT_REUSE_CONNECTION`           none                              ``reuse_connection``
+:attr:`.LDAP.DEFAULT_SSL_VERIFY`                 ``ssl_verify``                    ``ssl_verify``
+:attr:`.LDAP.DEFAULT_SSL_CA_FILE`                ``ssl_ca_file``                   ``ssl_ca_file``
+:attr:`.LDAP.DEFAULT_SSL_CA_PATH`                ``ssl_ca_path``                   ``ssl_ca_path``
+:attr:`.LDAP.DEFAULT_SSL_CA_DATA`                ``ssl_ca_data``                   ``ssl_ca_data``
+:attr:`.LDAP.DEFAULT_FETCH_RESULT_REFS`          ``default_fetch_result_refs``     ``fetch_result_refs``
+:attr:`.LDAP.DEFAULT_FOLLOW_REFERRALS`           ``default_follow_referrals``      ``follow_referrals``
+:attr:`.LDAP.DEFAULT_SASL_MECH`                  ``default_sasl_mech``             ``default_sasl_mech``
+:attr:`.LDAP.DEFAULT_SASL_FATAL_DOWNGRADE_CHECK` ``sasl_fatal_downgrade_check``    ``sasl_fatal_downgrade_check``
+:attr:`.LDAP.DEFAULT_CRITICALITY`                ``default_criticality``           ``default_criticality``
+:attr:`.LDAP.DEFAULT_VALIDATORS`                 ``validators``                    ``validators``
+================================================ ================================= ==================================
+
+The :class:`.LDAP` instance attributes beginning with ``default_`` are used as the defaults for corresponding arguments
+on other methods. ``default_sasl_mech`` is used with :meth:`.LDAP.sasl_bind`, ``default_criticality`` is the default
+criticality of all controls, the other ``default_`` attributes are used with :meth:`.LDAP.search`.
+
+The ``ssl_`` prefixed instances attributes are used as the defaults for :meth:`.LDAP.start_tls`, as well as the socket
+configuration when connecting to an ``ldaps://`` socket.
+
 Basic usage examples
 --------------------
 
@@ -269,6 +316,6 @@ Basic usage examples
         for obj in ldap.base.search():
         print(obj.format_ldif())
 
-:meth:`.LDAP.sasl_bind()` defaults to the ``EXTERNAL`` mechanism when an ``ldapi:`` URI is given, which uses the current
+:meth:`.LDAP.sasl_bind` defaults to the ``EXTERNAL`` mechanism when an ``ldapi:`` URI is given, which uses the current
 user for authorization via the unix socket (Known as "autobind" with 389 Directory Server)
 

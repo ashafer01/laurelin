@@ -330,6 +330,8 @@ class LDAP(Extensible):
 
         Leave arguments as their default (empty strings) to attempt an anonymous simple bind
 
+        Additional keywords are used as :doc:`/controls`.
+
         :param str username: Bind DN/username or empty string for anonymous
         :param str password: Password to bind with or empty string for anonymous
         :return: A response object
@@ -396,6 +398,7 @@ class LDAP(Extensible):
     def sasl_bind(self, mech=None, **props):
         """Perform a SASL bind operation.
 
+        Keywords are first taken as :doc:`/controls`.
         Required keyword args are dependent on the mechanism chosen.
 
         :param str mech: The SASL mechanism name to use or None to negotiate best mutually supported mechanism.
@@ -498,7 +501,7 @@ class LDAP(Extensible):
         except KeyError:
             raise TagError('tag {0} does not exist'.format(tag))
 
-    def obj(self, dn, attrs_dict=None, tag=None, *args, **kwds):
+    def obj(self, dn, attrs_dict=None, tag=None, **kwds):
         """Factory for LDAPObjects bound to this connection.
 
         Note that this does not query the server. Use :meth:`LDAP.get` to query the server for a particular DN.
@@ -512,9 +515,9 @@ class LDAP(Extensible):
         :rtype: LDAPObject
         :raises TagError: if the tag parameter is already defined
 
-        Additional arguments are passed through into the :class:`LDAPObject` constructor.
+        Additional keywords are passed through into the :class:`LDAPObject` constructor.
         """
-        obj = LDAPObject(dn, attrs_dict=attrs_dict, ldap_conn=self, *args, **kwds)
+        obj = LDAPObject(dn, attrs_dict=attrs_dict, ldap_conn=self, **kwds)
         if tag is not None:
             if tag in self._tagged_objects:
                 raise TagError('tag {0} already exists'.format(tag))
@@ -574,7 +577,7 @@ class LDAP(Extensible):
         :param Scope scope: One of the :class:`Scope` constants, default :attr:`Scope.SUB`. Controls the maximum depth
                             of the search.
         :param str filter: A filter string. Objects must match the filter to be included in results. Default includes
-                           all objects.
+                           all objects and can be overridden globally by defining :attr:`.LDAP.DEFAULT_FILTER`.
         :param list[str] attrs: A list of attribute names to include for each object. Default includes all user
                                 attributes. Use `['*', '+']` to get all user and all operational attributes.
         :param int search_timeout: The number of seconds the server should spend performing the search. Partial results
@@ -600,7 +603,7 @@ class LDAP(Extensible):
         :return: An iterator over the results of the search. May yield :class:`LDAPObject` or possibly
                  :class:`SearchReferenceHandle` if ``fetch_result_refs`` is False.
 
-        Additional keywords are passed through into the :class:`LDAPObject` constructor or handled as :doc:`/controls`.
+        Additional keywords are handled as :doc:`/controls` first and then passed through into :meth:`.LDAP.obj`.
 
         This method may also be used as a context manager. If all results have not been read, the operation will
         automatically be abandoned when the context manager exits. You can also raise :exc:`Abandon` to abandon
@@ -716,8 +719,7 @@ class LDAP(Extensible):
         :raises LDAPValidationError: if the object fails any configured validator
         :raises LDAPError: if we get a non-success result
 
-        Additional keyword arguments are passed through into the :class:`LDAPObject` constructor and then handled as
-        :doc:`/controls`.
+        Additional keyword arguments are passed through into :meth:`.LDAP.obj` and then handled as :doc:`/controls`.
         """
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -1123,7 +1125,7 @@ class LDAP(Extensible):
             try:
                 getattr(validator, method)(*args)
             except AttributeError:
-                pass
+                logger.debug('validator {0} has no method {1}'.format(validator.__class__.__name__, method))
 
     def validate_object(self, obj, write=True):
         """Run all configured validators for the given object.
