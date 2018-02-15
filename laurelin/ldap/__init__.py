@@ -8,7 +8,9 @@ from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases
 from .controls import critical, optional
 from .exceptions import LDAPError, NoSearchResults, Abandon
+from .filter import escape as filter_escape
 from .ldapobject import LDAPObject
+from .modify import Mod
 
 import pyasn1.type.univ
 

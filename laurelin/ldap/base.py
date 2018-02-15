@@ -77,7 +77,7 @@ class LDAP(Extensible):
                                ``search_timeout`` keyword on :meth:`LDAP.search`.
     :param DerefAliases deref_aliases: One of the :class:`DerefAliases` constants. Instructs the server how to handle
                                        alias objects in search results. Can be overridden on a per-search basis by
-                                       setting the ``search_timeout`` keyword on :meth:`LDAP.search`.
+                                       setting the ``deref_aliases`` keyword on :meth:`LDAP.search`.
     :param bool strict_modify: Use the strict modify strategy. If set to True, guarantees that another search will not
                                take place before a modify operation. May potentially produce more server errors.
     :param bool ssl_verify: Validate the certificate and hostname on an SSL/TLS connection

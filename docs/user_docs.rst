@@ -1,6 +1,9 @@
 User Docs
 =========
 
+.. contents::
+   :local:
+
 Major missing/incomplete features
 ---------------------------------
 
@@ -37,32 +40,33 @@ default settings, etc.
 Walkthrough
 -----------
 
-Begin by initializing a connection to an LDAP server. Pass a URI string to the :class:`.LDAP` constructor::
+Navigating
+^^^^^^^^^^
+
+Just about everything you need for routine user tasks is available in the :mod:`laurelin.ldap` package. You should not
+need to get into the sub-modules below this unless you are defining controls, extensions, schema, or validators, or if
+you are viewing the source.
+
+:doc:`/built_in_extensions` are stored in the :mod:`laurelin.extensions` package.
+
+Getting Started
+^^^^^^^^^^^^^^^
+
+The first thing you should typically do after importing is configure logging and/or warnings. There is a lot of useful
+information available at all log levels::
 
     from laurelin.ldap import LDAP
-    ldap = LDAP('ldap://dir.example.org:389')
-
-This will open a connection and query the server to find the "base DN" or DN suffix. With some server configurations,
-you may have to supply this yourself by passing the ``base_dn`` keyword argument, like so::
-
-    ldap = LDAP('ldap://dir.example.org:389', base_dn='dc=example,dc=org')
-
-An empty :class:`.LDAPObject` will be created with the base DN and stored as the ``base`` attribute on the
-:class:`.LDAP` instance. More on this later. For now we will briefly cover the basic LDAP interface which may seem
-somewhat familiar if you have used the standard python-ldap client before.
-
-This may be a good point to configure logging and warnings::
-
 
     LDAP.enable_logging()
     # Enables all log output on stderr
-    # It also accepts an optional log level argument, e.g. logging.ERROR
+    # It also accepts an optional log level argument, e.g. LDAP.enable_logging(logging.ERROR)
     # The function also returns the handler it creates for optional further manual handling
 
     import logging
 
     logger = logging.getLogger('laurelin.ldap')
     # Manually configure the logger and handlers here using the standard logging module
+    # Submodules use the logger matching their name, below laurelin.ldap
 
     LDAP.log_warnings()
     # emit all LDAP warnings as WARN-level log messages on the laurelin.ldap logger
@@ -75,7 +79,21 @@ This may be a good point to configure logging and warnings::
     LDAP.default_warnings()
     # take the default action for all warnings
 
-----------
+You can then initialize a connection to an LDAP server. Pass a URI string to the :class:`.LDAP` constructor::
+
+   with LDAP('ldap://dir.example.org:389') as ldap:
+        # do stuff...
+
+   # Its also possible, but not reccommended, to not use the context manager:
+   ldap = LDAP('ldap://dir.example.org:389')
+
+This will open a connection and query the server to find the "base DN" or DN suffix. An empty :class:`.LDAPObject` will
+be created with the base DN and stored as the ``base`` attribute on the :class:`.LDAP` instance. More on this later. For
+now we will briefly cover the basic LDAP interface which may seem somewhat familiar if you have used the standard
+python-ldap client before.
+
+LDAP Methods Intro
+^^^^^^^^^^^^^^^^^^
 
 :meth:`.LDAP.search` sends a search request and returns an iterable over instances of :class:`.LDAPObject`. Basic
 arguments are described here (listed in order):
@@ -116,7 +134,8 @@ all values for an attribute.
 :meth:`.LDAP.replace_attrs` replaces all values for the given attributes with the values passed in the attributes
 dictionary. Atrributes that are not mentioned are not touched. Passing an empty list removes all values.
 
------
+LDAPObject Methods Intro
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 Great, right? But specifying absolute DNs all the time is no fun. Enter :class:`.LDAPObject`, and keep in mind the
 ``base`` attribute mentioned earlier.

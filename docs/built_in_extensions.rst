@@ -1,6 +1,9 @@
 Built-In Extensions
 ===================
 
+.. contents::
+   :local:
+
 Description Attributes
 ----------------------
 

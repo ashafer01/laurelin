@@ -1,6 +1,9 @@
 Controls
 ========
 
+.. contents::
+   :local:
+
 Using Controls
 --------------
 
