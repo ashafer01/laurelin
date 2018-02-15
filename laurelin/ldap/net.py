@@ -266,7 +266,7 @@ class LDAPSocket(object):
         :param str op: The protocol operation name
         :param object obj: The associated protocol object (see :class:`.rfc4511.ProtocolOp` for mapping.
         :param controls: Any request controls for the message
-        :type rfc4511.Controls or None
+        :type controls: rfc4511.Controls or None
         :return: The message ID for this message
         :rtype: int
         """
@@ -284,7 +284,7 @@ class LDAPSocket(object):
         return next(self.recv_messages(want_message_id))
 
     def recv_messages(self, want_message_id):
-        """Iterate all messages with ``want_message_id` being sent by the server.
+        """Iterate all messages with ``want_message_id`` being sent by the server.
 
         :param int want_message_id: The desired message ID.
         :return: An iterator over :class:`.rfc4511.LDAPMessage`.

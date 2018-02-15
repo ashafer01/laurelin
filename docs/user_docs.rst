@@ -7,7 +7,8 @@ User Docs
 Major missing/incomplete features
 ---------------------------------
 
-The following features have not yet been implemented or are incomplete:
+Laurelin is still under development. What is done should be usable, but the following features have not yet been
+implemented or are incomplete:
 
  * Controls
 

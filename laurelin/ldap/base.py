@@ -875,7 +875,7 @@ class LDAP(Extensible):
         mdr.setComponentByName('deleteoldrdn', clean_attr)
         if new_parent is not None:
             mdr.setComponentByName('newSuperior', rfc4511.NewSuperior(new_parent))
-        controls = self._process_ctrl_kwds('modDN', ctrl_kwds, final=True)
+        controls = self._process_ctrl_kwds('mod_dn', ctrl_kwds, final=True)
         mid = self.sock.send_message('modDNRequest', mdr, controls)
         logger.info('Sent modDN request (ID {0}) for DN {1} newRDN="{2}" newParent="{3}"'.format(
                     mid, dn, new_rdn, new_parent))

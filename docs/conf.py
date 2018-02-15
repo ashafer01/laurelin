@@ -19,6 +19,7 @@
 #
 import os
 import sys
+from sphinx.domains.python import PythonDomain
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
 
@@ -170,7 +171,32 @@ texinfo_documents = [
 ]
 
 
-
-
-# Example configuration for intersphinx: refer to the Python standard library.
+# Example configuration for intersphinx: refer to the Python 3 standard library.
 intersphinx_mapping = {'https://docs.python.org/3/': None}
+
+
+# Make cross-references resolve to laurelin.ldap.Object if available
+
+_desired_base_module = 'laurelin.ldap'
+
+
+class LaurelinPythonDomain(PythonDomain):
+    def find_obj(self, env, modname, classname, name, type, searchmode=0):
+        """Ensures an object always resolves to laurelin.ldap.Object if defined there."""
+        orig_matches = PythonDomain.find_obj(self, env, modname, classname, name, type, searchmode)
+        matches = []
+        for match in orig_matches:
+            match_name = match[0]
+            desired_name = _desired_base_module + '.' + name.strip('.')
+            if match_name == desired_name:
+                matches.append(match)
+                break
+        if matches:
+            return matches
+        else:
+            return orig_matches
+
+
+def setup(sphinx):
+    """Use LaurelinPythonDomain in place of PythonDomain"""
+    sphinx.override_domain(LaurelinPythonDomain)

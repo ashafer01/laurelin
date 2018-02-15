@@ -8,6 +8,7 @@ rm -rf reference/*
 sphinx-apidoc -o reference ../laurelin \
     ../laurelin/ldap/controls.py \
     ../laurelin/ldap/rfc4511.py \
+    ../laurelin/extensions \
     ../laurelin/extensions/*.py \
     ../laurelin/ldap/protoutils.py \
     ../laurelin/ldap/rfc4512.py \

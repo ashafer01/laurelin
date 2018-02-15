@@ -3,13 +3,15 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to laurelin's documentation!
-====================================
-
-View the source on `GitHub <https://github.com/ashafer01/laurelin>`_.
+Laurelin Python LDAP Client
+===========================
 
 .. note::
    Docs are currently incomplete.
+
+View the source on `GitHub <https://github.com/ashafer01/laurelin>`_.
+
+Laurelin is a pure-Python ORM-esque LDAP client. Check out the :doc:`user docs </user_docs>` to get started.
 
 .. toctree::
    :maxdepth: 4
