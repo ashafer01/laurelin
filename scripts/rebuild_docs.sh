@@ -5,7 +5,7 @@ cd ../docs
 
 rm -rf _build/*
 rm -rf reference/*
-sphinx-apidoc -o reference ../laurelin \
+sphinx-apidoc -T -o reference ../laurelin \
     ../laurelin/ldap/controls.py \
     ../laurelin/ldap/rfc4511.py \
     ../laurelin/extensions \
