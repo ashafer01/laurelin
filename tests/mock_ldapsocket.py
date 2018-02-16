@@ -14,7 +14,7 @@ class MockLDAPSocket(LDAPSocket):
         self._outgoing_queue = deque()
         self._sock = None
         self.incoming_queue = deque()
-        self.uri = None
+        self.uri = 'mock:///'
 
     def add_messages(self, lm_list):
         """Add new messages to be received"""
@@ -30,14 +30,13 @@ class MockLDAPSocket(LDAPSocket):
     def recv_messages(self, want_message_id):
         while self._outgoing_queue:
             raw = self._outgoing_queue.popleft()
-            if self._has_sasl_client():
-                raw = self._sasl_client.unwrap(raw)
             lm, raw = ber_decode(raw, asn1Spec=rfc4511.LDAPMessage())
             if raw:
                 raise Exception('Unexpected leftover bits')
             have_message_id = lm.getComponentByName('messageID')
             if have_message_id != want_message_id:
-                raise Exception('Unexpected message ID in mock queue')
+                raise Exception('Unexpected message ID in mock queue (have={0} want={1})'.format(
+                                have_message_id, want_message_id))
             yield lm
         raise Exception('No messages in mock queue')
 
@@ -46,3 +45,6 @@ class MockLDAPSocket(LDAPSocket):
 
     def start_tls(self, verify=True, ca_file=None, ca_path=None, ca_data=None):
         warn('start_tls not possible with mock socket')
+
+    def clear_outgoing(self):
+        self._outgoing_queue.clear()
