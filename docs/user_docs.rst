@@ -38,17 +38,21 @@ implemented or are incomplete:
 Please feel free to open a github ticket if you spot anything else missing, or have any thoughts regarding naming,
 default settings, etc.
 
+
 Walkthrough
 -----------
 
 Navigating
 ^^^^^^^^^^
 
-Just about everything you need for routine user tasks is available in the :mod:`laurelin.ldap` package. You should not
-need to get into the sub-modules below this unless you are defining controls, extensions, schema, or validators, or if
-you are viewing the source.
+Just about everything you need for routine user tasks is available in the :mod:`laurelin.ldap` package.
+:mod:`laurelin.ldap.exceptions` contains all exception definitions which you may need to import to catch, but even some
+common ones are included in :mod:`laurelin.ldap`. Beyond that, you should not need to get into the sub-modules unless
+you are defining controls, extensions, schema, or validators.
+
 
 :doc:`/built_in_extensions` are stored in the :mod:`laurelin.extensions` package.
+
 
 Getting Started
 ^^^^^^^^^^^^^^^
@@ -77,9 +81,6 @@ information available at all log levels::
     # do not emit any LDAP warnings
     # all other warnings will take the default action
 
-    LDAP.default_warnings()
-    # take the default action for all warnings
-
 You can then initialize a connection to an LDAP server. Pass a URI string to the :class:`.LDAP` constructor::
 
    with LDAP('ldap://dir.example.org:389') as ldap:
@@ -92,6 +93,7 @@ This will open a connection and query the server to find the "base DN" or DN suf
 be created with the base DN and stored as the ``base`` attribute on the :class:`.LDAP` instance. More on this later. For
 now we will briefly cover the basic LDAP interface which may seem somewhat familiar if you have used the standard
 python-ldap client before.
+
 
 LDAP Methods Intro
 ^^^^^^^^^^^^^^^^^^
@@ -111,16 +113,10 @@ arguments are described here (listed in order):
 
 Use :meth:`LDAP.get` if you just need to get a single object by its DN. Also accepts an optional list of attributes.
 
------
-
 :meth:`.LDAP.add` adds a new object, and returns the corresponding :class:`.LDAPObject`, just pass the full, absolute
 DN and an :ref:`attributes dict <attributes-dictionaries>`
 
------
-
 :meth:`.LDAP.delete` deletes an entire object. Just pass the full, absolute DN of the object to delete.
-
------
 
 The following methods are preferred for modification, however raw :ref:`modify methods <modify-operations>` are
 provided.
@@ -134,6 +130,7 @@ all values for an attribute.
 
 :meth:`.LDAP.replace_attrs` replaces all values for the given attributes with the values passed in the attributes
 dictionary. Atrributes that are not mentioned are not touched. Passing an empty list removes all values.
+
 
 LDAPObject Methods Intro
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -181,7 +178,6 @@ require only a new attributes dictionary as an argument, of the same format as f
     for user in people.search(filter='(objectClass=posixAccount)'):
         print(user['uid'][0])
 
-This should cover the basics. More complexity to follow.
 
 .. _attributes-dictionaries:
 
@@ -254,6 +250,7 @@ Using an :class:`.LDAPObject` instead::
 
 Again, an arbitrary number of :class:`.Mod` entries may be specified for each ``modify`` call.
 
+
 Strict modification and higher-level modify functions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -278,6 +275,7 @@ attributes that are mentioned in the passed attributes dict.
 
 The raw ``modify`` functions on both :class:`.LDAP` and :class:`.LDAPObject` are unaffected by the ``strict_modify``
 setting - they will always attempt the modify operation exactly as specified.
+
 
 Global Defaults, LDAP instance attributes, and LDAP constructor arguments
 -------------------------------------------------------------------------
@@ -320,6 +318,7 @@ criticality of all controls, the other ``default_`` attributes are used with :me
 
 The ``ssl_`` prefixed instances attributes are used as the defaults for :meth:`.LDAP.start_tls`, as well as the socket
 configuration when connecting to an ``ldaps://`` socket.
+
 
 Basic usage examples
 --------------------
