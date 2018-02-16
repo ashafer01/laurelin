@@ -1363,29 +1363,33 @@ class LDAPURI(object):
     :var str filter: The filter string
     :var bool starttls: True if StartTLS was requested
     """
+
+    DEFAULT_ATTRS = ['*']
+    DEFAULT_SCOPE = Scope.BASE
+    DEFAULT_FILTER = LDAP.DEFAULT_FILTER
+    DEFAULT_STARTTLS = False
+
     def __init__(self, uri):
         self._orig = uri
         parsed_uri = urlparse(uri)
         self.scheme = parsed_uri.scheme
-        if self.scheme == '':
-            self.scheme = 'ldap'
         self.netloc = parsed_uri.netloc
         self.host_uri = '{0}://{1}'.format(self.scheme, self.netloc)
-        self.dn = parsed_uri.path
+        self.dn = parsed_uri.path[1:]
         params = parsed_uri.query.split('?')
         nparams = len(params)
         if (nparams > 0) and (len(params[0]) > 0):
             self.attrs = params[0].split(',')
         else:
-            self.attrs = ['*']
+            self.attrs = LDAPURI.DEFAULT_ATTRS
         if (nparams > 1) and (len(params[1]) > 0):
             self.scope = Scope.string(params[1])
         else:
-            self.scope = Scope.BASE
+            self.scope = LDAPURI.DEFAULT_SCOPE
         if (nparams > 2) and (len(params[2]) > 0):
             self.filter = params[2]
         else:
-            self.filter = LDAP.DEFAULT_FILTER
+            self.filter = LDAPURI.DEFAULT_FILTER
         if (nparams > 3) and (len(params[3]) > 0):
             extensions = params[3].split(',')
             for ext in extensions:
@@ -1402,7 +1406,7 @@ class LDAPURI(object):
                     else:
                         warn('Unsupported URI extension {0}'.format(ext), LDAPWarning)
         else:
-            self.starttls = False
+            self.starttls = LDAPURI.DEFAULT_STARTTLS
 
     def search(self, **kwds):
         """Perform the search operation described by the parsed URI

@@ -4,12 +4,13 @@ from laurelin.ldap import (
     protoutils,
     exceptions,
 )
+import laurelin.ldap.base
 import inspect
 import unittest
 from .mock_ldapsocket import MockLDAPSocket
 
 
-def obj_to_lm(mid, dn, attrs_dict):
+def obj_to_lm(mid, dn, attrs_dict, controls=None):
     """Create a searchResEntry LDAPMessage"""
     sre = rfc4511.SearchResultEntry()
     sre.setComponentByName('objectName', rfc4511.LDAPDN(dn))
@@ -26,18 +27,28 @@ def obj_to_lm(mid, dn, attrs_dict):
         attrs.setComponentByPosition(i, _attr)
         i += 1
 
-    sre.setComponentByName('attributes', attrs)
+    sre.setComponentByName('attributes', attrs, controls)
 
     return protoutils.pack(mid, 'searchResEntry', sre)
 
 
-def search_res_done(mid, dn, result_code=protoutils.RESULT_success):
+def search_res_done(mid, dn, result_code=protoutils.RESULT_success, controls=None):
     """Create a searchResDone LDAPMessage"""
-    srd = rfc4511.SearchResultDone()
-    srd.setComponentByName('resultCode', result_code)
-    srd.setComponentByName('matchedDN', rfc4511.LDAPDN(dn))
-    srd.setComponentByName('diagnosticMessage', rfc4511.LDAPString('THIS IS A TEST OBJECT'))
-    return protoutils.pack(mid, 'searchResDone', srd)
+    return ldap_result(rfc4511.SearchResultDone,
+                       mid,
+                       'searchResDone',
+                       dn=dn,
+                       result_code=result_code,
+                       msg='THIS IS A TEST OBJECT',
+                       controls=controls)
+
+
+def search_res_ref(mid, uris, controls=None):
+    """Generate a searchResultRef LDAPMessage"""
+    srr = rfc4511.SearchResultReference()
+    for i, uri in enumerate(uris):
+        srr.setComponentByPosition(i, uri)
+    return protoutils.pack(mid, 'searchResRef', srr, controls)
 
 
 def add_root_dse(mock_sock, mid=1):
@@ -50,21 +61,29 @@ def add_root_dse(mock_sock, mid=1):
     ])
 
 
-class TestLDAP(unittest.TestCase):
-    def setUp(self):
-        self.init_params = inspect.getargspec(LDAP.__init__).args
-        self.init_params.remove('self')
+def ldap_result(cls, mid, op, result_code=protoutils.RESULT_success, dn='', msg='', controls=None):
+    res = cls()
+    res.setComponentByName('resultCode', result_code)
+    res.setComponentByName('matchedDN', rfc4511.LDAPDN(dn))
+    res.setComponentByName('diagnosticMessage', rfc4511.LDAPString(msg))
+    return protoutils.pack(mid, op, res, controls)
 
+
+class TestLDAP(unittest.TestCase):
     def test_global_default_presence(self):
         """Ensure that all parameters of LDAP.__init__ have a global default defined"""
-        for param in self.init_params:
+        init_params = inspect.getargspec(LDAP.__init__).args
+        init_params.remove('self')
+        for param in init_params:
             gdefault = param.upper()
             if not gdefault.startswith('DEFAULT'):
                 gdefault = 'DEFAULT_'+gdefault
             assert hasattr(LDAP, gdefault) is True
 
     def test_init_base_dn(self):
-        """Test paths for base_dn. This also exercises the search method."""
+        """Test paths for base_dn"""
+        # This also exercises the search method.
+
         # this should get the only namingContext
         expected_base_dn = 'o=testing'
         mock_sock = MockLDAPSocket()
@@ -196,9 +215,70 @@ class TestLDAP(unittest.TestCase):
             obj_to_lm(3, '', root_dse),
             search_res_done(3, ''),
         ])
-
         with self.assertRaises(exceptions.LDAPError):
             ldap.recheck_sasl_mechs()
+
+    def test_duplicate_tag(self):
+        """Ensure trying to define a duplicate tag is an error"""
+        tag = 'foobar'
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+        ldap.obj('o=foo', tag=tag)
+        with self.assertRaises(exceptions.TagError):
+            ldap.obj('o=bar', tag=tag)
+
+    def test_tagging(self):
+        """Ensure setting and retreiving tags works"""
+        tag = 'foobar'
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+        expected_obj = ldap.obj('o=foo', tag=tag)
+        actual_obj = ldap.tag(tag)
+        self.assertIs(expected_obj, actual_obj)
+
+        with self.assertRaises(exceptions.TagError):
+            ldap.tag('not_a_defined_tag')
+
+    def test_search_result_ref(self):
+        """Ensure searchResRef is handled correctly"""
+        # Note: searchResEntry and searchResDone paths have already been exercised
+
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+
+        base_dn = 'ou=foo,o=testing'
+        uri = 'ldap://test.net/ou=foo,o=testing'
+
+        mock_sock.add_messages([
+            search_res_ref(2, [uri]),
+            search_res_done(2, base_dn)
+        ])
+
+        with ldap.search(base_dn, fetch_result_refs=False) as search:
+            results = list(search)
+            self.assertEqual(len(results), 1)
+            srh = results[0]
+            self.assertIsInstance(srh, laurelin.ldap.base.SearchReferenceHandle)
+            self.assertEqual(len(srh.uris), 1)
+
+        # TODO: verify we get a warning when response controls are returned with a searchResultRef
+        # TODO: test with fetch_result_refs set True, will need to mock SearchReferenceHandle
+
+    def test_bad_search_response(self):
+        """Ensure an incorrect search response is handled correctly"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+
+        mock_sock.add_messages([
+            ldap_result(rfc4511.CompareResponse, 2, 'compareResponse', result_code=protoutils.RESULT_compareTrue),
+        ])
+
+        with self.assertRaises(exceptions.UnexpectedResponseType):
+            list(ldap.search(''))
 
 
 if __name__ == '__main__':

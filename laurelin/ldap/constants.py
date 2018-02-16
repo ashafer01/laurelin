@@ -34,6 +34,18 @@ class Scope:
         else:
             raise ValueError()
 
+    @staticmethod
+    def constant(c):
+        """translate constants to RFC4516 URL scope string"""
+        if c == Scope.BASE:
+            return 'base'
+        elif c == Scope.ONE:
+            return 'one'
+        elif c == Scope.SUB:
+            return 'sub'
+        else:
+            raise ValueError()
+
 
 def _scope_repr(scope_obj):
     """Uses laurelin constant name representation for scope"""
