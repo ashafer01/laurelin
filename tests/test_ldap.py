@@ -190,6 +190,34 @@ class TestLDAP(unittest.TestCase):
 
         # Note: exactly 1 result is already exercised by test_init_base_dn
 
+    def test_exists(self):
+        """Ensure the exists function handles various result numbers properly"""
+
+        # Test no results
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        mock_sock.add_messages([search_res_done(2, 'o=foo')])
+        ldap = LDAP(mock_sock)
+
+        self.assertFalse(ldap.exists('o=foo'))
+
+        # Test multiple results
+        mock_sock.add_messages([
+            obj_to_lm(3, 'o=foo', {}),
+            obj_to_lm(3, 'o=foo', {}),
+            search_res_done(3, 'o=foo'),
+        ])
+
+        self.assertTrue(ldap.exists('o=foo'))
+
+        # Test exactly one result
+        mock_sock.add_messages([
+            obj_to_lm(4, 'o=foo', {}),
+            search_res_done(4, 'o=foo'),
+        ])
+
+        self.assertTrue(ldap.exists('o=foo'))
+
     def test_recheck_sasl_mechs(self):
         """Ensure a downgrade attack is properly identified"""
         root_dse = {
@@ -313,6 +341,39 @@ class TestLDAP(unittest.TestCase):
             self.assertEqual(len(results), 0)
 
         # TODO: test with follow_referrals set True, will need to mock SearchReferenceHandle
+
+    def test_compare(self):
+        """Ensure compare returns correct boolean results"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+
+        mock_sock.add_messages([
+            ldap_result(rfc4511.CompareResponse, 2, 'compareResponse', dn='',
+                        result_code=protoutils.RESULT_compareTrue)
+        ])
+        actual = ldap.compare('', 'foo', 'bar')
+        self.assertTrue(actual)
+
+        mock_sock.add_messages([
+            ldap_result(rfc4511.CompareResponse, 3, 'compareResponse', dn='',
+                        result_code=protoutils.RESULT_compareFalse)
+        ])
+        actual = ldap.compare('', 'foo', 'bar')
+        self.assertFalse(actual)
+
+    def test_add_bad_response(self):
+        """Ensure non-success results for add are handled correctly"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+
+        mock_sock.add_messages([
+            ldap_result(rfc4511.AddResponse, 2, 'addResponse', dn='', result_code=protoutils.RESULT_compareTrue)
+        ])
+
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.add('o=foo', {})
 
 
 if __name__ == '__main__':
