@@ -4,10 +4,10 @@ Testing Setup
 System
 ------
 
- * Digital Ocean VPS with Debian 7.9
- * OpenLDAP 2.4.31
- * Cyrus SASL 2.1.25
- * 389 Directory Server 1.3.6
+* Digital Ocean VPS with Debian 7.9
+* OpenLDAP 2.4.31
+* Cyrus SASL 2.1.25
+* 389 Directory Server 1.3.6
 
 SASL
 ----
@@ -55,8 +55,8 @@ SASL auth control test case
 LDAPS/StartTLS
 --------------
 
- * Certs set up following this `Stack Overflow answer <http://stackoverflow.com/a/21340898/94077>`_
- * Configured OpenLDAP as follows::
+* Certs set up following this `Stack Overflow answer <http://stackoverflow.com/a/21340898/94077>`_.
+* Configured OpenLDAP as follows::
 
     dn: cn=config
     changetype: modify
@@ -69,4 +69,4 @@ LDAPS/StartTLS
     replace: olcTLSCACertificateFile
     olcTLSCACertificateFile: /certs/cacert.pem
 
- * Added ``ldaps://127.0.0.1:636`` to ``SLAPD_SERVICES`` in ``/etc/default/slapd``
+* Added ``ldaps://127.0.0.1:636`` to ``SLAPD_SERVICES`` in ``/etc/default/slapd``

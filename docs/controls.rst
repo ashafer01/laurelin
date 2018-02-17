@@ -7,9 +7,9 @@ Controls
 Many LDAP users may be unfamiliar with controls. RFC4511 defines *controls* as "providing a mechanism whereby the
 semantics and arguments of existing LDAP operations may be extended." In other words, they can:
 
-    1. Instruct the server to process a method differently
-    2. Add new arguments to methods to control the altered processing
-    3. Add additional data to the response to a method call
+1. Instruct the server to process a method differently
+2. Add new arguments to methods to control the altered processing
+3. Add additional data to the response to a method call
 
 It is important to note that both the server and client must mutually support all controls used. Laurelin will
 automatically check for server support when using controls.
@@ -55,20 +55,22 @@ Defining Controls
 -----------------
 
 Controls must subclass Control and define at least:
- * :attr:`.Control.method`, a tuple of method names that this control supports. Current method names are `bind`,
-   `search`, `compare`, `add`, `delete`, `mod_dn`, `modify`, and `ext` (extended request). Note that these method
-   names do not necessarily correspond directly to :class:`.LDAP` method names. Even when they do, other methods may
-   call the base method and pass through control keywords. For example, :meth:`.LDAPObject.find` ends up passing any
-   control keywords through into :meth:`.LDAP.search` (which matches the `search` method). The `bind` method is used by
-   both :meth:`.LDAP.simple_bind` and :meth:`.LDAP.sasl_bind`.
- * :attr:`.Control.keyword`, the keyword argument to be used for the request control.
- * :attr:`.Control.REQUEST_OID` the OID of the reuqest control. If the control has criticality, the OID must be listed
-   in the supportedControl attribute of the root DSE of the server at runtime.
+
+* :attr:`.Control.method`, a tuple of method names that this control supports. Current method names are `bind`,
+  `search`, `compare`, `add`, `delete`, `mod_dn`, `modify`, and `ext` (extended request). Note that these method
+  names do not necessarily correspond directly to :class:`.LDAP` method names. Even when they do, other methods may
+  call the base method and pass through control keywords. For example, :meth:`.LDAPObject.find` ends up passing any
+  control keywords through into :meth:`.LDAP.search` (which matches the `search` method). The `bind` method is used by
+  both :meth:`.LDAP.simple_bind` and :meth:`.LDAP.sasl_bind`.
+* :attr:`.Control.keyword`, the keyword argument to be used for the request control.
+* :attr:`.Control.REQUEST_OID` the OID of the reuqest control. If the control has criticality, the OID must be listed
+  in the supportedControl attribute of the root DSE of the server at runtime.
 
 If there is an associated response control, also define the following:
- * :attr:`.Control.response_attr`, the name of the attribute which will be set on objects returned from the method.
- * :attr:`.Control.RESPONSE_OID` the OID of the response control. This may be equal to :attr:`.Control.REQUEST_OID`
-   depending on the spec. This must match the controlType of the response control to be properly set.
+
+* :attr:`.Control.response_attr`, the name of the attribute which will be set on objects returned from the method.
+* :attr:`.Control.RESPONSE_OID` the OID of the response control. This may be equal to :attr:`.Control.REQUEST_OID`
+  depending on the spec. This must match the controlType of the response control to be properly set.
 
 Most controls will not need to override methods if only strings are used for request and response values. However, if it
 is desirable to use a more complex data structure as a control value, you can override the :meth:`.Control.prepare`

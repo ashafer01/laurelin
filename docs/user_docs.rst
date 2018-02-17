@@ -10,30 +10,30 @@ Major missing/incomplete features
 Laurelin is still under development. What is done should be usable, but the following features have not yet been
 implemented or are incomplete:
 
- * Controls
+* Controls
 
-   * Framework in place, no actual controls implemented yet
+  * Framework in place, no actual controls implemented yet
 
- * Referrals
+* Referrals
 
-   * In place for search but untested
-   * Need to implement for other methods
+  * In place for search but untested
+  * Need to implement for other methods
 
- * LDIF input
+* LDIF input
 
-   * Partial, not full spec
+  * Partial, not full spec
 
- * Binary data
+* Binary data
 
-   * Entirely missing
+  * Entirely missing
 
- * Docs
+* Docs
 
-   * In progress
+  * In progress
 
- * Testing
+* Testing
 
-   * In progress
+  * In progress
 
 Please feel free to open a github ticket if you spot anything else missing, or have any thoughts regarding naming,
 default settings, etc.
