@@ -36,6 +36,8 @@ __all__ = [
     'NoSearchResults',
     'Abandon',
     'LDAPObject',
+    'filter_escape',
+    'Mod',
     'dc',
     'domain',
 ]

@@ -1,29 +1,27 @@
 from laurelin.ldap.attrsdict import AttrsDict
+import unittest
 
-def test_init_update():
-    """Test that types are properly checked at init"""
 
-    test_ok = {'abc': ['def', 'ghi']}
-    AttrsDict(test_ok)
+class TestAttrsDict(unittest.TestCase):
+    def test_init_update(self):
+        """Test that types are properly checked at init"""
 
-    test_bad_key = {('abc',): ['def']}
-    try:
-        AttrsDict(test_bad_key)
-        assert False
-    except TypeError:
-        pass
+        test_ok = {'abc': ['def', 'ghi']}
+        AttrsDict(test_ok)
 
-    test_bad_value = {'abc': 'def'}
-    try:
-        AttrsDict(test_bad_value)
-        assert False
-    except TypeError:
-        pass
+        test_bad_key = {('abc',): ['def']}
+        with self.assertRaises(TypeError):
+            AttrsDict(test_bad_key)
 
-class TestContains(object):
+        test_bad_value = {'abc': 'def'}
+        with self.assertRaises(TypeError):
+            AttrsDict(test_bad_value)
+
+
+class TestContains(unittest.TestCase):
     """Test __contains__"""
 
-    def __init__(self):
+    def setUp(self):
         self.k1 = 'abCdef'
         self.k2 = 'abc'
         self.testobj = AttrsDict({
@@ -32,25 +30,25 @@ class TestContains(object):
         })
 
     def test_case_exact(self):
-        assert (self.k1 in self.testobj)
+        self.assertIn(self.k1, self.testobj)
 
     def test_case_insensitive(self):
-        assert (self.k1.upper() in self.testobj)
+        self.assertIn(self.k1.upper(), self.testobj)
 
     def test_empty_list(self):
-        assert (self.k2 in self.testobj) is False
+        self.assertNotIn(self.k2, self.testobj)
 
     def test_empty_list_insensitive(self):
-        assert (self.k2.upper() in self.testobj) is False
+        self.assertNotIn(self.k2.upper(), self.testobj)
 
     def test_non_existant_key(self):
-        assert ('foo' in self.testobj) is False
+        self.assertNotIn('foo', self.testobj)
 
 
-class TestGets(object):
+class TestGets(unittest.TestCase):
     """Tests get, getAttr, and __getitem__"""
 
-    def __init__(self):
+    def setUp(self):
         self.k = 'abcDef'
         self.v = ['foo', 'bar']
         self.testobj = AttrsDict({
@@ -58,63 +56,57 @@ class TestGets(object):
         })
 
     def test_get(self):
-        assert self.testobj.get(self.k) is self.v
+        self.assertIs(self.testobj.get(self.k), self.v)
 
     def test_get_insensitive(self):
-        assert self.testobj[self.k.upper()] is self.v
+        self.assertIs(self.testobj[self.k.upper()], self.v)
 
-    def test_getAttr_notexists(self):
+    def test_get_attr_notexists(self):
         v = self.testobj.get_attr('foo')
-        assert isinstance(v, list)
-        assert (len(v) == 0)
+        self.assertIsInstance(v, list)
+        self.assertEqual(len(v), 0)
 
-    def test_getAttr_exists(self):
-        assert self.testobj.get_attr(self.k) is self.v
+    def test_get_attr_exists(self):
+        self.assertIs(self.testobj.get_attr(self.k), self.v)
 
     def test_get_default(self):
         expect = 'foobar'
         actual = self.testobj.get('foo', expect)
-        assert expect is actual
+        self.assertIs(expect, actual)
 
 
-class TestSetsDeletes(object):
+class TestSetsDeletes(unittest.TestCase):
     """Tests setting and deleting individual items"""
 
-    def __init__(self):
+    def setUp(self):
         self.testobj = AttrsDict()
 
     def test_set_retreive_delete(self):
         k = 'abcdEf'
         v = ['foo', 'bar']
         self.testobj[k] = v
-        assert (self.testobj[k.upper()] == v)
+        self.assertEqual(self.testobj[k.upper()], v)
         del self.testobj[k]
-        assert (k not in self.testobj)
+        self.assertNotIn(k, self.testobj)
 
     def test_invalid_key(self):
         k = ('foo',)
         v = ['bar']
-        try:
+        with self.assertRaises(TypeError):
             self.testobj[k] = v
-            assert False
-        except TypeError:
-            pass
 
     def test_invalid_value(self):
         k = 'foo'
         v = 'bar'
-        try:
+        with self.assertRaises(TypeError):
             self.testobj[k] = v
-            assert False
-        except TypeError:
-            pass
 
     def test_setdefault_notexists_retreive(self):
         k = 'aBcDefg'
         v = ['foo', 'bar']
         actual = self.testobj.setdefault(k, v)
-        assert (actual is v)
-        assert (self.testobj[k.upper()] is v)
+        self.assertIs(actual, v)
+        self.assertIs(self.testobj[k.upper()], v)
         del self.testobj[k]
 
     def test_setdefault_exists(self):
@@ -123,23 +115,17 @@ class TestSetsDeletes(object):
         d = ['other', 'another']
         self.testobj[k] = v
         actual = self.testobj.setdefault(k, d)
-        assert (actual is v)
+        self.assertIs(actual, v)
         del self.testobj[k]
 
     def test_setdefault_invalid_key(self):
         k = ('foo',)
         v = ['bar']
-        try:
+        with self.assertRaises(TypeError):
             self.testobj.setdefault(k, v)
-            assert False
-        except TypeError:
-            pass
 
     def test_setdefault_invalid_default(self):
         k = 'foo'
         v = 'bar'
-        try:
+        with self.assertRaises(TypeError):
             self.testobj.setdefault(k, v)
-            assert False
-        except TypeError:
-            pass

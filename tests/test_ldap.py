@@ -3,6 +3,7 @@ from laurelin.ldap import (
     rfc4511,
     protoutils,
     exceptions,
+    Mod,
 )
 import laurelin.ldap.base
 import inspect
@@ -218,6 +219,32 @@ class TestLDAP(unittest.TestCase):
 
         self.assertTrue(ldap.exists('o=foo'))
 
+    def test_get_sasl_mechs(self):
+        """Ensure get_sasl_mechs works correctly"""
+        mechs = [
+            'DIGEST-MD5',
+            'GSSAPI'
+        ]
+        root_dse = {
+            'namingContexts': ['o=testing'],
+            'supportedSASLMechanisms': mechs,
+        }
+        mock_sock = MockLDAPSocket()
+
+        # add root DSE
+        mock_sock.add_messages([
+            obj_to_lm(1, '', root_dse),
+            search_res_done(1, ''),
+        ])
+        # the constructor performs the initial root dse query
+        ldap = LDAP(mock_sock)
+
+        m1 = ldap.get_sasl_mechs()
+        m2 = ldap.get_sasl_mechs()
+
+        self.assertEqual(m1, mechs)
+        self.assertIs(m1, m2)
+
     def test_recheck_sasl_mechs(self):
         """Ensure a downgrade attack is properly identified"""
         root_dse = {
@@ -374,6 +401,62 @@ class TestLDAP(unittest.TestCase):
 
         with self.assertRaises(exceptions.LDAPError):
             ldap.add('o=foo', {})
+
+    def test_modify_zero_length(self):
+        """Ensure zero-length modlists are ignored"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+        mock_sock.incoming_queue.clear()
+        ldap.modify('', [])
+        self.assertEqual(len(mock_sock.incoming_queue), 0)
+
+    def test_modify(self):
+        """Ensure protocol-level modlist is contructed without error"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+
+        mock_sock.add_messages([
+            ldap_result(rfc4511.ModifyResponse, 2, 'modifyResponse', result_code=protoutils.RESULT_success)
+        ])
+        ldap.modify('', [
+            Mod(Mod.ADD, 'foo', ['bar', 'baz']),
+            Mod(Mod.REPLACE, 'foo', []),
+            Mod(Mod.REPLACE, 'foo', ['foo']),
+            Mod(Mod.DELETE, 'foo', []),
+            Mod(Mod.DELETE, 'foo', ['foo'])
+        ])
+
+    def test_who_am_i(self):
+        """Exercise the extension subsystem"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+
+        # ensure unsupported extensions raise an exceptions
+        with self.assertRaises(exceptions.LDAPSupportError):
+            ldap.who_am_i()
+
+        # make the who am i operation supported
+        root_dse = {
+            'namingContexts': ['o=testing'],
+            'supportedExtension': [LDAP.OID_WHOAMI],
+        }
+        mock_sock.add_messages([
+            obj_to_lm(2, '', root_dse),
+            search_res_done(2, '', result_code=protoutils.RESULT_success),
+            ldap_result(rfc4511.ExtendedResponse, 3, 'extendedResp', result_code=protoutils.RESULT_success)
+        ])
+        ldap.refresh_root_dse()
+        ldap.who_am_i()
+
+        # test failure result
+        mock_sock.add_messages([
+            ldap_result(rfc4511.ExtendedResponse, 4, 'extendedResp', result_code=protoutils.RESULT_compareFalse)
+        ])
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.who_am_i()
 
 
 if __name__ == '__main__':

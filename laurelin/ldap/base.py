@@ -1078,7 +1078,7 @@ class LDAP(Extensible):
         """
         handle = self.send_extended_request(LDAP.OID_WHOAMI, require_success=True, **ctrl_kwds)
         xr, res_ctrls = handle.recv_response()
-        return six.text_type(xr.getComponentByName('responseValue'))
+        return get_string_component(xr, 'responseValue')
 
     def start_tls(self, verify=None, ca_file=None, ca_path=None, ca_data=None):
         """Perform the StartTLS extended operation. This will instruct the server to begin encrypting this socket
@@ -1324,7 +1324,7 @@ class ExtendedResponseHandle(ResponseHandle):
     def _handle_msg(self, lm):
         try:
             mid, ir, res_ctrls = unpack('intermediateResponse', lm)
-            res_name = ir.getComponentByName('responseName')
+            res_name = get_string_component(ir, 'responseName')
             logger.debug('Got name={0} intermediate response for ID={1}'.format(res_name, mid))
             return ir, res_ctrls
         except UnexpectedResponseType:
