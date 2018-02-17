@@ -9,6 +9,7 @@ import laurelin.ldap.base
 import inspect
 import unittest
 from .mock_ldapsocket import MockLDAPSocket
+from types import ModuleType
 
 
 def obj_to_lm(mid, dn, attrs_dict, controls=None):
@@ -457,6 +458,15 @@ class TestLDAP(unittest.TestCase):
         ])
         with self.assertRaises(exceptions.LDAPError):
             ldap.who_am_i()
+
+    def test_activate_extension(self):
+        """Ensure extension activation/loading works"""
+        netgroups = LDAP.activate_extension('laurelin.extensions.netgroups')
+        self.assertIsInstance(netgroups, ModuleType)
+        self.assertTrue(hasattr(LDAP, 'get_netgroup'))
+
+        with self.assertRaises(ImportError):
+            LDAP.activate_extension('i.am.not.a.module')
 
 
 if __name__ == '__main__':

@@ -22,13 +22,14 @@ from .rfc4511 import (
     Final,
     ExtensibleMatch,
     MatchValue,
-    MatchingRuleId,
+    MatchingRule,
     DnAttributes,
+    Type,
 )
 from .exceptions import LDAPError
 from .utils import find_closing_paren
 
-escapeMap = [
+escape_map = [
     ('(', '\\28'),
     (')', '\\29'),
     ('&', '\\26'),
@@ -45,7 +46,7 @@ escapeMap = [
 
 def escape(text):
     """Escape special characters"""
-    for rep in escapeMap:
+    for rep in escape_map:
         text = text.replace(*rep)
     return text
 
@@ -54,17 +55,23 @@ def parse(filter_str):
     """Parse a filter string to a protocol-level object"""
 
     fil = Filter()
-    chunk = filter_str[1:find_closing_paren(filter_str)]
+    try:
+        chunk = filter_str[1:find_closing_paren(filter_str)]
+    except ValueError as e:
+        raise LDAPError('invalid filter - {0}'.format(str(e)))
     if chunk[0] == '&':
         fil.setComponentByName('and', _parse_set(chunk[1:], And))
     elif chunk[0] == '|':
         fil.setComponentByName('or', _parse_set(chunk[1:], Or))
     elif chunk[0] == '!':
-        notFilter = Not()
-        notFilter.setComponentByName('innerNotFilter', parse(chunk[1:]))
-        fil.setComponentByName('not', notFilter)
+        not_filter = Not()
+        not_filter.setComponentByName('innerNotFilter', parse(chunk[1:]))
+        fil.setComponentByName('not', not_filter)
     else:
-        attr, val = chunk.split('=', 1)
+        try:
+            attr, val = chunk.split('=', 1)
+        except ValueError:
+            raise LDAPError('Invalid filter - missing =')
         if attr[-1] == '>':
             ava = GreaterOrEqual()
             ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1].strip()))
@@ -118,9 +125,9 @@ def parse(filter_str):
             xm.setComponentByName('matchValue', MatchValue(val))
             xm.setComponentByName('dnAttributes', DnAttributes(dnattrs))
             if attr:
-                xm.setComponentByName('type', AttributeDescription(attr))
+                xm.setComponentByName('type', Type(attr))
             if rule:
-                xm.setComponentByName('matchingRule', MatchingRuleId(rule))
+                xm.setComponentByName('matchingRule', MatchingRule(rule))
             fil.setComponentByName('extensibleMatch', xm)
         elif val.strip() == '*':
             fil.setComponentByName('present', Present(attr))
