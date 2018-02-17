@@ -52,7 +52,5 @@ class TestLDAPURI(unittest.TestCase):
         self.assertEqual(LDAPURI.DEFAULT_STARTTLS, uri.starttls)
 
 
-
-
 if __name__ == '__main__':
     unittest.main()

@@ -32,7 +32,7 @@ def obj_to_lm(mid, dn, attrs_dict, controls=None):
     return protoutils.pack(mid, 'searchResEntry', sre)
 
 
-def search_res_done(mid, dn, result_code=protoutils.RESULT_success, controls=None):
+def search_res_done(mid, dn, result_code=protoutils.RESULT_success, controls=None, referral=None):
     """Create a searchResDone LDAPMessage"""
     return ldap_result(rfc4511.SearchResultDone,
                        mid,
@@ -40,7 +40,8 @@ def search_res_done(mid, dn, result_code=protoutils.RESULT_success, controls=Non
                        dn=dn,
                        result_code=result_code,
                        msg='THIS IS A TEST OBJECT',
-                       controls=controls)
+                       controls=controls,
+                       referral=referral)
 
 
 def search_res_ref(mid, uris, controls=None):
@@ -61,8 +62,14 @@ def add_root_dse(mock_sock, mid=1):
     ])
 
 
-def ldap_result(cls, mid, op, result_code=protoutils.RESULT_success, dn='', msg='', controls=None):
+def ldap_result(cls, mid, op, result_code=protoutils.RESULT_success, dn='', msg='', controls=None, referral=None):
     res = cls()
+    if referral:
+        result_code = protoutils.RESULT_referral
+        _referral = rfc4511.Referral()
+        for i, uri in enumerate(referral):
+            _referral.setComponentByPosition(i, rfc4511.URI(uri))
+        res.setComponentByName('referral', _referral)
     res.setComponentByName('resultCode', result_code)
     res.setComponentByName('matchedDN', rfc4511.LDAPDN(dn))
     res.setComponentByName('diagnosticMessage', rfc4511.LDAPString(msg))
@@ -267,18 +274,45 @@ class TestLDAP(unittest.TestCase):
         # TODO: verify we get a warning when response controls are returned with a searchResultRef
         # TODO: test with fetch_result_refs set True, will need to mock SearchReferenceHandle
 
-    def test_bad_search_response(self):
-        """Ensure an incorrect search response is handled correctly"""
+    def test_search_error_response(self):
+        """Ensure non-success results for search are handled correctly"""
         mock_sock = MockLDAPSocket()
         add_root_dse(mock_sock)
         ldap = LDAP(mock_sock)
 
         mock_sock.add_messages([
-            ldap_result(rfc4511.CompareResponse, 2, 'compareResponse', result_code=protoutils.RESULT_compareTrue),
+            search_res_done(2, '', result_code=protoutils.RESULT_compareTrue)
         ])
 
-        with self.assertRaises(exceptions.UnexpectedResponseType):
+        with self.assertRaises(exceptions.LDAPError):
             list(ldap.search(''))
+
+    def test_search_nosuchobject_response(self):
+        """Ensure noSuchObject response is treated as no results"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+
+        mock_sock.add_messages([
+            search_res_done(2, '', result_code=rfc4511.ResultCode('noSuchObject'))
+        ])
+
+        self.assertEqual(len(list(ldap.search(''))), 0)
+
+    def test_search_referral(self):
+        """Ensure a referral response is handled correctly for search"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+
+        uri = 'ldap://test.net/ou=foo,o=testing'
+        mock_sock.add_messages([search_res_done(2, '', referral=[uri])])
+
+        with ldap.search('', follow_referrals=False) as search:
+            results = list(search)
+            self.assertEqual(len(results), 0)
+
+        # TODO: test with follow_referrals set True, will need to mock SearchReferenceHandle
 
 
 if __name__ == '__main__':
