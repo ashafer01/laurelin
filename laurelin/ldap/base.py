@@ -1221,6 +1221,12 @@ class CompareResponse(LDAPResponse):
 
 class ResponseHandle(object):
     """Base for return from methods with multiple response messages."""
+    def __init__(self, ldap_conn, mid):
+        self.ldap_conn = ldap_conn
+        self.message_id = mid
+        self.abandoned = False
+        self.done = False
+
     def __enter__(self):
         return self
 
@@ -1243,13 +1249,10 @@ class ResponseHandle(object):
 
 class SearchResultHandle(ResponseHandle):
     def __init__(self, ldap_conn, message_id, fetch_result_refs, follow_referrals, obj_kwds):
-        self.ldap_conn = ldap_conn
-        self.message_id = message_id
+        ResponseHandle.__init__(self, ldap_conn, message_id)
         self.fetch_result_refs = fetch_result_refs
         self.follow_referrals = follow_referrals
         self.obj_kwds = obj_kwds
-        self.done = False
-        self.abandoned = False
 
     def __iter__(self):
         if self.abandoned:
@@ -1314,12 +1317,9 @@ class ExtendedResponseHandle(ResponseHandle):
     """
 
     def __init__(self, mid, ldap_conn, require_success=False):
-        self.message_id = mid
-        self.ldap_conn = ldap_conn
+        ResponseHandle.__init__(self, ldap_conn, mid)
         self.require_success = require_success
         self._recvr = ldap_conn.sock.recv_messages(mid)
-        self.done = False
-        self.abandoned = False
 
     def _handle_msg(self, lm):
         try:
@@ -1447,5 +1447,5 @@ class SearchReferenceHandle(object):
             try:
                 return uri.search(**self.obj_kwds)
             except LDAPConnectionError as e:
-                warn('Error connecting to URI {0} ({1})'.format(uri, e.message), LDAPWarning)
+                warn('Error connecting to URI {0} ({1})'.format(uri, six.text_type(e)), LDAPWarning)
         raise LDAPError('Could not complete reference URI search with any supplied URIs')
