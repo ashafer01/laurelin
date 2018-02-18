@@ -468,6 +468,56 @@ class TestLDAP(unittest.TestCase):
         with self.assertRaises(ImportError):
             LDAP.activate_extension('i.am.not.a.module')
 
+    def test_unbind(self):
+        """Test unbind/unbound behavior"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+        mock_sock.incoming_queue.clear()
+
+        ldap.unbind()
+
+        # ensure we sent the actual unbindRequest
+        self.assertEqual(len(mock_sock.incoming_queue), 1)
+
+        unbound_fail_methods = [
+            (ldap.simple_bind,),
+            (ldap.sasl_bind,),
+            (ldap.unbind,),
+            (ldap.get, ''),
+            (ldap.exists, ''),
+            (ldap.search, ''),
+            (ldap.compare, '', '', ''),
+            (ldap.add, '', None),
+            (ldap.delete, ''),
+            (ldap.mod_dn, '', ''),
+            (ldap.modify, '', [None]),
+        ]
+
+        for args in unbound_fail_methods:
+            nargs = len(args)
+            with self.assertRaises(exceptions.ConnectionUnbound):
+                if nargs == 1:
+                    args[0]()
+                else:
+                    args[0](*args[1:])
+
+    def test_bound(self):
+        """Ensure bind methods complain that the connection is already bound"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+        mock_sock.bound = True
+
+        bound_fail_methods = [
+            ldap.simple_bind,
+            ldap.sasl_bind
+        ]
+
+        for method in bound_fail_methods:
+            with self.assertRaises(exceptions.ConnectionAlreadyBound):
+                method()
+
 
 if __name__ == '__main__':
     unittest.main()

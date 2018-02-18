@@ -1,4 +1,7 @@
-"""Contains utilities for handling filters"""
+"""Contains utilities for handling filters.
+
+See RFC4515 String Representation of Search Filters
+"""
 
 from __future__ import absolute_import
 from .rfc4511 import (
