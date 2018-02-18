@@ -28,6 +28,7 @@ from .protoutils import (
     seq_to_list,
     get_string_component,
 )
+from .validation import Validator
 
 import logging
 import re
@@ -291,6 +292,10 @@ class LDAP(Extensible):
         # Validation setup
         if validators is None:
             validators = []
+        for validator in validators:
+            if not isinstance(validator, Validator):
+                raise TypeError('Validators must subclass laurelin.ldap.validation.Validator')
+            logger.debug('Using validator {0}'.format(validator.__class__.__name__))
         self.validators = validators
 
     def refresh_root_dse(self):
