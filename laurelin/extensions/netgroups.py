@@ -20,9 +20,9 @@ Member Lists
 This extension module allows a shortcut to specify members of netgroups. Any function with a ``members`` argument uses
 this feature.
 
-The function name will tell you whether it expects users (e.g., :func:`add_netgroup_users`) or hosts (e.g.
-:func:`add_netgroup_hosts`). If you just specify a string in your member list, it will be assumed to be either a user
-or a host accordingly.
+The function name will tell you whether it expects users (e.g., :meth:`LDAP.add_netgroup_users`) or hosts (e.g.
+:meth:`LDAP.add_netgroup_hosts`). If you just specify a string in your member list, it will be assumed to be either a
+user or a host accordingly.
 
 You can also specify a tuple with up to 3 elements for any member list entry. These fields must correspond to the
 ``nisNetgroupTriple`` fields: host, user, and domain. For user functions, at least the first 2 tuple elements must be
@@ -119,7 +119,9 @@ LDAP_methods = []
 
 
 def get_netgroup(self, cn, attrs=NETGROUP_ATTRS):
-    """Find a specific netgroup object. This method gets bound to :class:`.LDAP`.
+    """get_netgroup(cn, attrs=NETGROUP_ATTRS)
+
+    Find a specific netgroup object.
 
     This depends on the base object having been tagged and configured properly. See
     :mod:`laurelin.extensions.netgroups`.
@@ -137,7 +139,9 @@ LDAP_methods.append(get_netgroup)
 
 
 def netgroup_search(self, filter, attrs=NETGROUP_ATTRS):
-    """Search for netgroups. This method gets bound to :class:`.LDAP`.
+    """netgroup_search(filter, attrs=NETGROUP_ATTRS)
+
+    Search for netgroups.
 
     This depends on the base object having been tagged and configured properly. See
     :mod:`laurelin.extensions.netgroups`.
@@ -156,8 +160,10 @@ LDAP_methods.append(netgroup_search)
 
 
 def get_netgroup_obj_users(self, ng_obj, recursive=True):
-    """Get a list of netgroup users from an already queried object, possibly querying for memberNisNetgroups if
-    ``recursive=True`` (the default). This method gets bound to :class:`.LDAP`.
+    """get_netgroup_obj_users(ng_obj, recursive=True)
+
+    Get a list of netgroup users from an already queried object, possibly querying for memberNisNetgroups if
+    ``recursive=True`` (the default).
 
     :param LDAPObject ng_obj: A netgroup LDAP object
     :param bool recursive: Set to False to only consider members of this group directly
@@ -175,7 +181,9 @@ LDAP_methods.append(get_netgroup_obj_users)
 
 
 def get_netgroup_users(self, cn, recursive=True):
-    """Get a list of all user entries for a netgroup. This method gets bound to :class:`.LDAP`.
+    """get_netgroup_users(cn, recursive=True)
+
+    Get a list of all user entries for a netgroup.
 
     This depends on the base object having been tagged and configured properly. See
     :mod:`laurelin.extensions.netgroups`.
@@ -194,8 +202,10 @@ LDAP_methods.append(get_netgroup_users)
 
 
 def get_netgroup_obj_hosts(self, ng_obj, recursive=True):
-    """Get a list of netgroup hosts from an already queried object, possibly querying for memberNisNetgroups if
-    ``recursive=True`` (the default). This method gets bound to :class:`.LDAP`.
+    """get_netgroup_obj_hosts(ng_obj, recursive=True)
+
+    Get a list of netgroup hosts from an already queried object, possibly querying for memberNisNetgroups if
+    ``recursive=True`` (the default).
 
     :param LDAPObject ng_obj: A netgroup LDAP object
     :param bool recursive: Set to False to only consider members of this group directly
@@ -213,7 +223,9 @@ LDAP_methods.append(get_netgroup_obj_hosts)
 
 
 def get_netgroup_hosts(self, cn, recursive=True):
-    """Query a list of all host entries for a netgroup. This method gets bound to :class:`.LDAP`.
+    """get_netgroup_hosts(cn, recursive=True)
+
+    Query a list of all host entries for a netgroup.
 
     This depends on the base object having been tagged and configured properly. See
     :mod:`laurelin.extensions.netgroups`.
@@ -232,7 +244,9 @@ LDAP_methods.append(get_netgroup_hosts)
 
 
 def add_netgroup_users(self, dn, members, domain=''):
-    """Add new users to a netgroup. This method gets bound to :class:`.LDAP`.
+    """add_netgroup_users(dn, members, domain='')
+
+    Add new users to a netgroup.
 
     :param str dn: The absolute DN of the netgroup object
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or sinlge member list entry
@@ -247,7 +261,9 @@ LDAP_methods.append(add_netgroup_users)
 
 
 def add_netgroup_hosts(self, dn, members, domain=''):
-    """Add new hosts to a netgroup. This method gets bound to :class:`.LDAP`.
+    """add_netgroup_hosts(dn, members, domain='')
+
+    Add new hosts to a netgroup.
 
     :param str dn: The absolute DN of the netgroup object
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
@@ -262,7 +278,9 @@ LDAP_methods.append(add_netgroup_hosts)
 
 
 def replace_netgroup_users(self, dn, members, domain=''):
-    """Set new users on a netgroup. This method gets bound to :class:`.LDAP`.
+    """replace_netgroup_users(dn, members, domain='')
+
+    Set new users on a netgroup.
 
     :param str dn: The absolute DN of the netgroup object
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or sinlge member list entry
@@ -277,7 +295,9 @@ LDAP_methods.append(replace_netgroup_users)
 
 
 def replace_netgroup_hosts(self, dn, members, domain=''):
-    """Set new hosts on a netgroup. This method gets bound to :class:`.LDAP`.
+    """replace_netgroup_hosts(dn, members, domain='')
+
+    Set new hosts on a netgroup.
 
     :param str dn: The absolute DN of the netgroup object
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
@@ -292,7 +312,9 @@ LDAP_methods.append(replace_netgroup_hosts)
 
 
 def delete_netgroup_users(self, dn, members, domain=''):
-    """Delete users from a netgroup. This method gets bound to :class:`.LDAP`.
+    """delete_netgroup_users(dn, members, domain='')
+
+    Delete users from a netgroup.
 
     :param str dn: The absolute DN of the netgroup object
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or sinlge member list entry
@@ -307,7 +329,9 @@ LDAP_methods.append(delete_netgroup_users)
 
 
 def delete_netgroup_hosts(self, dn, members, domain=''):
-    """Delete hosts from a netgroup. This method gets bound to :class:`.LDAP`.
+    """delete_netgroup_hosts(dn, members, domain='')
+
+    Delete hosts from a netgroup.
 
     :param str dn: The absolute DN of the netgroup object
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
@@ -339,7 +363,9 @@ LDAPObject_methods.append(_require_netgroup)
 
 
 def obj_get_netgroup_users(self, recursive=True):
-    """Get all users in this netgroup object. This method gets bound to :class:`.LDAPObject` as ``get_netgroup_users``.
+    """obj_get_netgroup_users(recursive=True)
+
+    Get all users in this netgroup object.
 
     :param bool recursive: Set to False to ignore any memberNisNetgroups defined for this object.
     :return: A list of usernames
@@ -350,11 +376,14 @@ def obj_get_netgroup_users(self, recursive=True):
     return self.ldap_conn.get_netgroup_obj_users(self, recursive)
 
 
-LDAPObject_methods.append(('get_netgroup_users', obj_get_netgroup_users))
+obj_get_netgroup_users.__name__ = 'get_netgroup_users'
+LDAPObject_methods.append(obj_get_netgroup_users)
 
 
 def obj_get_netgroup_hosts(self, recursive=True):
-    """Get all hosts in this netgroup object. This method gets bound to :class:`.LDAPObject` as ``get_netgroup_hosts``.
+    """obj_get_netgroup_hosts(recursive=True)
+
+    Get all hosts in this netgroup object.
 
     :param bool recursive: Set to False to ignore any memberNisNetgroups defined for this object.
     :return: A list of hostnames
@@ -365,12 +394,14 @@ def obj_get_netgroup_hosts(self, recursive=True):
     return self.ldap_conn.get_netgroup_obj_hosts(self, recursive)
 
 
-LDAPObject_methods.append(('get_netgroup_hosts', obj_get_netgroup_hosts))
+obj_get_netgroup_hosts.__name__ = 'get_netgroup_hosts'
+LDAPObject_methods.append(obj_get_netgroup_hosts)
 
 
 def obj_add_netgroup_users(self, members, domain=''):
-    """Add new user netgroup entries to this netgroup object. This method gets bound to :class:`.LDAPObject` as
-    ``add_netgroup_users``
+    """obj_add_netgroup_users(members, domain='')
+
+    Add new user netgroup entries to this netgroup object.
 
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
     :type members: list or str or tuple
@@ -382,12 +413,14 @@ def obj_add_netgroup_users(self, members, domain=''):
     self.add_attrs(_member_user_list_to_attrs(members, domain))
 
 
-LDAPObject_methods.append(('add_netgroup_users', obj_add_netgroup_users))
+obj_add_netgroup_users.__name__ = 'add_netgroup_users'
+LDAPObject_methods.append(obj_add_netgroup_users)
 
 
 def obj_add_netgroup_hosts(self, members, domain=''):
-    """Add new host netgroup entries to this netgroup object. This method gets bound to :class:`.LDAPObject` as
-    ``add_netgroup_hosts``
+    """obj_add_netgroup_hosts(members, domain='')
+
+    Add new host netgroup entries to this netgroup object.
 
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
     :type members: list or str or tuple
@@ -399,12 +432,14 @@ def obj_add_netgroup_hosts(self, members, domain=''):
     self.add_attrs(_member_host_list_to_attrs(members, domain))
 
 
-LDAPObject_methods.append(('add_netgroup_hosts', obj_add_netgroup_hosts))
+obj_add_netgroup_hosts.__name__ = 'add_netgroup_hosts'
+LDAPObject_methods.append(obj_add_netgroup_hosts)
 
 
 def obj_replace_netgroup_users(self, members, domain=''):
-    """Set new user netgroup entries on this netgroup object. This method gets bound to :class:`.LDAPObject` as
-    ``replace_netgroup_users``
+    """obj_replace_netgroup_users(members, domain='')
+
+    Set new user netgroup entries on this netgroup object.
 
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
     :type members: list or str or tuple
@@ -416,12 +451,14 @@ def obj_replace_netgroup_users(self, members, domain=''):
     self.replace_attrs(_member_user_list_to_attrs(members, domain))
 
 
-LDAPObject_methods.append(('replace_netgroup_users', obj_replace_netgroup_users))
+obj_replace_netgroup_users.__name__ = 'replace_netgroup_users'
+LDAPObject_methods.append(obj_replace_netgroup_users)
 
 
 def obj_replace_netgroup_hosts(self, members, domain=''):
-    """Set new host netgroup entries on this netgroup object. This method gets bound to :class:`.LDAPObject` as
-    ``replace_netgroup_hosts``
+    """obj_replace_netgroup_hosts(members, domain='')
+
+    Set new host netgroup entries on this netgroup object.
 
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
     :type members: list or str or tuple
@@ -433,12 +470,14 @@ def obj_replace_netgroup_hosts(self, members, domain=''):
     self.replace_attrs(_member_host_list_to_attrs(members, domain))
 
 
-LDAPObject_methods.append(('replace_netgroup_hosts', obj_replace_netgroup_hosts))
+obj_replace_netgroup_hosts.__name__ = 'replace_netgroup_hosts'
+LDAPObject_methods.append(obj_replace_netgroup_hosts)
 
 
 def obj_delete_netgroup_users(self, members, domain=''):
-    """Delete user netgroup entries from this netgroup object. This method gets bound to :class:`.LDAPObject` as
-    ``delete_netgroup_users``
+    """obj_delete_netgroup_users(members, domain='')
+
+    Delete user netgroup entries from this netgroup object.
 
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
     :type members: list or str or tuple
@@ -450,12 +489,14 @@ def obj_delete_netgroup_users(self, members, domain=''):
     self.delete_attrs(_member_user_list_to_attrs(members, domain))
 
 
-LDAPObject_methods.append(('delete_netgroup_users', obj_delete_netgroup_users))
+obj_delete_netgroup_users.__name__ = 'delete_netgroup_users'
+LDAPObject_methods.append(obj_delete_netgroup_users)
 
 
 def obj_delete_netgroup_hosts(self, members, domain=''):
-    """Delete host netgroup entries from this netgroup object. This method gets bound to :class:`.LDAPObject` as
-    ``delete_netgroup_hosts``
+    """obj_delete_netgroup_hosts(members, domain='')
+
+    Delete host netgroup entries from this netgroup object.
 
     :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
     :type members: list or str or tuple
@@ -467,7 +508,8 @@ def obj_delete_netgroup_hosts(self, members, domain=''):
     self.delete_attrs(_member_host_list_to_attrs(members, domain))
 
 
-LDAPObject_methods.append(('delete_netgroup_hosts', obj_delete_netgroup_hosts))
+obj_delete_netgroup_hosts.__name__ = 'delete_netgroup_hosts'
+LDAPObject_methods.append(obj_delete_netgroup_hosts)
 
 
 ## Extension activation function

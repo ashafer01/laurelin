@@ -16,14 +16,6 @@ class TestExtensible(unittest.TestCase):
         MockExtensible.EXTEND([bar])
         self.assertTrue(hasattr(MockExtensible, 'bar'))
 
-        # test tuple
-        MockExtensible.EXTEND([('bar_xyz', bar)])
-        self.assertTrue(hasattr(MockExtensible, 'bar_xyz'))
-
-        # test bad tuple
-        with self.assertRaises(exceptions.LDAPExtensionError):
-            MockExtensible.EXTEND([('foo',)])
-
         # test dupe
         def foo(self):
             pass

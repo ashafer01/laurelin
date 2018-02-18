@@ -50,8 +50,10 @@ LDAPObject_methods = []
 
 
 def desc_attrs(self):
-    """Query the description attribute if unknown and return an :class:`.AttrsDict` representing the data stored in the
-    description. This method gets bound to :class:`.LDAPObject`
+    """desc_attrs()
+
+    Query the description attribute if unknown and return an :class:`.AttrsDict` representing the data stored in the
+    description.
 
     :return: An :class:`.AttrsDict` representing the data stored in the description.
     :rtype: AttrsDict
@@ -150,7 +152,9 @@ def _dict_mod_delete(to_dict, attrs_dict):
 
 
 def add_desc_attrs(self, attrs_dict):
-    """Add new description attributes. This method gets bound to :class:`.LDAPObject`.
+    """add_desc_attrs(attrs_dict)
+
+    Add new description attributes.
 
     :param attrs_dict: Dictionary of description attributes to add
     :type attrs_dict: dict(str, list[str]) or AttrsDict
@@ -163,7 +167,9 @@ LDAPObject_methods.append(add_desc_attrs)
 
 
 def replace_desc_attrs(self, attrs_dict):
-    """Replace description attributes. This method gets bound to :class:`.LDAPObject`.
+    """replace_desc_attrs(attrs_dict)
+
+    Replace description attributes.
 
     :param attrs_dict: Dictionary of description attributes to set
     :type attrs_dict: dict(str, list[str]) or AttrsDict
@@ -176,7 +182,9 @@ LDAPObject_methods.append(replace_desc_attrs)
 
 
 def delete_desc_attrs(self, attrs_dict):
-    """Delete description attributes. This method gets bound to :class:`.LDAPObject`.
+    """delete_desc_attrs(attrs_dict)
+
+    Delete description attributes.
 
     :param attrs_dict: Dictionary of description attributes to delete
     :type attrs_dict: dict(str, list[str]) or AttrsDict

@@ -20,6 +20,7 @@
 import os
 import sys
 from sphinx.domains.python import PythonDomain
+from sphinx.ext.autodoc import FunctionDocumenter
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
 
@@ -195,3 +196,21 @@ class LaurelinPythonDomain(PythonDomain):
 def setup(sphinx):
     """Use LaurelinPythonDomain in place of PythonDomain"""
     sphinx.override_domain(LaurelinPythonDomain)
+
+
+# Make functions use the __name__ attribute
+
+_base_format_name = FunctionDocumenter.format_name
+
+
+def _format_func_name(self):
+    formatted_name = _base_format_name(self)
+    func_name = self.object.__name__
+    if not formatted_name.endswith('.' + func_name):
+        name_parts = formatted_name.split('.')
+        name_parts[-1] = func_name
+        formatted_name = '.'.join(name_parts)
+    return formatted_name
+
+
+FunctionDocumenter.format_name = _format_func_name
