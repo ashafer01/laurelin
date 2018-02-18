@@ -1,0 +1,4 @@
+pyasn1>=0.3.1
+pure-sasl
+six
+py2casefold

@@ -1218,6 +1218,9 @@ class CompareResponse(LDAPResponse):
     def __bool__(self):
         return self.compare_result
 
+    def __nonzero__(self):
+        return self.compare_result
+
 
 class ResponseHandle(object):
     """Base for return from methods with multiple response messages."""
