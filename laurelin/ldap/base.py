@@ -525,7 +525,7 @@ class LDAP(Extensible):
                 self._tagged_objects[tag] = obj
         return obj
 
-    def get(self, dn, attrs=None, **obj_kwds):
+    def get(self, dn, attrs=None, **kwds):
         """Get a specific object by DN.
 
         Performs a search with :attr:`Scope.BASE` and ensures we get exactly one result.
@@ -543,7 +543,7 @@ class LDAP(Extensible):
         """
         if self.sock.unbound:
             raise ConnectionUnbound()
-        results = list(self.search(dn, Scope.BASE, attrs=attrs, limit=2, **obj_kwds))
+        results = list(self.search(dn, Scope.BASE, attrs=attrs, limit=2, **kwds))
         n = len(results)
         if n == 0:
             raise NoSearchResults()

@@ -13,7 +13,7 @@ class MockLDAPSocket(LDAPSocket):
         self._prop_init()
         self._outgoing_queue = deque()
         self._sock = None
-        self.incoming_queue = deque()
+        self._incoming_queue = deque()
         self.uri = 'mock:///'
 
     def add_messages(self, lm_list):
@@ -23,9 +23,25 @@ class MockLDAPSocket(LDAPSocket):
             self._outgoing_queue.append(raw)
 
     def send_message(self, op, obj, controls=None):
+        """Pack and send a message"""
         mid, raw = self._prep_message(op, obj, controls)
-        self.incoming_queue.append(raw)
+        self._incoming_queue.append(raw)
         return mid
+
+    def read_sent(self):
+        """Read the first sent message in the queue"""
+        lm, raw = ber_decode(self._incoming_queue.popleft(), asn1Spec=rfc4511.LDAPMessage())
+        if raw:
+            raise Exception('unexpected leftover bits')
+        return lm
+
+    def clear_sent(self):
+        """Clear all sent messages"""
+        self._incoming_queue.clear()
+
+    def num_sent(self):
+        """Obtain the number of sent messages"""
+        return len(self._incoming_queue)
 
     def recv_messages(self, want_message_id):
         while self._outgoing_queue:
@@ -45,6 +61,3 @@ class MockLDAPSocket(LDAPSocket):
 
     def start_tls(self, verify=True, ca_file=None, ca_path=None, ca_data=None):
         warn('start_tls not possible with mock socket')
-
-    def clear_outgoing(self):
-        self._outgoing_queue.clear()

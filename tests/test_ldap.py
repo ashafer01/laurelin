@@ -1,5 +1,6 @@
 from laurelin.ldap import (
     LDAP,
+    LDAPObject,
     rfc4511,
     protoutils,
     exceptions,
@@ -10,6 +11,7 @@ import inspect
 import unittest
 from .mock_ldapsocket import MockLDAPSocket
 from types import ModuleType
+from laurelin.ldap.validation import Validator
 
 
 def obj_to_lm(mid, dn, attrs_dict, controls=None):
@@ -408,9 +410,9 @@ class TestLDAP(unittest.TestCase):
         mock_sock = MockLDAPSocket()
         add_root_dse(mock_sock)
         ldap = LDAP(mock_sock)
-        mock_sock.incoming_queue.clear()
+        mock_sock.clear_sent()
         ldap.modify('', [])
-        self.assertEqual(len(mock_sock.incoming_queue), 0)
+        self.assertEqual(mock_sock.num_sent(), 0)
 
     def test_modify(self):
         """Ensure protocol-level modlist is contructed without error"""
@@ -419,7 +421,7 @@ class TestLDAP(unittest.TestCase):
         ldap = LDAP(mock_sock)
 
         mock_sock.add_messages([
-            ldap_result(rfc4511.ModifyResponse, 2, 'modifyResponse', result_code=protoutils.RESULT_success)
+            ldap_result(rfc4511.ModifyResponse, 2, 'modifyResponse')
         ])
         ldap.modify('', [
             Mod(Mod.ADD, 'foo', ['bar', 'baz']),
@@ -428,6 +430,140 @@ class TestLDAP(unittest.TestCase):
             Mod(Mod.DELETE, 'foo', []),
             Mod(Mod.DELETE, 'foo', ['foo'])
         ])
+
+    def test_modify_bad_response(self):
+        """Ensure modify complains when receiving a bad response from the server"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+
+        mock_sock.add_messages([
+            ldap_result(rfc4511.ModifyResponse, 2, 'modifyResponse', result_code=protoutils.RESULT_compareFalse)
+        ])
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.modify('', [
+                Mod(Mod.ADD, 'foo', ['bar', 'baz']),
+            ])
+
+    def test_add_attrs(self):
+        """Ensure add_attrs behaves correctly"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+        mock_sock.clear_sent()
+
+        # current is not None
+        # should NOT perform a search
+        mock_sock.add_messages([
+            ldap_result(rfc4511.ModifyResponse, 2, 'modifyResponse'),
+        ])
+        ldap.add_attrs('', {'foo': ['bar']}, current=LDAPObject('', {}))
+        self.assertEqual(mock_sock.num_sent(), 1)
+        protoutils.unpack('modifyRequest', mock_sock.read_sent())
+
+        # current is None and not strict_modify
+        # should perform a search before modify
+        mock_sock.add_messages([
+            obj_to_lm(3, '', {'abc': ['def']}),
+            search_res_done(3, ''),
+            ldap_result(rfc4511.ModifyResponse, 4, 'modifyResponse'),
+        ])
+        ldap.strict_modify = False
+        ldap.add_attrs('', {'foo': ['bar']})
+        self.assertEqual(mock_sock.num_sent(), 2)
+        protoutils.unpack('searchRequest', mock_sock.read_sent())
+        protoutils.unpack('modifyRequest', mock_sock.read_sent())
+
+        # current is None and strict_modify
+        # should NOT perform a search
+        mock_sock.add_messages([
+            ldap_result(rfc4511.ModifyResponse, 5, 'modifyResponse'),
+        ])
+        ldap.strict_modify = True
+        ldap.add_attrs('', {'foo': ['bar']})
+        self.assertEqual(mock_sock.num_sent(), 1)
+        protoutils.unpack('modifyRequest', mock_sock.read_sent())
+
+    def test_delete_attrs(self):
+        """Ensure delete_attrs behaves correctly"""
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+        mock_sock.clear_sent()
+
+        # current is not None
+        # should NOT perform a search
+        mock_sock.add_messages([
+            ldap_result(rfc4511.ModifyResponse, 2, 'modifyResponse'),
+        ])
+        ldap.delete_attrs('', {'foo': ['bar']}, current=LDAPObject('', {'foo': ['bar']}))
+        self.assertEqual(mock_sock.num_sent(), 1)
+        protoutils.unpack('modifyRequest', mock_sock.read_sent())
+
+        # current is None and not strict_modify
+        # should perform a search before modify
+        mock_sock.add_messages([
+            obj_to_lm(3, '', {'foo': ['bar']}),
+            search_res_done(3, ''),
+            ldap_result(rfc4511.ModifyResponse, 4, 'modifyResponse'),
+        ])
+        ldap.strict_modify = False
+        ldap.delete_attrs('', {'foo': ['bar']})
+        self.assertEqual(mock_sock.num_sent(), 2)
+        protoutils.unpack('searchRequest', mock_sock.read_sent())
+        protoutils.unpack('modifyRequest', mock_sock.read_sent())
+
+        # current is None and strict_modify
+        # should NOT perform a search
+        mock_sock.add_messages([
+            ldap_result(rfc4511.ModifyResponse, 5, 'modifyResponse'),
+        ])
+        ldap.strict_modify = True
+        ldap.delete_attrs('', {'foo': ['bar']})
+        self.assertEqual(mock_sock.num_sent(), 1)
+        protoutils.unpack('modifyRequest', mock_sock.read_sent())
+
+    def test_replace_attrs(self):
+        """Ensure replace_attrs behaves correctly"""
+        class MockValidator(Validator):
+            def validate_object(self, obj, write=True):
+                pass
+
+            def validate_modify(self, dn, modlist, current):
+                pass
+
+            def _validate_attribute(self, attr_name, values, write):
+                pass
+
+        mock_sock = MockLDAPSocket()
+        add_root_dse(mock_sock)
+        ldap = LDAP(mock_sock)
+        mock_sock.clear_sent()
+
+        # current is None and have validators and not strict_modify
+        # SHOULD perform a search before modify
+        ldap.validators = [MockValidator()]
+        ldap.strict_modify = False
+        mock_sock.add_messages([
+            obj_to_lm(2, '', {'foo': ['bar']}),
+            search_res_done(2, ''),
+            ldap_result(rfc4511.ModifyResponse, 3, 'modifyResponse'),
+        ])
+        ldap.strict_modify = False
+        ldap.replace_attrs('', {'foo': ['bar']})
+        self.assertEqual(mock_sock.num_sent(), 2)
+        protoutils.unpack('searchRequest', mock_sock.read_sent())
+        protoutils.unpack('modifyRequest', mock_sock.read_sent())
+
+        # else
+        # SHOULD NOT perform a search, only modify
+        ldap.validators = []
+        mock_sock.add_messages([
+            ldap_result(rfc4511.ModifyResponse, 4, 'modifyResponse'),
+        ])
+        ldap.replace_attrs('', {'foo': ['bar']})
+        self.assertEqual(mock_sock.num_sent(), 1)
+        protoutils.unpack('modifyRequest', mock_sock.read_sent())
 
     def test_who_am_i(self):
         """Exercise the extension subsystem"""
@@ -446,15 +582,15 @@ class TestLDAP(unittest.TestCase):
         }
         mock_sock.add_messages([
             obj_to_lm(2, '', root_dse),
-            search_res_done(2, '', result_code=protoutils.RESULT_success),
-            ldap_result(rfc4511.ExtendedResponse, 3, 'extendedResp', result_code=protoutils.RESULT_success)
+            search_res_done(2, ''),
+            ldap_result(rfc4511.ExtendedResponse, 3, 'extendedResp'),
         ])
         ldap.refresh_root_dse()
         ldap.who_am_i()
 
         # test failure result
         mock_sock.add_messages([
-            ldap_result(rfc4511.ExtendedResponse, 4, 'extendedResp', result_code=protoutils.RESULT_compareFalse)
+            ldap_result(rfc4511.ExtendedResponse, 4, 'extendedResp', result_code=protoutils.RESULT_compareFalse),
         ])
         with self.assertRaises(exceptions.LDAPError):
             ldap.who_am_i()
@@ -473,12 +609,12 @@ class TestLDAP(unittest.TestCase):
         mock_sock = MockLDAPSocket()
         add_root_dse(mock_sock)
         ldap = LDAP(mock_sock)
-        mock_sock.incoming_queue.clear()
+        mock_sock.clear_sent()
 
         ldap.unbind()
 
         # ensure we sent the actual unbindRequest
-        self.assertEqual(len(mock_sock.incoming_queue), 1)
+        self.assertEqual(mock_sock.num_sent(), 1)
 
         unbound_fail_methods = [
             (ldap.simple_bind,),
@@ -495,12 +631,8 @@ class TestLDAP(unittest.TestCase):
         ]
 
         for args in unbound_fail_methods:
-            nargs = len(args)
             with self.assertRaises(exceptions.ConnectionUnbound):
-                if nargs == 1:
-                    args[0]()
-                else:
-                    args[0](*args[1:])
+                args[0](*args[1:])
 
     def test_bound(self):
         """Ensure bind methods complain that the connection is already bound"""

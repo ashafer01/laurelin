@@ -27,14 +27,6 @@ implemented or are incomplete:
 
   * Entirely missing
 
-* Docs
-
-  * In progress
-
-* Testing
-
-  * In progress
-
 Please feel free to open a github ticket if you spot anything else missing, or have any thoughts regarding naming,
 default settings, etc.
 
