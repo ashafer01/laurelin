@@ -193,7 +193,7 @@ dict values are a ``list`` of attribute values. For example::
 Note that there is an :class:`.AttrsDict` class defined - there is **no requirement** to create instances of this class
 to pass as arguments, though you are welcome to if you find the additional methods provided this class convenient, such
 as :meth:`.AttrsDict.get_attr`. Further, it overrides ``dict`` special methods to enforce type requirements and enable
-case-insensitive keys and matching rule-based comparisons in value lists.
+case-insensitive keys.
 
 .. _modify-operations:
 

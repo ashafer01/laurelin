@@ -18,6 +18,7 @@ Laurelin is a pure-Python ORM-esque LDAP client. Check out the :doc:`user docs <
 
    user_docs
    built_in_extensions
+   creating_extensions
    controls
    reference
    testing_setup

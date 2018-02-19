@@ -126,7 +126,7 @@ class MatchingRule(object):
 
     def prepare(self, value):
         """Prepare a string for matching"""
-        for method in getattr(self, 'prepMethods', ()):
+        for method in getattr(self, 'prep_methods', ()):
             value = method(value)
         return value
 

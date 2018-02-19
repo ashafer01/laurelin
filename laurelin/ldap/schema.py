@@ -449,7 +449,7 @@ class TelexNumber(RegexSyntaxRule):
 ## Matching Rules
 
 
-caseExactPrepMethods = (
+case_exact_prep_methods = (
     rfc4518.Transcode,
     rfc4518.Map.characters,
     rfc4518.Normalize,
@@ -457,7 +457,7 @@ caseExactPrepMethods = (
     rfc4518.Insignificant.space,
 )
 
-caseIgnorePrepMethods = (
+case_ignore_prep_methods = (
     rfc4518.Transcode,
     rfc4518.Map.all,
     rfc4518.Normalize,
@@ -482,35 +482,35 @@ class caseExactIA5Match(EqualityMatchingRule):
     OID = '1.3.6.1.4.1.1466.109.114.1'
     NAME = 'caseExactIA5Match'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.26'
-    prepMethods = caseExactPrepMethods
+    prep_methods = case_exact_prep_methods
 
 
 class caseExactMatch(EqualityMatchingRule):
     OID = '2.5.13.5'
     NAME = 'caseExactMatch'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.15'
-    prepMethods = caseExactPrepMethods
+    prep_methods = case_exact_prep_methods
 
 
 class caseIgnoreIA5Match(EqualityMatchingRule):
     OID = '1.3.6.1.4.1.1466.109.114.2'
     NAME = 'caseIgnoreIA5Match'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.26'
-    prepMethods = caseIgnorePrepMethods
+    prep_methods = case_ignore_prep_methods
 
 
 class caseIgnoreListMatch(EqualityMatchingRule):
     OID = '2.5.13.11'
     NAME = 'caseIgnoreListMatch'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.4'
-    prepMethods = caseIgnorePrepMethods
+    prep_methods = case_ignore_prep_methods
 
 
 class caseIgnoreMatch(EqualityMatchingRule):
     OID = '2.5.13.2'
     NAME = 'caseIgnoreMatch'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.15'
-    prepMethods = caseIgnorePrepMethods
+    prep_methods = case_ignore_prep_methods
 
 
 class directoryStringFirstComponentMatch(EqualityMatchingRule):
@@ -583,7 +583,7 @@ class numericStringMatch(EqualityMatchingRule):
     OID = '2.5.13.8'
     NAME = 'numericStringMatch'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.36'
-    prepMethods = (
+    prep_methods = (
         rfc4518.Transcode,
         rfc4518.Map.characters,
         rfc4518.Normalize,
@@ -614,7 +614,7 @@ class telephoneNumberMatch(EqualityMatchingRule):
     OID = '2.5.13.20'
     NAME = 'telephoneNumberMatch'
     SYNTAX = '1.3.6.1.4.1.1466.115.121.1.50'
-    prepMethods = (
+    prep_methods = (
         rfc4518.Transcode,
         rfc4518.Map.all,
         rfc4518.Normalize,

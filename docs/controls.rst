@@ -54,7 +54,8 @@ An :exc:`.LDAPSupportError` will be raised if the control is marked critical and
 Defining Controls
 -----------------
 
-Controls must subclass Control and define at least:
+Controls must subclass Control. As soon as they are defined as a subclass of Control, they are ready to use. Controls
+must define at least:
 
 * :attr:`.Control.method`, a tuple of method names that this control supports. Current method names are `bind`,
   `search`, `compare`, `add`, `delete`, `mod_dn`, `modify`, and `ext` (extended request). Note that these method
