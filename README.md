@@ -1,5 +1,7 @@
 # laurelin
-Pure-python LDAP client
+[![Build Status](https://travis-ci.org/ashafer01/laurelin.svg?branch=master)](https://travis-ci.org/ashafer01/laurelin)
+
+Pure-python ORM-esque LDAP client
 
 View documentation on [ReadTheDocs](http://laurelin-ldap.readthedocs.io/en/latest/index.html).
 
