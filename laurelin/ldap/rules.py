@@ -34,6 +34,14 @@ class MetaSyntaxRule(type):
 @six.add_metaclass(MetaSyntaxRule)
 class SyntaxRule(object):
     """Base class for all syntax rules"""
+
+    OID = ''
+    """The globally unique numeric OID of the syntax rule. Referenced in attribute type and matching rule specs. Must be
+    defined by subclasses."""
+
+    DESC = ''
+    """Short text description of the rule. Must be defined by subclasses."""
+
     def __init__(self):
         oid = getattr(self, 'OID', None)
         if oid:
@@ -42,18 +50,33 @@ class SyntaxRule(object):
             _oid_syntax_rule_objects[oid] = self
 
     def validate(self, s):
+        """Validate a string. Must be implemented by subclasses.
+
+        :param s: Candidate string
+        :return: Any useful value for the rule
+        :raises InvalidSyntaxError: if the string is invalid
+        """
         raise NotImplementedError()
 
 
 class RegexSyntaxRule(SyntaxRule):
-    """For validating rules based on a regular expression
-     Subclasses must define the `regex` attribute
-    """
+    """For validating rules based on a regular expression. Most syntax rules can inherit from this."""
+
+    regex = r''
+    """The regular expression defining the rule. Subclasses must define this attribute."""
+
     def __init__(self):
         self.compiled_re = re.compile(self.regex)
         SyntaxRule.__init__(self)
 
     def validate(self, s):
+        """Validate a string against the regular expression.
+
+        :param s: Candidate string
+        :return: The regex match object
+        :rtype: MatchObject
+        :raises InvalidSyntaxError: if the string does not match
+        """
         m = self.compiled_re.match(s)
         if m:
             return m
@@ -108,6 +131,19 @@ class MetaMatchingRule(type):
 class MatchingRule(object):
     """Base class for all matching rules"""
 
+    OID = ''
+    """Globally unique numeric OID for the matching rule. This must be defined by subclasses."""
+
+    NAME = ''
+    """Globally unique name for the matching rule. Most attribute type specs will reference rules using the name, but
+    they can also use the OID. This must be defined by subclasses."""
+
+    SYNTAX = ''
+    """The numeric OID for the syntax rule that assertion values must comply with. Subclasses must define this."""
+
+    prep_methods = ()
+    """A tuple of callables used to prepare attribute and asserion values. Subclasses may optionally define this."""
+
     def __init__(self):
         oid = getattr(self, 'OID', None)
         if oid:
@@ -136,7 +172,7 @@ class MatchingRule(object):
 
     def match(self, attribute_value, assertion_value):
         """Prepare values and perform the match operation. Assumes values have
-         already been validated.
+        already been validated.
         """
         attribute_value = self.prepare(attribute_value)
         assertion_value = self.prepare(assertion_value)

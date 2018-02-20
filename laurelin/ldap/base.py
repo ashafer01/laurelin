@@ -268,6 +268,16 @@ class LDAP(Extensible):
             raise TypeError('Must supply URI string or LDAPSocket for server')
         self.sock.refcount += 1
 
+        # Validation setup
+        if validators is None:
+            validators = []
+        for validator in validators:
+            if not isinstance(validator, Validator):
+                raise TypeError('Validators must subclass laurelin.ldap.validation.Validator')
+            logger.debug('Using validator {0}'.format(validator.__class__.__name__))
+        self.validators = validators
+
+        # find base_dn
         self.refresh_root_dse()
         if base_dn is None:
             if 'defaultNamingContext' in self.root_dse:
@@ -289,14 +299,6 @@ class LDAP(Extensible):
         logger.debug('Creating base object for {0}'.format(self.base_dn))
         self.base = self.obj(self.base_dn, relative_search_scope=Scope.SUBTREE)
 
-        # Validation setup
-        if validators is None:
-            validators = []
-        for validator in validators:
-            if not isinstance(validator, Validator):
-                raise TypeError('Validators must subclass laurelin.ldap.validation.Validator')
-            logger.debug('Using validator {0}'.format(validator.__class__.__name__))
-        self.validators = validators
 
     def refresh_root_dse(self):
         """Update the local copy of the root DSE, containing metadata about the directory server. The root DSE is an
