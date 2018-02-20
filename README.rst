@@ -1,10 +1,8 @@
-laurelin
-========
+laurelin-ldap
+=============
 
 .. image:: https://travis-ci.org/ashafer01/laurelin.svg?branch=master
     :target: https://travis-ci.org/ashafer01/laurelin
-
-Pure-python ORM-esque LDAP client.
 
 View documentation on `ReadTheDocs <http://laurelin-ldap.readthedocs.io/en/latest/index.html>`_.
 

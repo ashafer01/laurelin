@@ -4,13 +4,11 @@ from setuptools import setup, find_packages
 with open('requirements.txt') as f:
     install_requires = f.read().split()
 
-description = 'A pure-Python ORM-esque LDAP client.'
-
 setup(
     name='laurelin-ldap',
     version='0.1',
-    description=description,
-    long_description=description,
+    description='A pure-Python ORM-esque LDAP client.',
+    long_description=open('README.rst').read(),
     author='Alex Shafer',
     author_email='ashafer01@gmail.com',
     url='https://github.com/ashafer01/laurelin',
