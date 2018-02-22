@@ -1,5 +1,9 @@
 """RFC 2696 Simple Paged Results Manipulation
 
+This adds a control to support paging results. Use the control keyword ``paged`` with search methods. Returns a cookie
+on the ``page_cookie`` response attribute which can be found on the results handle after all paged results have been
+received. See example below.
+
 Note: Do not use this extension to simply limit the total number of results. The search methods accept a ``limit``
 keyword out of the box for this purpose.
 

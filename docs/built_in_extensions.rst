@@ -88,3 +88,8 @@ NIS Netgroups
    .. autofunction:: laurelin.extensions.netgroups.obj_delete_netgroup_users
 
    .. autofunction:: laurelin.extensions.netgroups.obj_delete_netgroup_hosts
+
+Paged Results
+-------------
+
+.. automodule:: laurelin.extensions.pagedresults
