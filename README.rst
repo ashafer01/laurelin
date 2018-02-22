@@ -6,6 +6,8 @@ laurelin-ldap
 
 View documentation on `ReadTheDocs <http://laurelin-ldap.readthedocs.io/en/latest/index.html>`_.
 
+Please star the repo on `GitHub <https://github.com/ashafer01/laurelin>`_ if you like the project!
+
 Named for one of the Two Trees of Valinor in Tolkien lore.
 
     Laurelin, which means 'Golden-song' in the Quenya tongue, bore shining golden leaves, the Light from which mingled

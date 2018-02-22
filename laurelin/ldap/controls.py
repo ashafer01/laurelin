@@ -20,9 +20,9 @@ _reserved_kwds = set(['attr', 'attrs', 'attrs_dict', 'attrs_only', 'base_dn', 'c
 def process_kwds(method, kwds, supported_ctrls, default_criticality, final=False):
     """Process keyword arguments for registered controls, returning a protocol-level Controls
 
-     Removes entries from kwds as they are used, allowing the same dictionary to be passed on
-     to another function which may have statically defined arguments. If final is True, then a
-     TypeError will be raised if all kwds are not exhausted.
+    Removes entries from kwds as they are used, allowing the same dictionary to be passed on
+    to another function which may have statically defined arguments. If final is True, then a
+    TypeError will be raised if all kwds are not exhausted.
     """
     i = 0
     ctrls = Controls()
@@ -69,11 +69,11 @@ def handle_response(obj, controls):
             except KeyError:
                 raise LDAPExtensionError('No response control defined for {0}'.format(ctrl_oid))
             value = ctrl.handle(control.getComponentByName('controlValue'))
-            if not hasattr(obj, ctrl.responseAttr):
-                setattr(obj, ctrl.responseAttr, value)
+            if not hasattr(obj, ctrl.response_attr):
+                setattr(obj, ctrl.response_attr, value)
             else:
                 raise LDAPExtensionError('Response control attribute "{0}" is already defined on the object'.format(
-                                         ctrl.responseAttr))
+                                         ctrl.response_attr))
 
 
 class MetaControl(type):
@@ -93,7 +93,7 @@ class MetaControl(type):
             _request_controls[cls.keyword] = instance
 
         if cls.RESPONSE_OID:
-            if not cls.responseAttr:
+            if not cls.response_attr:
                 raise ValueError('Missing response_attr on control {0}'.format(name))
             if cls.RESPONSE_OID in _response_controls:
                 raise LDAPExtensionError('Response control OID {0} is already defined'.format(cls.RESPONSE_OID))

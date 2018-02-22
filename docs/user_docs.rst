@@ -10,10 +10,6 @@ Major missing/incomplete features
 Laurelin is still under development. What is done should be usable, but the following features have not yet been
 implemented or are incomplete:
 
-* Controls
-
-  * Framework in place, no actual controls implemented yet
-
 * Referrals
 
   * In place for search but untested
