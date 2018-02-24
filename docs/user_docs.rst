@@ -7,12 +7,11 @@ User Docs
 Major missing/incomplete features
 ---------------------------------
 
-Laurelin is still under development. What is done should be usable, but the following features have not yet been
-implemented or are incomplete:
+Laurelin is in beta and the following features have not yet been implemented or are incomplete:
 
 * Referrals
 
-  * In place for search but untested
+  * In place for search
   * Need to implement for other methods
 
 * LDIF input
