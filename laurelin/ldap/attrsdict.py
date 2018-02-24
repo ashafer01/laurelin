@@ -113,7 +113,7 @@ class AttrsDict(dict):
 
         :param str attr: The string to validate for use as an attribute name
         :rtype: None
-        :raises: TypeError: when the string is invalid
+        :raises TypeError: when the string is invalid
         """
         if not isinstance(attr, six.string_types):
             raise TypeError('attribute name must be string')

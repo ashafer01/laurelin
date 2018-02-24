@@ -274,7 +274,7 @@ class LDAP(Extensible):
         for validator in validators:
             if not isinstance(validator, Validator):
                 raise TypeError('Validators must subclass laurelin.ldap.validation.Validator')
-            logger.debug('Using validator {0}'.format(validator.__class__.__name__))
+            logger.info('Using validator {0}'.format(validator.__class__.__name__))
         self.validators = validators
 
         # find base_dn
@@ -298,7 +298,6 @@ class LDAP(Extensible):
 
         logger.debug('Creating base object for {0}'.format(self.base_dn))
         self.base = self.obj(self.base_dn, relative_search_scope=Scope.SUBTREE)
-
 
     def refresh_root_dse(self):
         """Update the local copy of the root DSE, containing metadata about the directory server. The root DSE is an
@@ -777,11 +776,11 @@ class LDAP(Extensible):
     def add_or_mod_add_if_exists(self, dn, attrs_dict):
         """Add object if it doesn't exist, otherwise addAttrs
 
-         * If the object at DN exists, perform an add modification using the attrs dictionary.
-           Otherwise, create the object using the attrs dictionary.
-         * This ensures that, for the attributes mentioned in attrs, AT LEAST those values will
-           exist on the given DN, regardless of prior state of the DB.
-         * Always returns an :class:`LDAPObject` corresponding to the final state of the DB
+        * If the object at DN exists, perform an add modification using the attrs dictionary.
+          Otherwise, create the object using the attrs dictionary.
+        * This ensures that, for the attributes mentioned in attrs, AT LEAST those values will
+          exist on the given DN, regardless of prior state of the DB.
+        * Always returns an :class:`LDAPObject` corresponding to the final state of the DB
 
         :param str dn: The object DN
         :param attrs_dict: The objects minimum attributes
@@ -799,11 +798,11 @@ class LDAP(Extensible):
     def add_or_mod_replace_if_exists(self, dn, attrs_dict):
         """Add object if it doesn't exist, otherwise replaceAttrs
 
-         * If the object at DN exists, perform a replace modification using the attrs dictionary
-           Otherwise, create the object using the attrs dictionary
-         * This ensures that, for the attributes mentioned in attrs, ONLY those values will exist on
-           the given DN regardless of prior state of the DB.
-         * Always returns an :class:`LDAPObject` corresponding to the final state of the DB
+        * If the object at DN exists, perform a replace modification using the attrs dictionary
+          Otherwise, create the object using the attrs dictionary
+        * This ensures that, for the attributes mentioned in attrs, ONLY those values will exist on
+          the given DN regardless of prior state of the DB.
+        * Always returns an :class:`LDAPObject` corresponding to the final state of the DB
 
         :param str dn: The object DN
         :param attrs_dict: The objects new required attributes
@@ -821,9 +820,9 @@ class LDAP(Extensible):
     def add_if_not_exists(self, dn, attrs_dict):
         """Add object if it doesn't exist
 
-         * Gets and returns the object at DN if it exists, otherwise create the object using the
-           attrs dictionary
-         * Always returns an LDAPObject corresponding to the final state of the DB
+        * Gets and returns the object at DN if it exists, otherwise create the object using the
+          attrs dictionary
+        * Always returns an LDAPObject corresponding to the final state of the DB
 
         :param str dn: The object DN
         :param attrs_dict: The attributes to use if adding the object
@@ -1019,9 +1018,9 @@ class LDAP(Extensible):
     def replace_attrs(self, dn, attrs_dict, current=None, **ctrl_kwds):
         """Replace all values on given attributes with the passed values
 
-         * Attributes not mentioned in attrsDict are not touched
-         * Attributes will be created if they do not exist
-         * Specifying a 0-length entry will delete all values for that attribute
+        * Attributes not mentioned in attrsDict are not touched
+        * Attributes will be created if they do not exist
+        * Specifying a 0-length entry will delete all values for that attribute
 
         :param str dn: The DN of the object to modify
         :param attrs_dict: The new attributes to set on the object
@@ -1322,8 +1321,8 @@ class SearchResultHandle(ResponseHandle):
 
 
 class ExtendedResponseHandle(ResponseHandle):
-    """Obtains rfc4511.ExtendedResponse or rfc4511.IntermediateResponse instances from the server
-     for a particular message ID
+    """Obtains rfc4511.ExtendedResponse or rfc4511.IntermediateResponse instances from the server for a particular
+    message ID
     """
 
     def __init__(self, mid, ldap_conn, require_success=False):
@@ -1362,7 +1361,8 @@ class LDAPURI(object):
     """Represents a parsed LDAP URI as specified in RFC4516
 
     Supported extensions:
-      * "StartTLS"
+
+    * "StartTLS"
 
     :var str scheme: urlparse standard
     :var str netloc: urlparse standard
