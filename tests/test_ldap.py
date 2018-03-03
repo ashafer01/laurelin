@@ -5,6 +5,7 @@ from laurelin.ldap import (
     protoutils,
     exceptions,
     Mod,
+    controls,
 )
 import laurelin.ldap.base
 import inspect
@@ -523,6 +524,32 @@ class TestLDAP(unittest.TestCase):
         for method in bound_fail_methods:
             with self.assertRaises(exceptions.ConnectionAlreadyBound):
                 method()
+
+    def test_search_kwds(self):
+        """Ensure all valid forms of search keywords work and that invalid keywords are detected early"""
+        mock_sock = MockLDAPSocket()
+        mock_sock.add_root_dse()
+        ldap = LDAP(mock_sock)
+
+        # create a valid control keyword
+        class MockControl(controls.Control):
+            method = ('search',)
+            keyword = 'mock_control'
+            REQUEST_OID = '9.999.999.999.999.9999999'
+
+        test_dn = 'o=foo'
+        mock_sock.add_search_res_entry(test_dn, {'description': ['foo']})
+        mock_sock.add_search_res_done(test_dn)
+
+        # test with valid search keyword, control keyword, and object keyword
+        list(ldap.search(test_dn, limit=7, mock_control='foo', rdn_attr='ou'))
+
+        mock_sock.clear_sent()
+
+        # test with bad keyword
+        with self.assertRaises(TypeError):
+            ldap.search(bad_keyword='foo')
+        self.assertEqual(mock_sock.num_sent(), 0)
 
 
 if __name__ == '__main__':
