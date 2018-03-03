@@ -153,11 +153,23 @@ class LDAPObject(AttrsDict, Extensible):
         :return: The new object
         :rtype: LDAPObject
 
-        Additional arguments are passed through into :meth:`LDAP.add`
+        Additional keyword arguments are passed through into :meth:`LDAP.add`
         """
         self._require_ldap()
         self._set_obj_kwd_defaults(kwds)
         return self.ldap_conn.add(self.rdn(rdn), attrs_dict, **kwds)
+
+    def delete_child(self, rdn, **ctrl_kwds):
+        """Delete a child object below this one.
+
+        :param str rdn: The RDN, or RDN value if `rdn_attr` is defined for this object
+        :return: The :class:`.LDAPResponse` from the delete operation
+        :rtype: LDAPResponse
+
+        Additional keyword arguments are treated as controls.
+        """
+        self._require_ldap()
+        return self.ldap_conn.delete(self.rdn(rdn), **ctrl_kwds)
 
     def search(self, filter=None, attrs=None, **kwds):
         """Perform a search below this object.
@@ -178,11 +190,12 @@ class LDAPObject(AttrsDict, Extensible):
         """Obtain a single object below this one with the most efficient means possible.
 
         The strategy used is based on the ``relative_search_scope`` property of this object.
-         * If it is :attr:`.Scope.BASE`, this method will always raise an :exc:`.LDAPError`.
-         * If it is :attr:`.Scope.ONE`, then the absolute DN for the child object will be constructed, and a
-           :attr:`.Scope.BASE` search will be performed to get the object.
-         * If it is :attr:`.Scope.SUB`, then a subtree search will be performed below this object, using the RDN as a
-           search filter.
+
+        * If it is :attr:`.Scope.BASE`, this method will always raise an :exc:`.LDAPError`.
+        * If it is :attr:`.Scope.ONE`, then the absolute DN for the child object will be constructed, and a
+          :attr:`.Scope.BASE` search will be performed to get the object.
+        * If it is :attr:`.Scope.SUB`, then a subtree search will be performed below this object, using the RDN as a
+          search filter.
 
         Additional keywords are passed through into :meth:`.LDAPObject.search`.
 
@@ -547,7 +560,7 @@ class ModTransactionObject(LDAPObject):
         self._orig_obj = ldap_object
         self._modlist = []
 
-        LDAPObject.__init__(dn=ldap_object.dn, attrs_dict=ldap_object.deepcopy(), ldap_conn=ldap_object.ldap_conn,
+        LDAPObject.__init__(self, dn=ldap_object.dn, attrs_dict=ldap_object.deepcopy(), ldap_conn=ldap_object.ldap_conn,
                             relative_search_scope=ldap_object.relative_search_scope, rdn_attr=ldap_object.rdn_attr)
 
     def __enter__(self):
@@ -580,6 +593,20 @@ class ModTransactionObject(LDAPObject):
         self._modlist.extend(modlist)
         self._local_modify(modlist)
 
+    def format_mod_ldif(self):
+        """Format the modify operation as an LDIF
+
+        :return: The LDIF string describing the modify operation to be performed
+        :rtype: str
+        """
+        ldif = 'dn: {0}\nchangetype: modify\n'.format(self.dn)
+        for mod in self._modlist:
+            ldif += '{0}: {1}\n'.format(Mod.op_to_string(mod.op).lower(), mod.attr)
+            for val in mod.vals:
+                ldif += '{0}: {1}\n'.format(mod.attr, val)
+            ldif += '-\n'
+        return ldif
+
     def add_child(self, rdn, attrs_dict, **kwds):
         """Raises an error if used in a transaction. Transactions can only modify one object at a time.
 
@@ -594,9 +621,16 @@ class ModTransactionObject(LDAPObject):
         """
         raise LDAPTransactionError('delete not included in modify transaction')
 
+    def delete_child(self, rdn, **ctrl_kwds):
+        """Raises an error if used in a transaction. Transactions can only modify one object at a time.
+
+        :raises LDAPTransactionError: if this method is called
+        """
+        raise LDAPTransactionError('delete not included in modify transaction')
+
     def mod_dn(self, new_rdn, clean_attr=True, new_parent=None, **ctrl_kwds):
         """Raises an error if used in a transaction. Transactions can only modify one object at a time.
 
         :raises LDAPTransactionError: if this method is called.
         """
-        raise LDAPTransactionError('modDN not included in modify transaction')
+        raise LDAPTransactionError('mod_dn not included in modify transaction')

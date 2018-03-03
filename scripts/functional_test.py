@@ -32,3 +32,19 @@ with LDAP('ldap://localhost:10389',
     assert set(testobj.get_attr('description')) == set(('unstructured desc', 'foo=four'))
     print(testobj.format_ldif())
     testobj.delete()
+
+    # test mod_transaction and format_mod_ldif
+    testobj = ldap.base.add_child('ou=functest', {
+        'objectClass': ['organizationalUnit'],
+        'ou': ['functest'],
+    })
+    with testobj.mod_transaction() as trans:
+        trans.add_attrs({'description': ['foo', 'bar']})
+        trans.delete_attrs({'description': ['bar']})
+        trans.replace_attrs({
+            'postalAddress': ['1234 Main, San Mateo, CA'],
+        })
+        print(trans.format_mod_ldif())
+        trans.commit()
+    print(testobj.format_ldif())
+    testobj.delete()
