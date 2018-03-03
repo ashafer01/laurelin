@@ -1228,7 +1228,7 @@ class CompareResponse(LDAPResponse):
         return self.compare_result
 
 
-class ResponseHandle(object):
+class ResponseHandle(LDAPResponse):
     """Base for return from methods with multiple response messages."""
     def __init__(self, ldap_conn, mid):
         self.ldap_conn = ldap_conn
