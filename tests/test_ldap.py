@@ -548,7 +548,7 @@ class TestLDAP(unittest.TestCase):
 
         # test with bad keyword
         with self.assertRaises(TypeError):
-            ldap.search(bad_keyword='foo')
+            ldap.search(test_dn, bad_keyword='foo')
         self.assertEqual(mock_sock.num_sent(), 0)
 
 
