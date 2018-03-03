@@ -72,7 +72,7 @@ def _check_obj_kwds(kwds):
         if kwd not in _obj_kwds:
             bad_kwds.add(kwd)
     if bad_kwds:
-        raise TypeError('Unknown keyword arguments: {0}', ', '.join(bad_kwds))
+        raise TypeError('Unknown keyword arguments: {0}'.format(', '.join(bad_kwds)))
 
 
 class LDAP(Extensible):
@@ -740,7 +740,7 @@ class LDAP(Extensible):
         :raises LDAPValidationError: if the object fails any configured validator
         :raises LDAPError: if we get a non-success result
 
-        Additional keyword arguments are passed through into :meth:`.LDAP.obj` and then handled as :doc:`/controls`.
+        Additional keyword arguments are handled as :doc:`/controls` and then passed through into :meth:`.LDAP.obj`.
         """
         if self.sock.unbound:
             raise ConnectionUnbound()
@@ -750,6 +750,7 @@ class LDAP(Extensible):
         if not isinstance(attrs_dict, dict):
             raise TypeError('attrs_dict must be dict')
 
+        req_ctrls = self._process_ctrl_kwds('add', kwds)
         obj = self.obj(dn, attrs_dict, **kwds)
 
         self.validate_object(obj)
@@ -770,8 +771,6 @@ class LDAP(Extensible):
             al.setComponentByPosition(i, attr)
             i += 1
         ar.setComponentByName('attributes', al)
-
-        req_ctrls = self._process_ctrl_kwds('add', kwds)
 
         mid = self.sock.send_message('addRequest', ar, req_ctrls)
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mid, dn))
