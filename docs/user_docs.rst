@@ -4,30 +4,47 @@ User Docs
 .. contents::
    :local:
 
-Major missing/incomplete features
----------------------------------
+Features Overview
+-----------------
 
-Laurelin is in beta and the following features have not yet been implemented or are incomplete:
+* Fully compliant with RFC 4510 and its children.
+* Pure Python codebase, meaning that it can be used with Python implementations other than CPython.
+* Tested against CPython 2.7, 3.3, 3.4, 3.5, 3.6, PyPy, and PyPy3.
+* Pythonic attributes input and presentation. It's just a dictionary.
+* Exceedingly easy relative searching. All objects have a suite of search methods which will automatically pass the
+  object's DN as the search base. In many cases, you wont have to pass *any* arguments to search methods.
+* Similarly, all objects have a suite of modify methods which allow you to change attributes on already-queried objects
+  without having to pass their DN again.
+* Intelligent modification will never send existing attribute values to the server, nor will it request deletion of
+  attribute values that do not exist. This prevents many unnecessary server errors. Laurelin will go as far as to query
+  the object for you before modifying it to ensure you don't see pointless errors (if you want it to).
+* Custom validation. You can define validators which check new objects and modify operations for correctness before
+  sending them to the server. Since you control this code, this can be anything from a simple regex check against a
+  particular attribute value, to a complex approval queue mechanism.
+* Highly extensible. New methods can easily and safely be bound to base classes.
+* Seamless integration of controls. Once defined, these are just new keyword arguments on particular methods, and
+  additional attributes on the response object.
+* Includes Python implementations of standard schema elements. This conveys many benefits:
 
-* Referrals
+  * Allows changes to be validated *before* sending the server
+  * Allows matching rules to be used to compare attribute values locally. Many attribute types are case-insensitive and
+    have other rules meaning that the standard Python ``==`` or ``in`` operators won't tell you what you want to know.
+    Laurelin makes them work according to these rules.
 
-  * In place for search
-  * Need to implement for other methods
+Missing/incomplete features
+---------------------------
 
-* LDIF input
-
-  * Partial, not full spec
-
-* Binary data
-
-  * Entirely missing
-
-Please feel free to open a github ticket if you spot anything else missing, or have any thoughts regarding naming,
-default settings, etc.
-
+Laurelin is in beta and some lesser-used features of the LDAP protocol have not yet been implemented or are incomplete.
+Check the `GitHub issues <https://github.com/ashafer01/laurelin/issues>`_ to see if your use case is affected. Please
+add a comment if so, or open a new issue if you spot anything else. PRs are always welcome.
 
 Walkthrough
 -----------
+
+.. note::
+
+    I'm assuming that if you're here, you're already pretty familiar with LDAP fundamentals. If you don't know how to
+    write a search filter, you may want to do some more reading on LDAP before continuing.
 
 Navigating
 ^^^^^^^^^^
@@ -105,12 +122,12 @@ DN and an :ref:`attributes dict <attributes-dictionaries>`
 
 :meth:`.LDAP.delete` deletes an entire object. Just pass the full, absolute DN of the object to delete.
 
-The following methods are preferred for modification, however raw :ref:`modify methods <modify-operations>` are
+The following methods are preferred for modification, however raw :ref:`modify methods <modify-operations>` are also
 provided.
 
 All accept the absolute DN of the object to modify, and an :ref:`attributes dictionary <attributes-dictionaries>`.
 
-:meth:`.LDAP.add_attrs` adds new attributes
+:meth:`.LDAP.add_attrs` adds new attributes.
 
 :meth:`.LDAP.delete_attrs` deletes attribute values. Pass an empty values list in the attributes dictionary to delete
 all values for an attribute.
@@ -132,8 +149,8 @@ Great, right? But specifying absolute DNs all the time is no fun. Enter :class:`
 automatically, or only require the RDN prefix, with the object's ``dn`` automatically appended to obtain the absolute
 DN.
 
-:meth:`.LDAPObject.search` accepts all the same arguments as :meth:`.LDAP.search` except ``base_dn`` (and ``scope`` -
-more on this in future section). The object's own DN is always used for ``base_dn``.
+:meth:`.LDAPObject.search` accepts all the same arguments as :meth:`.LDAP.search` except ``base_dn`` and ``scope``.
+The object's own DN is always used for ``base_dn``, and the ``relative_search_scope`` is always used as the ``scope``.
 
 :meth:`.LDAPObject.find` is more or less a better :meth:`.LDAPObject.get_child`. It looks at the object's
 ``relative_search_scope`` property to determine the most efficient way to find a single object below this one. It will
@@ -165,6 +182,24 @@ require only a new attributes dictionary as an argument, of the same format as f
     for user in people.search(filter='(objectClass=posixAccount)'):
         print(user['uid'][0])
 
+.. _relative-search:
+
+Relative Searching
+------------------
+
+All objects have :meth:`.LDAPObject.search` and :meth:`.LDAPObject.find` methods which utilize the
+``relative_search_scope`` attribute of the object. ``relative_search_scope`` can be passed as a keyword to any method
+that creates new objects, including :meth:`.LDAP.obj`, :meth:`.LDAP.get`, :meth:`.LDAP.search`, :meth:`.LDAP.add`,
+:meth:`.LDAPObject.obj`, :meth:`.LDAPObject.find`, :meth:`.LDAPObject.search`, :meth:`.LDAPObject.get_child`, and
+:meth:`.LDAPObject.add_child`.
+
+When you create an object from another :class:`.LDAPObject` and you *don't* specify the ``relative_search_scope``, it is
+automatically inherited from the parent object. When you create an object from an :class:`.LDAP` method, it defaults to
+:attr:`.Scope.SUB`.
+
+The real win with this feature is when your tree is structured such that you can set this to :attr:`.Scope.ONE` as this
+conveys significant performance benefits, especially when using :meth:`.LDAPObject.find`. This allows laurelin to
+to construct the absolute DN of the child object and perform a highly efficient *BASE* search.
 
 .. _attributes-dictionaries:
 
@@ -320,7 +355,7 @@ Basic usage examples
     with LDAP('ldapi:///') as ldap:
         ldap.sasl_bind()
         for obj in ldap.base.search():
-        print(obj.format_ldif())
+            print(obj.format_ldif())
 
 :meth:`.LDAP.sasl_bind` defaults to the ``EXTERNAL`` mechanism when an ``ldapi:`` URI is given, which uses the current
 user for authorization via the unix socket (Known as "autobind" with 389 Directory Server)
