@@ -12,6 +12,7 @@ import inspect
 import unittest
 from .mock_ldapsocket import MockLDAPSocket
 from types import ModuleType
+from base64 import b64encode, b64decode
 from laurelin.ldap.validation import Validator
 
 
@@ -550,6 +551,61 @@ class TestLDAP(unittest.TestCase):
         with self.assertRaises(TypeError):
             ldap.search(test_dn, bad_keyword='foo')
         self.assertEqual(mock_sock.num_sent(), 0)
+
+    def test_process_ldif(self):
+        mock_sock = MockLDAPSocket()
+        mock_sock.add_root_dse()
+        ldap = LDAP(mock_sock)
+
+        dn = 'ou=modify,o=bar'
+        b64dn = b64encode(dn.encode()).decode('ascii')
+
+        add_dn = 'ou=foo,o=bar'
+        add_desc = 'hello world'
+        b64desc = b64encode(add_desc.encode()).decode('ascii')
+        expected_add_object = LDAPObject(dn=add_dn, attrs_dict={
+            'objectClass': ['top', 'organizationalUnit'],
+            'description': [add_desc],
+            'ou': ['foo'],
+        })
+
+        ldif = ('dn: {add_dn}\n'
+                'changetype: add\n'
+                'objectClass: top\n'
+                'objectClass: organizationalUnit\n'
+                'description:: {b64desc}\n'
+                'ou: foo\n'
+                '\n'
+                'dn: ou=delete,o=bar\n'
+                'changetype: delete\n'
+                '\n'
+                'dn: ou=modify,o=bar\n'
+                'changetype: modify\n'
+                'add: description\n'
+                'description: foo\n'
+                '-\n'
+                'replace: description\n'
+                'description: bar\n'
+                '-\n'
+                'delete: description\n'
+                'description: bar\n'
+                '-\n'
+                '\n'
+                'dn:: {b64dn}\n'
+                'changetype: moddn\n'
+                'newrdn: ou=modified\n'
+                'deleteoldrdn: 1\n'
+                'newsuperior: o=foo\n'
+                '\n'.format(b64desc=b64desc, b64dn=b64dn, add_dn=add_dn))
+
+        mock_sock.add_ldap_result(rfc4511.AddResponse, 'addResponse')
+        mock_sock.add_ldap_result(rfc4511.DelResponse, 'delResponse')
+        mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
+        mock_sock.add_ldap_result(rfc4511.ModifyDNResponse, 'modDNResponse')
+
+        results = ldap.process_ldif(ldif)
+
+        self.assertEqual(expected_add_object, results[0])
 
 
 if __name__ == '__main__':

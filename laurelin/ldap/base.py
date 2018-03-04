@@ -1225,10 +1225,12 @@ class LDAP(Extensible):
         ldif_str = ''.join(ldif_lines)
 
         # split into operations based on double newline
-        ldif_operations = re.split(r'(\n|\r\n){2,}', ldif_str)
+        ldif_operations = re.split(r'(?:\n|\r\n){2,}', ldif_str)
 
         # iterate operations
         for ldif_op in ldif_operations:
+            if not ldif_op:
+                continue
             ldif_lines = deque(ldif_op.splitlines())
             clear_comments(ldif_lines)
 
@@ -1244,7 +1246,7 @@ class LDAP(Extensible):
             # get controls
             token = 'control:'
             ctrl_kwds = {}
-            while len(ldif_lines > 1) and ldif_lines[0].startswith(token):
+            while len(ldif_lines) > 1 and ldif_lines[0].startswith(token):
                 control = ldif_lines.popleft()[len(token):].strip()
                 m = re.match(r'^(?P<oid>[0-9]+(\.[0-9]+)+)(?P<crit> (true|false))?(?P<value>:.+)$', control)
                 value = m.group('value')
@@ -1405,6 +1407,8 @@ class LDAP(Extensible):
 
             else:
                 raise ValueError('changetype {0} unknown'.format(changetype))
+
+        return ldap_responses
 
 
 class LDAPResponse(object):
