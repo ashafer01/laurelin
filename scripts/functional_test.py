@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from getpass import getpass
-from laurelin.ldap import LDAP
+from laurelin.ldap import LDAP, LDAPObject
 from laurelin.ldap.schema import SchemaValidator
 
 LDAP.enable_logging()
@@ -48,3 +48,21 @@ with LDAP('ldap://localhost:10389',
         trans.commit()
     print(testobj.format_ldif())
     testobj.delete()
+
+    # test format_ldif
+    o = LDAPObject('o=foo ', {
+        'binaryAndNormal': [b'\xff\xab\xcd\xef', 'abc'],
+        'encodeBadLeading': [
+            ':leading colon must be encoded',
+            ' leading space must be encoded',
+            '<leading left angle must be encoded',
+        ],
+        'encodeBadChar': [
+            'newlines\nmust be encoded',
+            'cr\rmust be encoded',
+            'null\0must be encoded',
+        ],
+        'lineFold': ['abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmno'
+                     'pqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzab'],
+    })
+    print(o.format_ldif())

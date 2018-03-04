@@ -16,6 +16,9 @@ from .modify import (
     AddModlist,
     DeleteModlist,
 )
+import six
+import re
+from base64 import b64encode
 
 
 class LDAPObject(AttrsDict, Extensible):
@@ -249,11 +252,49 @@ class LDAPObject(AttrsDict, Extensible):
         :return: The object encoded as an LDIF.
         :rtype: str
         """
-        lines = ['dn: {0}'.format(self.dn)]
+        def b64ascii(s):
+            return b64encode(s.encode()).decode('ascii')
+
+        def encode_value(strvalue):
+            if not re.match(r'^[\x01-\x09\x0b-\x0c\x0e-\x1f\x21-\x39\x3b\x3d-\x7f][\x01-\x09\x0b-\x0c\x0e-\x7f]*$',
+                            strvalue):
+                # Any value that contains characters other than those defined as
+                # "SAFE-CHAR", or begins with a character other than those
+                # defined as "SAFE-INIT-CHAR", above, MUST be base-64 encoded.
+                return ': ' + b64ascii(strvalue)
+            elif strvalue.endswith(' '):
+                # Values or distinguished names that end with SPACE SHOULD be
+                # base-64 encoded.
+                return ': ' + b64ascii(strvalue)
+            else:
+                return ' ' + strvalue
+
+        ldif = 'dn:{0}\n'.format(encode_value(self.dn))
         for attr, val in self.iterattrs():
-            lines.append('{0}: {1}'.format(attr, val))
-        lines.append('')
-        return '\n'.join(lines)
+            try:
+                if hasattr(val, 'decode'):
+                    val = val.decode('utf-8')
+                line = '{0}:{1}'.format(attr, encode_value(val))
+            except UnicodeDecodeError:
+                val = b64encode(val).decode('ascii')
+                line = '{0}:: {1}'.format(attr, val)
+            line_len = len(line)
+            n = 0
+            step = 76
+            if line_len > step:
+                ldif += line[n:step]
+                ldif += '\n '
+                n += step
+                fragments = []
+                step = 75
+                while n < line_len:
+                    fragments.append(line[n:n+step])
+                    n += step
+                ldif += '\n '.join(fragments)
+            else:
+                ldif += line
+            ldif += '\n'
+        return ldif
 
     def has_object_class(self, object_class):
         """A convenience method which checks if this object has a particular objectClass. May query the server for the

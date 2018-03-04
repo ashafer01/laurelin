@@ -95,6 +95,8 @@ class MetaControl(type):
                 raise LDAPExtensionError('Control keyword "{0}" is reserved'.format(cls.keyword))
             if cls.keyword in _request_controls:
                 raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(cls.keyword))
+            if cls.REQUEST_OID in _request_controls_oid:
+                raise LDAPExtensionError('Control {0} is already defined'.format(cls.REQUEST_OID))
             _request_controls[cls.keyword] = instance
             _request_controls_oid[cls.REQUEST_OID] = instance
 
@@ -144,7 +146,8 @@ class Control(object):
 
         When overriding this function, you must always call and return this base function.
 
-        :param str ctrl_value: The string request control value to send to the server
+        :param ctrl_value: The string request control value to send to the server
+        :type ctrl_value: str or bytes
         :param bool criticality: True if the control has criticality. This is indicated by wrapping the keyword
                                  argument in :class:`critical` or :class:`optional`, and by the `default_criticality`
                                  keyword passed to the :class:`LDAP` constructor, and global default

@@ -48,7 +48,10 @@ def seq_to_list(seq):
     """Convert a pyasn1 sequence to a list of strings"""
     ret = []
     for i in range(len(seq)):
-        ret.append(six.text_type(seq.getComponentByPosition(i)))
+        try:
+            ret.append(six.text_type(seq.getComponentByPosition(i)))
+        except UnicodeDecodeError:
+            ret.append(six.binary_type(seq.getComponentByPosition(i)))
     return ret
 
 

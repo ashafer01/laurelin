@@ -1,4 +1,4 @@
-from laurelin.ldap import LDAP, rfc4511, protoutils
+from laurelin.ldap import LDAP, rfc4511, protoutils, LDAPObject
 from .mock_ldapsocket import MockLDAPSocket
 import unittest
 
@@ -173,3 +173,34 @@ class TestLDAPObject(unittest.TestCase):
         self.assertNotIn('deleteme', obj)
         self.assertEqual(obj['test'], ['def'])
         self.assertEqual(obj['foo'], ['bar'])
+
+    def test_format_ldif(self):
+        """Exercise format_ldif"""
+        o = LDAPObject('o=foo ', {
+            'binaryAndNormal': [b'\xff\xab\xcd\xef', 'abc'],
+            'encodeBadLeading': [
+                ':leading colon must be encoded',
+                ' leading space must be encoded',
+                '<leading left angle must be encoded',
+            ],
+            'encodeBadChar': [
+                'newlines\nmust be encoded',
+                'cr\rmust be encoded',
+                'null\0must be encoded',
+            ],
+            'lineFold': ['abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmno'
+                         'pqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzab'],
+        })
+        expect = ('dn:: bz1mb28g\n'
+                  'binaryAndNormal:: /6vN7w==\n'
+                  'binaryAndNormal: abc\n'
+                  'encodeBadLeading:: OmxlYWRpbmcgY29sb24gbXVzdCBiZSBlbmNvZGVk\n'
+                  'encodeBadLeading:: IGxlYWRpbmcgc3BhY2UgbXVzdCBiZSBlbmNvZGVk\n'
+                  'encodeBadLeading:: PGxlYWRpbmcgbGVmdCBhbmdsZSBtdXN0IGJlIGVuY29kZWQ=\n'
+                  'encodeBadChar:: bmV3bGluZXMKbXVzdCBiZSBlbmNvZGVk\n'
+                  'encodeBadChar:: Y3INbXVzdCBiZSBlbmNvZGVk\n'
+                  'encodeBadChar:: bnVsbABtdXN0IGJlIGVuY29kZWQ=\n'
+                  'lineFold: abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmn\n'
+                  ' opqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk\n'
+                  ' lmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzab\n')
+        self.assertEqual(expect, o.format_ldif())

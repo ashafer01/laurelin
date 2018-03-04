@@ -129,6 +129,5 @@ class AttrsDict(dict):
         if not isinstance(attr_val_list, list):
             raise TypeError('must be list')
         for val in attr_val_list:
-            # TODO binary data support throughout...
-            if not isinstance(val, six.string_types):
-                raise TypeError('attribute values must be string')
+            if not isinstance(val, six.string_types) and not isinstance(val, six.binary_type):
+                raise TypeError('attribute values must be string or bytes')

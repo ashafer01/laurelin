@@ -1178,7 +1178,6 @@ class LDAP(Extensible):
 
         TODO: full RFC 2849 implementation. Missing:
 
-        * base64-encoded values only partially supported, must be unicode
         * attribute options
 
         :param str ldif_str: An RFC 2849 complying LDIF string
@@ -1204,10 +1203,13 @@ class LDAP(Extensible):
             while len(lines) >= 1 and lines[0].strip().startswith('#'):
                 lines.popleft()
 
-        def base64_to_unicode(b64value):
+        def handle_base64(b64value):
             b64value = b64value[1:].strip()  # remove leading colon and whitespace
-            univalue = b64decode(b64value).decode('utf-8')
-            return univalue
+            binvalue = b64decode(b64value)
+            try:
+                return binvalue.decode('utf-8')
+            except UnicodeDecodeError:
+                return binvalue
 
         # check version
         ldif_lines = deque(ldif_str.splitlines(keepends=True))
@@ -1236,7 +1238,7 @@ class LDAP(Extensible):
                 raise ValueError('Missing dn')
             dn = ldif_lines.popleft()[len(token):].strip()
             if dn[0] == ':':
-                dn = base64_to_unicode(dn)
+                dn = handle_base64(dn)
             clear_comments(ldif_lines)
 
             # get controls
@@ -1249,7 +1251,7 @@ class LDAP(Extensible):
                 if not value:
                     value = ''
                 if value and value[0] == ':':
-                    value = base64_to_unicode(value)
+                    value = handle_base64(value)
                 crit_str = m.group('crit')
                 if crit_str:
                     crit_str = crit_str.strip()
@@ -1294,7 +1296,7 @@ class LDAP(Extensible):
 
                     # handle base64 values
                     if val[0] == ':':
-                        val = base64_to_unicode(val)
+                        val = handle_base64(val)
 
                     # check for options
                     opts = attr.split(';')
@@ -1346,7 +1348,7 @@ class LDAP(Extensible):
 
                             # handle base64 values
                             if val[0] == ':':
-                                val = base64_to_unicode(val)
+                                val = handle_base64(val)
 
                             # store value
                             vals.append(val.strip())
@@ -1370,7 +1372,7 @@ class LDAP(Extensible):
                 if len(ldif_lines) >= 1 and ldif_lines[0].startswith(token):
                     new_rdn = ldif_lines.popleft()[len(token):].strip()
                     if new_rdn[0] == ':':
-                        new_rdn = base64_to_unicode(new_rdn)
+                        new_rdn = handle_base64(new_rdn)
                 else:
                     raise ValueError('missing newrdn')
                 clear_comments(ldif_lines)
@@ -1394,7 +1396,7 @@ class LDAP(Extensible):
                 if len(ldif_lines) >= 1 and ldif_lines[0].startswith(token):
                     new_parent = ldif_lines.popleft()[len(token):].strip()
                     if new_parent[0] == ':':
-                        new_parent = base64_to_unicode(new_parent)
+                        new_parent = handle_base64(new_parent)
                 else:
                     new_parent = None
 
