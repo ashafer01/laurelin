@@ -34,6 +34,7 @@ import logging
 import re
 import six
 import warnings
+from base64 import b64decode
 from collections import deque
 from importlib import import_module
 from six.moves import range
@@ -1177,8 +1178,8 @@ class LDAP(Extensible):
 
         TODO: full RFC 2849 implementation. Missing:
 
-        * base-64 encoded DN's, RDN's and values
-        * options
+        * base64-encoded values only partially supported, must be unicode
+        * attribute options
 
         :param str ldif_str: An RFC 2849 complying LDIF string
         :return: A list with elements corresponding to the return of each described operation
@@ -1196,12 +1197,17 @@ class LDAP(Extensible):
         # fetch URL values
         def fetch_url(m):
             with urlopen(m.group(1).strip()) as u:
-                return u.read()
+                return ': ' + u.read()
         ldif_str = re.sub(r':<([^\n]+)', fetch_url, ldif_str)
 
         def clear_comments(lines):
             while len(lines) >= 1 and lines[0].strip().startswith('#'):
                 lines.popleft()
+
+        def base64_to_unicode(b64value):
+            b64value = b64value[1:].strip()  # remove leading colon and whitespace
+            univalue = b64decode(b64value).decode('utf-8')
+            return univalue
 
         # check version
         ldif_lines = deque(ldif_str.splitlines(keepends=True))
@@ -1230,8 +1236,7 @@ class LDAP(Extensible):
                 raise ValueError('Missing dn')
             dn = ldif_lines.popleft()[len(token):].strip()
             if dn[0] == ':':
-                # TODO support base64 DN
-                raise LDAPError('base64 DN is not yet supported implemented')
+                dn = base64_to_unicode(dn)
             clear_comments(ldif_lines)
 
             # get controls
@@ -1243,10 +1248,9 @@ class LDAP(Extensible):
                 value = m.group('value')
                 if not value:
                     value = ''
+                if value and value[0] == ':':
+                    value = base64_to_unicode(value)
                 crit_str = m.group('crit')
-                if value[0] == ':':
-                    # TODO support base64 control value
-                    raise LDAPError('base64 control value is not yet implemented')
                 if crit_str:
                     crit_str = crit_str.strip()
                     if crit_str == 'true':
@@ -1288,9 +1292,9 @@ class LDAP(Extensible):
                     # get new object attributes
                     attr, val = line.split(':', 1)
 
+                    # handle base64 values
                     if val[0] == ':':
-                        # TODO support base64 attribute values
-                        raise LDAPError('base64 attribute values are not yet implemented')
+                        val = base64_to_unicode(val)
 
                     # check for options
                     opts = attr.split(';')
@@ -1340,9 +1344,9 @@ class LDAP(Extensible):
                                 # TODO support attribute options
                                 raise LDAPError('LDIF attribute options are not yet implemented')
 
+                            # handle base64 values
                             if val[0] == ':':
-                                # TODO: support base64 attribute values
-                                raise LDAPError('base64 attribute values are not yet implemented')
+                                val = base64_to_unicode(val)
 
                             # store value
                             vals.append(val.strip())
@@ -1366,8 +1370,7 @@ class LDAP(Extensible):
                 if len(ldif_lines) >= 1 and ldif_lines[0].startswith(token):
                     new_rdn = ldif_lines.popleft()[len(token):].strip()
                     if new_rdn[0] == ':':
-                        # TODO support base64 RDN
-                        raise LDAPError('base64 RDN not yet implemented')
+                        new_rdn = base64_to_unicode(new_rdn)
                 else:
                     raise ValueError('missing newrdn')
                 clear_comments(ldif_lines)
@@ -1391,8 +1394,7 @@ class LDAP(Extensible):
                 if len(ldif_lines) >= 1 and ldif_lines[0].startswith(token):
                     new_parent = ldif_lines.popleft()[len(token):].strip()
                     if new_parent[0] == ':':
-                        # TODO support base64 DN
-                        raise LDAPError('base64 newsuperior not yet supported')
+                        new_parent = base64_to_unicode(new_parent)
                 else:
                     new_parent = None
 
