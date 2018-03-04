@@ -1180,10 +1180,10 @@ class LDAP(Extensible):
         * base-64 encoded DN's, RDN's and values
         * options
 
-        :param str ldif_str: A single LDIF-formatted operation
-        :return: The return of the operation
-        :rtype: LDAPResponse or LDAPObject
-        :raises ValueError: if the LDIF is malformed or contains an unsupported operation
+        :param str ldif_str: An RFC 2849 complying LDIF string
+        :return: A list with elements corresponding to the return of each described operation
+        :rtype: list[LDAPResponse or LDAPObject]
+        :raises ValueError: if the LDIF is malformed
         :raises LDAPError: if an unimplemented feature is used
         :raises LDAPSupportError: if a version other than 1 is specified or a critical control is undefined
         """
