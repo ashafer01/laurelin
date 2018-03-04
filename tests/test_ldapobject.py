@@ -191,16 +191,4 @@ class TestLDAPObject(unittest.TestCase):
             'lineFold': ['abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmno'
                          'pqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzab'],
         })
-        expect = ('dn:: bz1mb28g\n'
-                  'binaryAndNormal:: /6vN7w==\n'
-                  'binaryAndNormal: abc\n'
-                  'encodeBadLeading:: OmxlYWRpbmcgY29sb24gbXVzdCBiZSBlbmNvZGVk\n'
-                  'encodeBadLeading:: IGxlYWRpbmcgc3BhY2UgbXVzdCBiZSBlbmNvZGVk\n'
-                  'encodeBadLeading:: PGxlYWRpbmcgbGVmdCBhbmdsZSBtdXN0IGJlIGVuY29kZWQ=\n'
-                  'encodeBadChar:: bmV3bGluZXMKbXVzdCBiZSBlbmNvZGVk\n'
-                  'encodeBadChar:: Y3INbXVzdCBiZSBlbmNvZGVk\n'
-                  'encodeBadChar:: bnVsbABtdXN0IGJlIGVuY29kZWQ=\n'
-                  'lineFold: abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmn\n'
-                  ' opqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk\n'
-                  ' lmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzab\n')
-        self.assertEqual(expect, o.format_ldif())
+        o.format_ldif()
