@@ -529,7 +529,7 @@ class LDAP(Extensible):
 
         :param str dn: The DN of the object.
         :param attrs_dict: Optional. The object's attributes and values.
-        :type attrs_dict: dict(str, list[str or bytes/]) or AttrsDict or None
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict or None
         :param tag: Optional. The tag for this object. Tagged objects can be retrieved with :meth:`LDAP.tag`.
         :type tag: str or None
         :return: The new object bound to this connection.
