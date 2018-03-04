@@ -34,9 +34,11 @@ import logging
 import re
 import six
 import warnings
+from collections import deque
 from importlib import import_module
 from six.moves import range
 from six.moves.urllib.parse import urlparse
+from six.moves.urllib.request import urlopen
 from warnings import warn
 
 logger = logging.getLogger('laurelin.ldap')
@@ -1173,54 +1175,232 @@ class LDAP(Extensible):
     def process_ldif(self, ldif_str):
         """Process a basic LDIF
 
-        TODO: full RFC 2849 implementation
+        TODO: full RFC 2849 implementation. Missing:
+
+        * base-64 encoded DN's, RDN's and values
+        * options
 
         :param str ldif_str: A single LDIF-formatted operation
         :return: The return of the operation
         :rtype: LDAPResponse or LDAPObject
         :raises ValueError: if the LDIF is malformed or contains an unsupported operation
+        :raises LDAPError: if an unimplemented feature is used
+        :raises LDAPSupportError: if a version other than 1 is specified or a critical control is undefined
         """
-        ldif_lines = ldif_str.splitlines()
-        if not ldif_lines[0].startswith('dn:'):
-            raise ValueError('Missing dn')
-        dn = ldif_lines[0][3:].strip()
-        if not ldif_lines[1].startswith('changetype:'):
-            raise ValueError('Missing changetype')
-        changetype = ldif_lines[1][11:].strip()
+        # stores returns of individual method calls in order for return
+        ldap_responses = []
 
-        if changetype == 'add':
-            attrs = {}
-            for line in ldif_lines[2:]:
-                attr, val = line.split(':', 1)
-                if attr not in attrs:
-                    attrs[attr] = []
-                attrs[attr].append(val)
-            return self.add(dn, attrs)
-        elif changetype == 'delete':
-            return self.delete(dn)
-        elif changetype == 'modify':
-            mod_op = None
-            mod_attr = None
-            vals = []
-            modlist = []
-            for line in ldif_lines[2:]:
-                if mod_op is None:
-                    _mod_op, _mod_attr = line.split(':')
-                    mod_op = Mod.string(_mod_op)
-                    mod_attr = _mod_attr.strip()
-                    vals = []
-                elif line == '-':
-                    if mod_op == 'add' and len(vals) == 0:
-                        raise ValueError('no attribute values to add')
-                    modlist += Modlist(mod_op, {mod_attr: vals})
-                else:
-                    if line.startswith(mod_attr):
-                        vals.append(line[len(mod_attr)+1:].strip())
+        # unfold lines by removing newline followed by a space
+        ldif_str = re.sub(r'(\n|\r\n) ', '', ldif_str)
+
+        # fetch URL values
+        def fetch_url(m):
+            with urlopen(m.group(1).strip()) as u:
+                return u.read()
+        ldif_str = re.sub(r':<([^\n]+)', fetch_url, ldif_str)
+
+        def clear_comments(lines):
+            while len(lines) >= 1 and lines[0].strip().startswith('#'):
+                lines.popleft()
+
+        # check version
+        ldif_lines = deque(ldif_str.splitlines(keepends=True))
+        clear_comments(ldif_lines)
+
+        token = 'version:'
+        if ldif_lines[0].startswith(token):
+            version = ldif_lines.popleft()[len(token):].strip()
+            if version != '1':
+                raise LDAPSupportError('Unsupported LDIF version {0}'.format(version))
+
+        # TODO refactor to avoid re-joining this
+        ldif_str = ''.join(ldif_lines)
+
+        # split into operations based on double newline
+        ldif_operations = re.split(r'(\n|\r\n){2,}', ldif_str)
+
+        # iterate operations
+        for ldif_op in ldif_operations:
+            ldif_lines = deque(ldif_op.splitlines())
+            clear_comments(ldif_lines)
+
+            # get dn
+            token = 'dn:'
+            if len(ldif_lines) < 1 or not ldif_lines[0].startswith(token):
+                raise ValueError('Missing dn')
+            dn = ldif_lines.popleft()[len(token):].strip()
+            if dn[0] == ':':
+                # TODO support base64 DN
+                raise LDAPError('base64 DN is not yet supported implemented')
+            clear_comments(ldif_lines)
+
+            # get controls
+            token = 'control:'
+            ctrl_kwds = {}
+            while len(ldif_lines > 1) and ldif_lines[0].startswith(token):
+                control = ldif_lines.popleft()[len(token):].strip()
+                m = re.match(r'^(?P<oid>[0-9]+(\.[0-9]+)+)(?P<crit> (true|false))?(?P<value>:.+)$', control)
+                value = m.group('value')
+                if not value:
+                    value = ''
+                crit_str = m.group('crit')
+                if value[0] == ':':
+                    # TODO support base64 control value
+                    raise LDAPError('base64 control value is not yet implemented')
+                if crit_str:
+                    crit_str = crit_str.strip()
+                    if crit_str == 'true':
+                        value = controls.critical(value)
+                        criticality = True
                     else:
-                        raise ValueError('Unexpected attribute')
-            return self.modify(dn, modlist)
-        else:
-            raise ValueError('changetype {0} unknown/not yet implemented'.format(changetype))
+                        value = controls.optional(value)
+                        criticality = False
+                else:
+                    criticality = self.default_criticality
+                if not m:
+                    raise ValueError('Invalid control specification')
+                oid = m.group('oid')
+                try:
+                    keyword = controls.get_control(oid).keyword
+                except KeyError:
+                    if criticality:
+                        raise LDAPSupportError('Unsupported critical control {0}'.format(oid))
+                    keyword = None
+                if keyword:
+                    ctrl_kwds[keyword] = value
+
+            # get changetype
+            token = 'changetype:'
+            if len(ldif_lines) < 1 or not ldif_lines[0].startswith(token):
+                raise ValueError('Missing changetype')
+            changetype = ldif_lines.popleft()[len(token):].strip()
+            clear_comments(ldif_lines)
+
+            # handle changetypes
+            if changetype == 'add':
+                attrs = {}
+                for line in ldif_lines:
+                    line = line.strip()
+                    if line.startswith('#'):
+                        # ignore comments
+                        continue
+
+                    # get new object attributes
+                    attr, val = line.split(':', 1)
+
+                    if val[0] == ':':
+                        # TODO support base64 attribute values
+                        raise LDAPError('base64 attribute values are not yet implemented')
+
+                    # check for options
+                    opts = attr.split(';')
+                    if len(opts) > 1:
+                        # TODO support attribute options
+                        raise LDAPError('LDIF attribute options are not yet implemented')
+
+                    # store attribute values
+                    if attr not in attrs:
+                        attrs[attr] = []
+                    attrs[attr].append(val.strip())
+                ldap_responses.append(self.add(dn, attrs, **ctrl_kwds))
+
+            elif changetype == 'delete':
+                ldap_responses.append(self.delete(dn, **ctrl_kwds))
+
+            elif changetype == 'modify':
+                mod_op = None
+                mod_attr = None
+                vals = []
+                modlist = []
+                for line in ldif_lines:
+                    line = line.strip()
+                    if line.startswith('#'):
+                        # ignore comments
+                        continue
+                    elif mod_op is None:
+                        # get new mod operation and attribute
+                        _mod_op, _mod_attr = line.split(':')
+                        mod_op = Mod.string(_mod_op)
+                        mod_attr = _mod_attr.strip()
+                    elif line == '-':
+                        # end mod operation and add to modlist
+                        if mod_op == 'add' and len(vals) == 0:
+                            raise ValueError('no attribute values to add')
+                        modlist += Modlist(mod_op, {mod_attr: vals})
+                        mod_op = None
+                        vals = []
+                    else:
+                        # get new modify value
+                        if line.startswith(mod_attr):
+                            attr, val = line.split(':')
+
+                            # check for options
+                            opts = attr.split(';')
+                            if len(opts) > 1:
+                                # TODO support attribute options
+                                raise LDAPError('LDIF attribute options are not yet implemented')
+
+                            if val[0] == ':':
+                                # TODO: support base64 attribute values
+                                raise LDAPError('base64 attribute values are not yet implemented')
+
+                            # store value
+                            vals.append(val.strip())
+                        else:
+                            raise ValueError('Unexpected attribute')
+
+                # add any trailing values
+                if mod_op is not None:
+                    modlist += Modlist(mod_op, {mod_attr: vals})
+
+                # send modify operation
+                ldap_responses.append(self.modify(dn, modlist, **ctrl_kwds))
+
+            elif changetype == 'modrdn' or changetype == 'moddn':
+                if len(ldif_lines) < 2:
+                    raise ValueError('Insufficient parameters for {0} - must supply newrdn and deleteoldrdn'.format(
+                                     changetype))
+
+                # get new rdn
+                token = 'newrdn:'
+                if len(ldif_lines) >= 1 and ldif_lines[0].startswith(token):
+                    new_rdn = ldif_lines.popleft()[len(token):].strip()
+                    if new_rdn[0] == ':':
+                        # TODO support base64 RDN
+                        raise LDAPError('base64 RDN not yet implemented')
+                else:
+                    raise ValueError('missing newrdn')
+                clear_comments(ldif_lines)
+
+                # check whether to remove old rdn attribute
+                token = 'deleteoldrdn:'
+                if len(ldif_lines) >= 1 and ldif_lines[0].startswith(token):
+                    del_old_str = ldif_lines.popleft()[len(token):].strip()
+                    if del_old_str == '0':
+                        clean_attr = False
+                    elif del_old_str == '1':
+                        clean_attr = True
+                    else:
+                        raise ValueError('invalid deleteoldrdn, must be 0 or 1')
+                else:
+                    raise ValueError('missing deleteoldrdn')
+                clear_comments(ldif_lines)
+
+                # get optional new parent DN
+                token = 'newsuperior:'
+                if len(ldif_lines) >= 1 and ldif_lines[0].startswith(token):
+                    new_parent = ldif_lines.popleft()[len(token):].strip()
+                    if new_parent[0] == ':':
+                        # TODO support base64 DN
+                        raise LDAPError('base64 newsuperior not yet supported')
+                else:
+                    new_parent = None
+
+                # send mod_dn
+                ldap_responses.append(self.mod_dn(dn, new_rdn, clean_attr, new_parent, **ctrl_kwds))
+
+            else:
+                raise ValueError('changetype {0} unknown'.format(changetype))
 
 
 class LDAPResponse(object):
