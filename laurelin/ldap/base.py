@@ -1067,12 +1067,12 @@ class LDAP(Extensible):
 
         :param str oid: The OID of the extension. Must be declared as supported by the server in the root DSE.
         :param value: The request value (optional)
-        :type value: str or None
+        :type value: str or bytes or None
         :return: An iterator yielding tuples of the form (:class:`rfc4511.IntermediateResponse`,
                  :class:`rfc4511.Controls`) or (:class:`rfc4511.ExtendedResponse`, :class:`rfc4511.Controls`).
         :rtype: ExtendedResponseHandle
         :raises LDAPSupportError: if the OID is not listed in the supportedExtension attribute of the root DSE
-        :raises TypeError: if the `value` parameter is not a string or None
+        :raises TypeError: if the `value` parameter is not a valid type
 
         Additional keyword arguments are handled as :doc:`/controls` and then passed through into the
         :class:`ExtendedResponseHandle` constructor.
@@ -1082,8 +1082,8 @@ class LDAP(Extensible):
         xr = rfc4511.ExtendedRequest()
         xr.setComponentByName('requestName', rfc4511.RequestName(oid))
         if value is not None:
-            if not isinstance(value, six.string_types):
-                raise TypeError('extendedRequest value must be string')
+            if not isinstance(value, six.string_types) and not isinstance(value, six.binary_type):
+                raise TypeError('extendedRequest value must be string or bytes')
             xr.setComponentByName('requestValue', rfc4511.RequestValue(value))
         req_ctrls = self._process_ctrl_kwds('ext', kwds)
         mid = self.sock.send_message('extendedReq', xr, req_ctrls)
