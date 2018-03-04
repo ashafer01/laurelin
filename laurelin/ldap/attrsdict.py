@@ -93,7 +93,7 @@ class AttrsDict(dict):
     @staticmethod
     def validate(attrs_dict):
         """Validate that ``attrs_dict`` is either already an :class:`.AttrsDict` or that it conforms to the required
-        ``dict(str, list[str])`` typing.
+        ``dict(str, list[str or bytes])`` typing.
 
         :param dict attrs_dict: The dictionary to validate for use as an attributes dictionary
         :rtype: None
@@ -120,7 +120,7 @@ class AttrsDict(dict):
 
     @staticmethod
     def validate_values(attr_val_list):
-        """Validate that ``attr_val_list`` conforms to the required ``list[str]`` typing.
+        """Validate that ``attr_val_list`` conforms to the required ``list[str or bytes]`` typing.
 
         :param list attr_val_list: The list to validate for use as an attribute value list.
         :rtype: None

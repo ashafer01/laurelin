@@ -16,7 +16,6 @@ from .modify import (
     AddModlist,
     DeleteModlist,
 )
-import six
 import re
 from base64 import b64encode
 
@@ -35,7 +34,7 @@ class LDAPObject(AttrsDict, Extensible):
 
     :param str dn: The DN of the object
     :param attrs_dict: The object's attributes
-    :type attrs_dict: dict(str, list[str]) or AttrsDict or None
+    :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict or None
     :param ldap_conn: The optional LDAP connection to use
     :type ldap_conn: LDAP or None
     :param Scope relative_search_scope: One of the :class:`Scope` constants, this is the default scope used when using
@@ -114,7 +113,7 @@ class LDAPObject(AttrsDict, Extensible):
 
         :param str rdn: The RDN, or RDN value if `rdn_attr` is defined for this object
         :param attrs_dict: The attributes for the object
-        :type attrs_dict: dict(str, list[str]) or AttrsDict or None
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict or None
         :param tag: Optional tag for the object
         :type tag: str or None
         :return: The new object
@@ -152,7 +151,7 @@ class LDAPObject(AttrsDict, Extensible):
 
         :param str rdn: The RDN, or RDN value if `rdn_attr` is defined for this object
         :param attrs_dict: The attributes for the object
-        :type attrs_dict: dict(str, list[str]) or AttrsDict or None
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict or None
         :return: The new object
         :rtype: LDAPObject
 
@@ -362,7 +361,7 @@ class LDAPObject(AttrsDict, Extensible):
         """Add new attribute values to this object.
 
         :param attrs_dict: The new attributes to add to the object
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :rtype: None
 
         Additional keywords are passed through into :meth:`.LDAPObject.modify`.
@@ -376,7 +375,7 @@ class LDAPObject(AttrsDict, Extensible):
         """Replace all values on the given attributes with the passed values.
 
         :param attrs_dict: The new attributes to set on the object
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :rtype: None
 
         Additional keywords are passed through into :meth:`.LDAPObject.modify`.
@@ -389,7 +388,7 @@ class LDAPObject(AttrsDict, Extensible):
         delete all values for that attribute.
 
         :param attrs_dict: The attributes to delete from the object
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :rtype: None
 
         Additional keywords are passed through into :meth:`.LDAPObject.modify`.

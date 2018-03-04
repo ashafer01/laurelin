@@ -529,7 +529,7 @@ class LDAP(Extensible):
 
         :param str dn: The DN of the object.
         :param attrs_dict: Optional. The object's attributes and values.
-        :type attrs_dict: dict(str, list[str]) or AttrsDict or None
+        :type attrs_dict: dict(str, list[str or bytes/]) or AttrsDict or None
         :param tag: Optional. The tag for this object. Tagged objects can be retrieved with :meth:`LDAP.tag`.
         :type tag: str or None
         :return: The new object bound to this connection.
@@ -735,7 +735,7 @@ class LDAP(Extensible):
 
         :param str dn: The new object's DN
         :param attrs_dict: The new attributes for the object
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :return: The new object
         :rtype: LDAPObject
         :raises ConnectionUnbound: if the connection has been unbound
@@ -801,7 +801,7 @@ class LDAP(Extensible):
 
         :param str dn: The object DN
         :param attrs_dict: The objects minimum attributes
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :return: The new or modified object
         :rtype: LDAPObject
         """
@@ -823,7 +823,7 @@ class LDAP(Extensible):
 
         :param str dn: The object DN
         :param attrs_dict: The objects new required attributes
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :return: The new or modified object
         :rtype: LDAPObject
         """
@@ -843,7 +843,7 @@ class LDAP(Extensible):
 
         :param str dn: The object DN
         :param attrs_dict: The attributes to use if adding the object
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :return: The new or existing object
         :rtype: LDAPObject
         """
@@ -990,7 +990,7 @@ class LDAP(Extensible):
 
         :param str dn: The DN of the object to modify
         :param attrs_dict: The new attributes to add to the object
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :param current: The current known state of the object for use in validation
         :type current: LDAPObject or None
         :return: A response object
@@ -1015,7 +1015,7 @@ class LDAP(Extensible):
         :param str dn: The DN of the object to modify
         :param attrs_dict: The attributes to remove from the object. Specify an empty list for a value to delete all
                            values.
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :param current: The current known state of the object for use in validation
         :type current: LDAPObject or None
         :return: A response object
@@ -1041,7 +1041,7 @@ class LDAP(Extensible):
 
         :param str dn: The DN of the object to modify
         :param attrs_dict: The new attributes to set on the object
-        :type attrs_dict: dict(str, list[str]) or AttrsDict
+        :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
         :param current: The current known state of the object for use in validation
         :type current: LDAPObject or None
         :return: A response object
@@ -1212,7 +1212,7 @@ class LDAP(Extensible):
                 return binvalue
 
         # check version
-        ldif_lines = deque(ldif_str.splitlines(keepends=True))
+        ldif_lines = deque(ldif_str.splitlines(True))  # keepends=True
         clear_comments(ldif_lines)
 
         token = 'version:'
