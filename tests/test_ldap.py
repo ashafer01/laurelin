@@ -12,7 +12,7 @@ import inspect
 import unittest
 from .mock_ldapsocket import MockLDAPSocket
 from types import ModuleType
-from base64 import b64encode, b64decode
+from base64 import b64encode
 from laurelin.ldap.validation import Validator
 
 
