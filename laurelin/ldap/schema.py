@@ -341,7 +341,10 @@ class JPEG(SyntaxRule):
     def validate(self, s):
         # The LDAP-specific encoding of a value of this syntax is the sequence
         # of octets of the JFIF encoding of the image.
-        return
+        if not isinstance(s, six.binary_type):
+            raise InvalidSyntaxError('Must be binary')
+        if s[6:10] != b'JFIF':  # adapted from imghdr source
+            raise InvalidSyntaxError('not a JFIF-encoded image ')
 
 
 class LDAPSyntaxDescription(RegexSyntaxRule):
