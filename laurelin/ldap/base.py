@@ -791,7 +791,7 @@ class LDAP(Extensible):
     ## search+add patterns
 
     def add_or_mod_add_if_exists(self, dn, attrs_dict):
-        """Add object if it doesn't exist, otherwise addAttrs
+        """Add object if it doesn't exist, otherwise add_attrs
 
         * If the object at DN exists, perform an add modification using the attrs dictionary.
           Otherwise, create the object using the attrs dictionary.
@@ -813,7 +813,7 @@ class LDAP(Extensible):
             return self.add(dn, attrs_dict)
 
     def add_or_mod_replace_if_exists(self, dn, attrs_dict):
-        """Add object if it doesn't exist, otherwise replaceAttrs
+        """Add object if it doesn't exist, otherwise replace_attrs
 
         * If the object at DN exists, perform a replace modification using the attrs dictionary
           Otherwise, create the object using the attrs dictionary
