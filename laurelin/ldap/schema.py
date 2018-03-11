@@ -557,7 +557,7 @@ class caseIgnoreIA5Match(EqualityMatchingRule):
 class caseIgnoreListMatch(EqualityMatchingRule):
     OID = '2.5.13.11'
     NAME = 'caseIgnoreListMatch'
-    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.4'
+    SYNTAX = '1.3.6.1.4.1.1466.115.121.1.41'
     prep_methods = case_ignore_prep_methods
 
 
@@ -850,6 +850,53 @@ AttributeType("""
 ExtensibleObjectClass("""
       ( 1.3.6.1.4.1.1466.101.120.111 NAME 'extensibleObject'
               SUP top AUXILIARY )
+""")
+
+
+## RFC 4512 5.1 Root DSE Attributes
+
+
+AttributeType("""
+      ( 1.3.6.1.4.1.1466.101.120.6 NAME 'altServer'
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.26
+        USAGE dSAOperation )
+""")
+
+AttributeType("""
+      ( 1.3.6.1.4.1.1466.101.120.5 NAME 'namingContexts'
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
+        USAGE dSAOperation )
+""")
+
+AttributeType("""
+      ( 1.3.6.1.4.1.1466.101.120.13 NAME 'supportedControl'
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.38
+        USAGE dSAOperation )
+""")
+
+AttributeType("""
+      ( 1.3.6.1.4.1.1466.101.120.7 NAME 'supportedExtension'
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.38
+        USAGE dSAOperation )
+""")
+
+AttributeType("""
+      ( 1.3.6.1.4.1.4203.1.3.5 NAME 'supportedFeatures'
+          EQUALITY objectIdentifierMatch
+          SYNTAX 1.3.6.1.4.1.1466.115.121.1.38
+          USAGE dSAOperation )
+""")
+
+AttributeType("""
+      ( 1.3.6.1.4.1.1466.101.120.15 NAME 'supportedLDAPVersion'
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
+        USAGE dSAOperation )
+""")
+
+AttributeType("""
+      ( 1.3.6.1.4.1.1466.101.120.14 NAME 'supportedSASLMechanisms'
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+        USAGE dSAOperation )
 """)
 
 

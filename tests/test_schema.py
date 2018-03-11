@@ -1,15 +1,19 @@
 import unittest
+from importlib import import_module
 
-from laurelin.ldap import objectclass, attributetype
+from laurelin.ldap import objectclass, attributetype, rules
 from laurelin.ldap.objectclass import get_object_class, DefaultObjectClass
 from laurelin.ldap.attributetype import get_attribute_type, DefaultAttributeType
 from laurelin.ldap.rules import get_matching_rule, get_syntax_rule
-from .utils import load_schema
+from .utils import load_schema, reload
 
 
 class TestSchema(unittest.TestCase):
     def setUp(self):
         load_schema()
+
+        # reload built-in extensions defining new schema elements
+        reload(import_module('laurelin.extensions.netgroups'))
 
     def test_object_classes(self):
         """Ensure all defined object classes have defined attributes and superclasses"""
@@ -43,6 +47,15 @@ class TestSchema(unittest.TestCase):
             except KeyError:
                 self.fail('syntax rule {0} is not defined for attr {1}'.format(at.syntax_oid, attr_name))
 
+    def test_matching_rules(self):
+        """Ensure all matching rule syntaxes are defined"""
+
+        for rule_name in rules._name_matching_rules:
+            mr = rules.get_matching_rule(rule_name)
+            try:
+                get_syntax_rule(mr.SYNTAX)
+            except KeyError:
+                self.fail('syntax rule {0} is not defined for matching rule {1}'.format(mr.SYNTAX, rule_name))
 
 
 if __name__ == '__main__':
