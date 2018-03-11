@@ -4,6 +4,7 @@ from . import rules
 from . import utils
 from .exceptions import LDAPSchemaError
 from .protoutils import parse_qdescrs
+from .utils import CaseIgnoreDict
 
 import logging
 import re
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 _re_attr_type = re.compile(utils.re_anchor(rfc4512.AttributeTypeDescription))
 
 _oid_attribute_types = {}
-_name_attribute_types = {}
+_name_attribute_types = CaseIgnoreDict()
 
 
 def get_attribute_type(ident):
@@ -29,7 +30,7 @@ def get_attribute_type(ident):
         try:
             return _name_attribute_types[ident]
         except KeyError:
-            return _name_attribute_types.setdefault(ident, DefaultAttributeType(ident))
+            return DefaultAttributeType(ident)
 
 
 class AttributeType(object):

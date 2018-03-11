@@ -118,3 +118,53 @@ def escaped_regex(escape_chars):
     subpatterns.append('[^{0}]'.format(escape_chars))
 
     return '({0})'.format('|'.join(subpatterns))
+
+
+class CaseIgnoreDict(dict):
+    """A dictionary with case-insensitive keys and storage of last actual key casing"""
+    def __init__(self, plaindict=None):
+        self._keys = {}
+        if plaindict is not None:
+            self.update(plaindict)
+
+    def __setitem__(self, key, value):
+        self._keys[key.lower()] = key
+        dict.__setitem__(self, key, value)
+
+    def setdefault(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            self[key] = default
+            return default
+
+    def __getitem__(self, key):
+        key = self._keys[key.lower()]
+        return dict.__getitem__(self, key)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __contains__(self, key):
+        try:
+            self[key]
+            return True
+        except KeyError:
+            return False
+
+    def update(self, other):
+        for key in other:
+            self[key] = other[key]
+
+    def __delitem__(self, key):
+        lkey = key.lower()
+        key = self._keys[lkey]
+        dict.__delitem__(self, key)
+        del self._keys[lkey]
+
+    def clear(self):
+        dict.clear(self)
+        self._keys.clear()

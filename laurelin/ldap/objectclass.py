@@ -4,6 +4,7 @@ from . import utils
 from .attributetype import get_attribute_type
 from .exceptions import LDAPSchemaError, LDAPWarning
 from .protoutils import parse_qdescrs
+from .utils import CaseIgnoreDict
 
 import logging
 import re
@@ -12,7 +13,7 @@ from warnings import warn
 _re_object_class = re.compile(utils.re_anchor(rfc4512.ObjectClassDescription))
 
 _oid_object_classes = {}
-_name_object_classes = {}
+_name_object_classes = CaseIgnoreDict()
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def get_object_class(ident):
         try:
             return _name_object_classes[ident]
         except KeyError:
-            return _name_object_classes.setdefault(ident, DefaultObjectClass(ident))
+            return DefaultObjectClass(ident)
 
 
 def _parse_oids(spec):

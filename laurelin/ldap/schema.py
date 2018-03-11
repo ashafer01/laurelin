@@ -66,6 +66,26 @@ class SchemaValidator(Validator):
         for value in values:
             attr.validate(value)
 
+## RFC 2252 Syntaxes
+
+
+class Binary(SyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.5'
+    DESC = 'Binary'
+
+    def validate(self, s):
+        if not isinstance(s, six.binary_type):
+            raise InvalidSyntaxError('Must be binary type')
+
+
+class Certificate(SyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.8'
+    DESC = 'Certificate'
+
+    def validate(self, s):
+        if not isinstance(s, six.binary_type):
+            raise InvalidSyntaxError('Must be binary type')
+
 
 ## RFC 4517 Syntaxes and Matching Rules
 
@@ -78,6 +98,12 @@ _BitString = r"'[01]*'B"
 
 
 ## Syntax Rules
+
+
+class AttributeTypeDescription(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.3'
+    DESC = 'Attribute Type Description'
+    regex = utils.re_anchor(rfc4512.AttributeTypeDescription)
 
 
 class BitString(RegexSyntaxRule):
@@ -322,6 +348,21 @@ class GeneralizedTime(RegexSyntaxRule):
             return m
 
 
+class Guide(EnhancedGuide):
+    OID = '1.3.6.1.4.1.1466.115.121.1.25'
+    DESC = 'Guide'
+
+    def validate(self, s):
+        try:
+            objectclass, criteria = s.split('#')
+        except ValueError:
+            raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
+        if not self._object_class.match(objectclass):
+            raise InvalidSyntaxError('Not a valid {0} - invalid object class'.format(self.DESC))
+        criteria = criteria.strip()
+        self._validate_criteria(criteria)
+
+
 class IA5String(RegexSyntaxRule):
     OID = '1.3.6.1.4.1.1466.115.121.1.26'
     DESC = 'IA5 String'
@@ -441,6 +482,17 @@ class TelephoneNumber(SyntaxRule):
     def validate(self, s):
         if not utils.validate_phone_number(s):
             raise InvalidSyntaxError('Not a valid {0}'.format(self.DESC))
+
+
+class TeletextTerminalIdentifier(RegexSyntaxRule):
+    OID = '1.3.6.1.4.1.1466.115.121.1.51'
+    DESC = 'Teletex Terminal Identifier'
+
+    _ttx_value = r'(?:[\x00-\x23]|\x5c24|\x5c5C)*'
+    _ttx_key = r'(?:graphic|control|misc|page|private)'
+    _ttx_param = _ttx_key + r':' + _ttx_value
+
+    regex = utils.re_anchor(_PrintableString + r'(?:\$' + _ttx_param + r')*')
 
 
 class TelexNumber(RegexSyntaxRule):
@@ -976,6 +1028,11 @@ AttributeType("""
 """)
 
 AttributeType("""
+      ( 2.5.4.14 NAME 'searchGuide'
+         SYNTAX 1.3.6.1.4.1.1466.115.121.1.25 )
+""")
+
+AttributeType("""
       ( 2.5.4.34 NAME 'seeAlso'
          SUP distinguishedName )
 """)
@@ -1009,6 +1066,11 @@ AttributeType("""
          EQUALITY telephoneNumberMatch
          SUBSTR telephoneNumberSubstringsMatch
          SYNTAX 1.3.6.1.4.1.1466.115.121.1.50 )
+""")
+
+AttributeType("""
+      ( 2.5.4.22 NAME 'teletexTerminalIdentifier'
+         SYNTAX 1.3.6.1.4.1.1466.115.121.1.51 )
 """)
 
 AttributeType("""
@@ -1227,3 +1289,381 @@ ObjectClass("""
          MUST uid )
 """)
 
+## RFC 2798 inetOrgPerson - Attribute Types
+
+AttributeType("""
+    ( 2.16.840.1.113730.3.1.1 NAME 'carLicense'
+      DESC 'vehicle license or registration plate'
+      EQUALITY caseIgnoreMatch
+      SUBSTR caseIgnoreSubstringsMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+""")
+
+AttributeType("""
+    ( 2.16.840.1.113730.3.1.2
+      NAME 'departmentNumber'
+      DESC 'identifies a department within an organization'
+      EQUALITY caseIgnoreMatch
+      SUBSTR caseIgnoreSubstringsMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+""")
+
+AttributeType("""
+  ( 2.16.840.1.113730.3.1.241
+    NAME 'displayName'
+    DESC 'preferred name of a person to be used when displaying entries'
+    EQUALITY caseIgnoreMatch
+    SUBSTR caseIgnoreSubstringsMatch
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+    SINGLE-VALUE )
+""")
+
+AttributeType("""
+    ( 2.16.840.1.113730.3.1.3
+      NAME 'employeeNumber'
+      DESC 'numerically identifies an employee within an organization'
+      EQUALITY caseIgnoreMatch
+      SUBSTR caseIgnoreSubstringsMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+      SINGLE-VALUE )
+""")
+
+AttributeType("""
+    ( 2.16.840.1.113730.3.1.4
+      NAME 'employeeType'
+      DESC 'type of employment for a person'
+      EQUALITY caseIgnoreMatch
+      SUBSTR caseIgnoreSubstringsMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+""")
+
+AttributeType("""
+    ( 0.9.2342.19200300.100.1.60
+      NAME 'jpegPhoto'
+      DESC 'a JPEG image'
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.28 )
+""")
+
+AttributeType("""
+    ( 2.16.840.1.113730.3.1.39
+      NAME 'preferredLanguage'
+      DESC 'preferred written or spoken language for a person'
+      EQUALITY caseIgnoreMatch
+      SUBSTR caseIgnoreSubstringsMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+      SINGLE-VALUE )
+""")
+
+AttributeType("""
+    ( 2.16.840.1.113730.3.1.40
+      NAME 'userSMIMECertificate'
+      DESC 'PKCS#7 SignedData used to support S/MIME'
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 )
+""")
+
+AttributeType("""
+( 2.16.840.1.113730.3.1.216
+  NAME 'userPKCS12'
+  DESC 'PKCS #12 PFX PDU for exchange of personal identity information'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 )
+""")
+
+## RFC 2798 inetOrgPerson - Object Class
+
+ObjectClass("""
+( 2.16.840.1.113730.3.2.2
+    NAME 'inetOrgPerson'
+    SUP organizationalPerson
+    STRUCTURAL
+    MAY (
+        audio $ businessCategory $ carLicense $ departmentNumber $
+        displayName $ employeeNumber $ employeeType $ givenName $
+        homePhone $ homePostalAddress $ initials $ jpegPhoto $
+        labeledURI $ mail $ manager $ mobile $ o $ pager $
+        photo $ roomNumber $ secretary $ uid $ userCertificate $
+        x500uniqueIdentifier $ preferredLanguage $
+        userSMIMECertificate $ userPKCS12
+    )
+)
+""")
+
+## RFC 2256 Attribute Types via RFC 2798 sec 9.1.2
+
+AttributeType("""
+    ( 2.5.4.36
+      NAME 'userCertificate'
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.8 )
+""")
+
+## RFC 1274 Attribute Types via RFC 2798 sec 9.1.3
+
+AttributeType("""
+    ( 0.9.2342.19200300.100.1.55
+      NAME 'audio'
+      EQUALITY octetStringMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.40{250000} )
+""")
+
+AttributeType("""
+    ( 0.9.2342.19200300.100.1.7
+      NAME 'photo' )
+""")
+
+## RFC 2079 Attribute Types via RFC 2798 sec 9.1.4
+
+AttributeType("""
+    ( 1.3.6.1.4.1.250.1.57
+      NAME 'labeledURI'
+      EQUALITY caseExactMatch
+      SUBSTR caseExactSubstringsMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+""")
+
+## RFC 4524 Attribute Types
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.37 NAME 'associatedDomain'
+        EQUALITY caseIgnoreIA5Match
+        SUBSTR caseIgnoreIA5SubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.38 NAME 'associatedName'
+        EQUALITY distinguishedNameMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.48 NAME 'buildingName'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.43 NAME 'co'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.14 NAME 'documentAuthor'
+        EQUALITY distinguishedNameMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.11 NAME 'documentIdentifier'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.15 NAME 'documentLocation'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.56 NAME 'documentPublisher'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.12 NAME 'documentTitle'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.13 NAME 'documentVersion'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.5 NAME 'drink'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.20 NAME 'homePhone'
+        EQUALITY telephoneNumberMatch
+        SUBSTR telephoneNumberSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.50 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.39 NAME 'homePostalAddress'
+        EQUALITY caseIgnoreListMatch
+        SUBSTR caseIgnoreListSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.41 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.9 NAME 'host'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.4 NAME 'info'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{2048} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.3 NAME 'mail'
+        EQUALITY caseIgnoreIA5Match
+        SUBSTR caseIgnoreIA5SubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.26{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.10 NAME 'manager'
+        EQUALITY distinguishedNameMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.41 NAME 'mobile'
+        EQUALITY telephoneNumberMatch
+        SUBSTR telephoneNumberSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.50 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.45 NAME 'organizationalStatus'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.42 NAME 'pager'
+        EQUALITY telephoneNumberMatch
+        SUBSTR telephoneNumberSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.50 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.40 NAME 'personalTitle'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.6 NAME 'roomNumber'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.21 NAME 'secretary'
+        EQUALITY distinguishedNameMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.44 NAME 'uniqueIdentifier'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+AttributeType("""
+      ( 0.9.2342.19200300.100.1.8 NAME 'userClass'
+        EQUALITY caseIgnoreMatch
+        SUBSTR caseIgnoreSubstringsMatch
+        SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+""")
+
+## RFC 4524 Object Classes
+
+ObjectClass("""
+      ( 0.9.2342.19200300.100.4.5 NAME 'account'
+        SUP top STRUCTURAL
+        MUST uid
+        MAY ( description $ seeAlso $ l $ o $ ou $ host ) )
+""")
+
+ObjectClass("""
+      ( 0.9.2342.19200300.100.4.6 NAME 'document'
+        SUP top STRUCTURAL
+        MUST documentIdentifier
+        MAY ( cn $ description $ seeAlso $ l $ o $ ou $
+          documentTitle $ documentVersion $ documentAuthor $
+          documentLocation $ documentPublisher ) )
+""")
+
+ObjectClass("""
+      ( 0.9.2342.19200300.100.4.9 NAME 'documentSeries'
+        SUP top STRUCTURAL
+        MUST cn
+        MAY ( description $ l $ o $ ou $ seeAlso $
+          telephonenumber ) )
+""")
+
+ObjectClass("""
+      ( 0.9.2342.19200300.100.4.13 NAME 'domain'
+        SUP top STRUCTURAL
+        MUST dc
+        MAY ( userPassword $ searchGuide $ seeAlso $ businessCategory $
+          x121Address $ registeredAddress $ destinationIndicator $
+          preferredDeliveryMethod $ telexNumber $
+          teletexTerminalIdentifier $ telephoneNumber $
+          internationaliSDNNumber $ facsimileTelephoneNumber $ street $
+          postOfficeBox $ postalCode $ postalAddress $
+          physicalDeliveryOfficeName $ st $ l $ description $ o $
+          associatedName ) )
+""")
+
+ObjectClass("""
+      ( 0.9.2342.19200300.100.4.17 NAME 'domainRelatedObject'
+        SUP top AUXILIARY
+        MUST associatedDomain )
+""")
+
+ObjectClass("""
+      ( 0.9.2342.19200300.100.4.18 NAME 'friendlyCountry'
+        SUP country STRUCTURAL
+        MUST co )
+""")
+
+ObjectClass("""
+      ( 0.9.2342.19200300.100.4.14 NAME 'rFC822localPart'
+        SUP domain STRUCTURAL
+        MAY ( cn $ description $ destinationIndicator $
+          facsimileTelephoneNumber $ internationaliSDNNumber $
+          physicalDeliveryOfficeName $ postalAddress $ postalCode $
+          postOfficeBox $ preferredDeliveryMethod $ registeredAddress $
+          seeAlso $ sn $ street $ telephoneNumber $
+          teletexTerminalIdentifier $ telexNumber $ x121Address ) )
+""")
+
+ObjectClass("""
+      ( 0.9.2342.19200300.100.4.7 NAME 'room'
+        SUP top STRUCTURAL
+        MUST cn
+        MAY ( roomNumber $ description $ seeAlso $ telephoneNumber ) )
+""")
+
+ObjectClass("""
+      ( 0.9.2342.19200300.100.4.19 NAME 'simpleSecurityObject'
+        SUP top AUXILIARY
+        MUST userPassword )
+""")

@@ -1,8 +1,9 @@
 from __future__ import absolute_import
+from .utils import CaseIgnoreDict
 import six
 
 
-class AttrsDict(dict):
+class AttrsDict(CaseIgnoreDict):
     """Stores attributes and provides utility methods without any server or object affinity
 
      Dict keys are case-insensitive attribute names, and dict values are a list of attribute values
@@ -35,9 +36,7 @@ class AttrsDict(dict):
     ## dict overrides for case-insensitive keys and enforcing types
 
     def __init__(self, attrs_dict=None):
-        self._keys = {}
-        if attrs_dict is not None:
-            self.update(attrs_dict)
+        CaseIgnoreDict.__init__(self, attrs_dict)
 
     def __contains__(self, attr):
         try:
@@ -48,8 +47,7 @@ class AttrsDict(dict):
     def __setitem__(self, attr, values):
         AttrsDict.validate_attr(attr)
         AttrsDict.validate_values(values)
-        self._keys[attr.lower()] = attr
-        dict.__setitem__(self, attr, values)
+        CaseIgnoreDict.__setitem__(self, attr, values)
 
     def setdefault(self, attr, default=None):
         AttrsDict.validate_attr(attr)
@@ -59,36 +57,11 @@ class AttrsDict(dict):
             AttrsDict.validate_values(default)
         except TypeError as e:
             raise TypeError('invalid default - {0}'.format(str(e)))
-        try:
-            return self[attr]
-        except KeyError:
-            self[attr] = default
-            return default
-
-    def __getitem__(self, key):
-        key = self._keys[key.lower()]
-        return dict.__getitem__(self, key)
-
-    def get(self, key, default=None):
-        try:
-            return self[key]
-        except KeyError:
-            return default
+        return CaseIgnoreDict.setdefault(self, attr, default)
 
     def update(self, attrs_dict):
         AttrsDict.validate(attrs_dict)
-        for key in attrs_dict:
-            self[key] = attrs_dict[key]
-
-    def __delitem__(self, key):
-        lkey = key.lower()
-        key = self._keys[lkey]
-        dict.__delitem__(self, key)
-        del self._keys[lkey]
-
-    def clear(self):
-        dict.clear(self)
-        self._keys.clear()
+        CaseIgnoreDict.update(self, attrs_dict)
 
     @staticmethod
     def validate(attrs_dict):

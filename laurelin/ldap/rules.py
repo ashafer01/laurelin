@@ -2,6 +2,7 @@
 
 from __future__ import absolute_import
 from .exceptions import InvalidSyntaxError, LDAPSchemaError
+from .utils import CaseIgnoreDict
 import re
 import six
 
@@ -26,7 +27,9 @@ class MetaSyntaxRule(type):
         cls = type.__new__(meta, name, bases, dct)
         if oid:
             if oid in _oid_syntax_rules:
-                raise LDAPSchemaError('Duplicate OID in syntax rule declaration')
+                cur_class = _oid_syntax_rules[oid].__name__
+                raise LDAPSchemaError('Duplicate OID {0} in syntax rule declaration (original class {1}, '
+                                      'new class {2})'.format(oid, cur_class, name))
             _oid_syntax_rules[oid] = cls
         return cls
 
@@ -88,9 +91,9 @@ class RegexSyntaxRule(SyntaxRule):
 
 
 _oid_matching_rules = {}
-_name_matching_rules = {}
+_name_matching_rules = CaseIgnoreDict()
 _oid_matching_rule_objects = {}
-_name_matching_rule_objects = {}
+_name_matching_rule_objects = CaseIgnoreDict()
 
 
 def get_matching_rule(ident):

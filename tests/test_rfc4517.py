@@ -1,23 +1,15 @@
-from laurelin.ldap import schema
-from laurelin.ldap import rules
 from laurelin.ldap.exceptions import InvalidSyntaxError
+from .utils import clear_rules, load_schema
 
-
-def reset_registrations():
-    rules._oid_syntax_rules.clear()
-    rules._oid_syntax_rule_objects.clear()
-    rules._oid_matching_rules.clear()
-    rules._name_matching_rules.clear()
-    rules._oid_matching_rule_objects.clear()
-    rules._name_matching_rule_objects.clear()
+schema = load_schema()
 
 
 def setup():
-    reset_registrations()
+    clear_rules()
 
 
 def teardown():
-    reset_registrations()
+    clear_rules()
 
 
 def run_syntax(testobj, tests_good, tests_bad):
@@ -128,7 +120,6 @@ def test_enhanced_guide():
 
 
 def test_distinguished_name():
-    import laurelin.ldap.schema
     run_syntax(
         testobj = schema.DistinguishedName(),
         tests_good = (
