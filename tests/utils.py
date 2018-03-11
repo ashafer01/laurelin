@@ -1,12 +1,18 @@
 from laurelin.ldap import attributetype, objectclass, rules
 from importlib import import_module
-try:
-    reload
-except NameError:
+
+def get_reload():
     try:
-        from imp import reload
-    except ImportError:
-        from importlib import reload
+        return reload
+    except NameError:
+        try:
+            from imp import reload
+            return reload
+        except ImportError:
+            from importlib import reload
+            return reload
+
+reload = get_reload()
 
 
 def clear_attribute_types():

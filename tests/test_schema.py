@@ -5,7 +5,9 @@ from laurelin.ldap import objectclass, attributetype, rules
 from laurelin.ldap.objectclass import get_object_class, DefaultObjectClass
 from laurelin.ldap.attributetype import get_attribute_type, DefaultAttributeType
 from laurelin.ldap.rules import get_matching_rule, get_syntax_rule
-from .utils import load_schema, reload
+from .utils import load_schema, get_reload
+
+reload = get_reload()
 
 
 class TestSchema(unittest.TestCase):
