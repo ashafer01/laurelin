@@ -859,6 +859,7 @@ ExtensibleObjectClass("""
 
 AttributeType("""
       ( 1.3.6.1.4.1.1466.101.120.6 NAME 'altServer'
+        EQUALITY caseExactMatch
         SYNTAX 1.3.6.1.4.1.1466.115.121.1.26
         USAGE dSAOperation )
 """)
@@ -1466,9 +1467,13 @@ AttributeType("""
       SYNTAX 1.3.6.1.4.1.1466.115.121.1.40{250000} )
 """)
 
+# Note: EQUALITY and SYNTAX in the photo spec are non-standard
+
 AttributeType("""
     ( 0.9.2342.19200300.100.1.7
-      NAME 'photo' )
+      NAME 'photo'
+      EQUALITY octetStringMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 )
 """)
 
 ## RFC 2079 Attribute Types via RFC 2798 sec 9.1.4

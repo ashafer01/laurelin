@@ -8,7 +8,6 @@ from .utils import CaseIgnoreDict
 
 import logging
 import re
-from warnings import warn
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +72,8 @@ class AttributeType(object):
 
         # register OID
         self.oid = m.group('oid')
+        if not self.oid:
+            raise LDAPSchemaError('No OID defined for attribute type')
         if self.oid in _oid_attribute_types:
             raise LDAPSchemaError('Duplicate attribute type OID {0}'.format(self.oid))
         _oid_attribute_types[self.oid] = self
@@ -83,16 +84,18 @@ class AttributeType(object):
             if name in _name_attribute_types:
                 raise LDAPSchemaError('Duplicate attribute type name {0}'.format(name))
             _name_attribute_types[name] = self
+        if not self.names:
+            raise LDAPSchemaError('No names defined for attribute type {0}'.format(self.oid))
 
         self.supertype = m.group('supertype')
+        if self.supertype:
+            self.supertype = self.supertype.strip()
 
         equality = m.group('equality')
         if equality is not None:
             self.equality_oid = equality
         elif not self.supertype:
             self.equality_oid = None
-        if not self.equality_oid:
-            warn('Attribute type {0} does not have a defined equality matching rule'.format(self.oid), LDAPWarning)
 
         # Note: ordering and substring matching not currently implemented
         # specs stored in m.group('ordering') and m.group('substr')
@@ -108,8 +111,6 @@ class AttributeType(object):
         elif not self.supertype:
             self.syntax_oid = None
             self.syntax_length = -1
-        if not self.syntax_oid:
-            warn('Attribute type {0} does not have a defined syntax'.format(self.oid), LDAPWarning)
 
         obsolete = m.group('obsolete')
         if obsolete is not None:
@@ -144,18 +145,23 @@ class AttributeType(object):
     @property
     def syntax(self):
         """Gets the :class:`SyntaxRule` for this attribute type."""
+        if not self.syntax_oid:
+            raise LDAPSchemaError('Attribute type {0} does not have a defined syntax'.format(self.oid))
         return rules.get_syntax_rule(self.syntax_oid)
 
     @property
     def equality(self):
         """Gets the :class:`EqualityMatchingRule` for this attribute type."""
+        if not self.equality_oid:
+            raise LDAPSchemaError('Attribute type {0} does not have a defined equality matching rule'.format(self.oid))
         return rules.get_matching_rule(self.equality_oid)
 
     def __getattr__(self, name):
         if self.supertype:
             return getattr(get_attribute_type(self.supertype), name)
         else:
-            raise AttributeError("No attribute named '{0}' and no supertype specified".format(name))
+            raise AttributeError("No attribute named '{0}' and no supertype specified for attr {1}".format(
+                                 name, self.oid))
 
     def validate(self, value):
         """Validate a value according to the attribute type's syntax rule.

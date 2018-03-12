@@ -44,6 +44,7 @@ def clear_schema_registrations():
 
 def load_schema():
     schema_mod = 'laurelin.ldap.schema'
+    clear_schema_registrations()
     schema = import_module(schema_mod)
     clear_schema_registrations()
     reload(schema)
