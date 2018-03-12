@@ -34,9 +34,10 @@ Features Overview
 Missing/incomplete features
 ---------------------------
 
-Laurelin is in beta and some lesser-used features of the LDAP protocol have not yet been implemented or are incomplete.
-Check the `GitHub issues <https://github.com/ashafer01/laurelin/issues>`_ to see if your use case is affected. Please
-add a comment if so, or open a new issue if you spot anything else. PRs are always welcome.
+Some lesser-used features of the LDAP protocol have not yet been implemented or are incomplete. Check the
+`GitHub issues <https://github.com/ashafer01/laurelin/issues>`_ to see if your use case is affected. Please add a
+comment if so, or open a new issue if you spot anything else. PRs are always welcome.
+
 
 Walkthrough
 -----------
