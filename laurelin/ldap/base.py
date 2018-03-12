@@ -154,7 +154,8 @@ class LDAP(Extensible):
     LOG_FORMAT = '[%(asctime)s] %(name)s %(levelname)s : %(message)s'
 
     # OIDs
-    OID_WHOAMI   = '1.3.6.1.4.1.4203.1.11.3'
+    OID_OBJ_CLASS_ATTR = '1.3.6.1.4.1.4203.1.5.2'  # RFC 4529 Requesting Attributes by Object Class
+    OID_WHOAMI = '1.3.6.1.4.1.4203.1.11.3'  # RFC 4532 "Who am I?" Operation
     OID_STARTTLS = '1.3.6.1.4.1.1466.20037'
 
     ## logging and warning controls
@@ -668,6 +669,9 @@ class LDAP(Extensible):
         if not isinstance(attrs, list):
             attrs = [attrs]
         for desc in attrs:
+            if desc[0] == '@':
+                if LDAP.OID_OBJ_CLASS_ATTR not in self.root_dse.get_attr('supportedFeatures'):
+                    raise LDAPSupportError('Server does not support RFC 4529 @objectClass attribute requests')
             _attrs.setComponentByPosition(i, rfc4511.LDAPString(desc))
             i += 1
         req.setComponentByName('attributes', _attrs)
