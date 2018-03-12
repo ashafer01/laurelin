@@ -2,12 +2,13 @@ from __future__ import absolute_import
 from . import rfc4512
 from . import rules
 from . import utils
-from .exceptions import LDAPSchemaError
+from .exceptions import LDAPSchemaError, LDAPWarning
 from .protoutils import parse_qdescrs
 from .utils import CaseIgnoreDict
 
 import logging
 import re
+from warnings import warn
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,8 @@ class AttributeType(object):
             self.equality_oid = equality
         elif not self.supertype:
             self.equality_oid = None
+        if not self.equality_oid:
+            warn('Attribute type {0} does not have a defined equality matching rule'.format(self.oid), LDAPWarning)
 
         # Note: ordering and substring matching not currently implemented
         # specs stored in m.group('ordering') and m.group('substr')
@@ -105,6 +108,8 @@ class AttributeType(object):
         elif not self.supertype:
             self.syntax_oid = None
             self.syntax_length = -1
+        if not self.syntax_oid:
+            warn('Attribute type {0} does not have a defined syntax'.format(self.oid), LDAPWarning)
 
         obsolete = m.group('obsolete')
         if obsolete is not None:

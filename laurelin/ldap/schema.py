@@ -854,6 +854,7 @@ ExtensibleObjectClass("""
 
 
 ## RFC 4512 5.1 Root DSE Attributes
+## Note: equality rules in this section are NOT a part of the spec
 
 
 AttributeType("""
@@ -864,18 +865,21 @@ AttributeType("""
 
 AttributeType("""
       ( 1.3.6.1.4.1.1466.101.120.5 NAME 'namingContexts'
+        EQUALITY distinguishedNameMatch
         SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
         USAGE dSAOperation )
 """)
 
 AttributeType("""
       ( 1.3.6.1.4.1.1466.101.120.13 NAME 'supportedControl'
+        EQUALITY objectIdentifierMatch
         SYNTAX 1.3.6.1.4.1.1466.115.121.1.38
         USAGE dSAOperation )
 """)
 
 AttributeType("""
       ( 1.3.6.1.4.1.1466.101.120.7 NAME 'supportedExtension'
+        EQUALITY objectIdentifierMatch
         SYNTAX 1.3.6.1.4.1.1466.115.121.1.38
         USAGE dSAOperation )
 """)
@@ -889,12 +893,14 @@ AttributeType("""
 
 AttributeType("""
       ( 1.3.6.1.4.1.1466.101.120.15 NAME 'supportedLDAPVersion'
+        EQUALITY integerMatch
         SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
         USAGE dSAOperation )
 """)
 
 AttributeType("""
       ( 1.3.6.1.4.1.1466.101.120.14 NAME 'supportedSASLMechanisms'
+        EQUALITY caseIgnoreMatch
         SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
         USAGE dSAOperation )
 """)
