@@ -27,7 +27,7 @@ class TestSchema(unittest.TestCase):
                                          'attribute {0} is not defined for objectClass {1}'.format(attr, oc_name))
             for sc_name in oc.superclasses:
                 self.assertNotIsInstance(get_object_class(sc_name), DefaultObjectClass,
-                                         'superclass {0} is not defined for objectClass {1}'.format( sc_name, oc_name))
+                                         'superclass {0} is not defined for objectClass {1}'.format(sc_name, oc_name))
 
     def test_attribute_types(self):
         """Ensure all attribute syntax rules, equality rules, and supertypes are defined"""

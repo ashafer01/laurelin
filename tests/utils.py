@@ -1,6 +1,7 @@
 from laurelin.ldap import attributetype, objectclass, rules
 from importlib import import_module
 
+
 def get_reload():
     try:
         return reload
@@ -11,6 +12,7 @@ def get_reload():
         except ImportError:
             from importlib import reload
             return reload
+
 
 reload = get_reload()
 
