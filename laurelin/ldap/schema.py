@@ -1422,6 +1422,9 @@ ObjectClass("""
     NAME 'inetOrgPerson'
     SUP organizationalPerson
     STRUCTURAL
+    MUST (
+        cn $ objectClass $ sn
+    )
     MAY (
         audio $ businessCategory $ carLicense $ departmentNumber $
         displayName $ employeeNumber $ employeeType $ givenName $
@@ -1429,7 +1432,13 @@ ObjectClass("""
         labeledURI $ mail $ manager $ mobile $ o $ pager $
         photo $ roomNumber $ secretary $ uid $ userCertificate $
         x500uniqueIdentifier $ preferredLanguage $
-        userSMIMECertificate $ userPKCS12
+        userSMIMECertificate $ userPKCS12 $
+        description $ destinationIndicator $ facsimileTelephoneNumber $
+        internationaliSDNNumber $ l $ ou $ physicalDeliveryOfficeName $
+        postalAddress $ postalCode $ postOfficeBox $
+        preferredDeliveryMethod $ registeredAddress $ seeAlso $
+        st $ street $ telephoneNumber $ teletexTerminalIdentifier $
+        telexNumber $ title $ userPassword $ x121Address
     )
 )
 """)
