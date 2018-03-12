@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from . import rfc4512
 from . import rules
 from . import utils
-from .exceptions import LDAPSchemaError, LDAPWarning
+from .exceptions import LDAPSchemaError
 from .protoutils import parse_qdescrs
 from .utils import CaseIgnoreDict
 
