@@ -10,7 +10,7 @@ python:
 sudo: required
 services:
   - docker
-before_intall:
+before_install:
   - docker pull osixia/openldap:1.2.0
   - docker run --name openldap -p 127.0.0.1:10389:389 -p 127.0.0.1:10636:636 --env LDAP_TLS_VERIFY_CLIENT=never --detach osixia/openldap:1.2.0 --loglevel debug
 install:
