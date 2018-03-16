@@ -4,7 +4,10 @@ laurelin-ldap
 .. image:: https://travis-ci.org/ashafer01/laurelin.svg?branch=master
     :target: https://travis-ci.org/ashafer01/laurelin
 
-View documentation on `ReadTheDocs <http://laurelin-ldap.readthedocs.io/en/latest/index.html>`_.
+View documentation on `ReadTheDocs <http://laurelin-ldap.readthedocs.io/en/latest/index.html>`_. You might also like
+to read the `introduction <https://medium.com/@ashafer01/laurelin-a-new-ldap-client-for-python-675ebac78d96>`_.
+
+``pip install laurelin-ldap`` or clone the repo to get started.
 
 Please star the repo on `GitHub <https://github.com/ashafer01/laurelin>`_ if you like the project!
 
