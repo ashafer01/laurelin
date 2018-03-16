@@ -136,6 +136,14 @@ all values for an attribute.
 :meth:`.LDAP.replace_attrs` replaces all values for the given attributes with the values passed in the attributes
 dictionary. Atrributes that are not mentioned are not touched. Passing an empty list removes all values.
 
+For :meth:`.LDAP.delete_attrs` and :meth:`.LDAP.replace_attrs` you can specify the constant :attr:`.LDAP.DELETE_ALL` in
+place of an empty attribute value list to remove all values for the attribute. For example::
+
+    ldap.replace_attrs('cn=foo,dc=example,dc=org', {'someAttribute': LDAP.DELETE_ALL})
+
+If you wish to require the use of the constant instead of an empty list, pass ``error_empty_list=True`` to the
+:class:`.LDAP` constructor. This will be the default behavior in a future release.
+
 
 LDAPObject Methods Intro
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -226,6 +234,9 @@ to pass as arguments, though you are welcome to if you find the additional metho
 as :meth:`.AttrsDict.get_attr`. Further, it overrides ``dict`` special methods to enforce type requirements and enable
 case-insensitive keys.
 
+Also note that when passing an attributes dictionary to :meth:`.LDAP.replace_attrs` or :meth:`.LDAP.delete_attrs` it is
+legal to specify the constant :attr:`.LDAP.DELETE_ALL` in place of a value list.
+
 .. _modify-operations:
 
 Modify Operations
@@ -246,10 +257,13 @@ required with 3 arguments:
 
 2. The name of the attribute to modify. Each entry may only modify one attribute, but an unlimited number of entries may
    be specified in a single modify operation.
-3. A list of attribute values to use with the modify operation:
+3. A list of attribute values to use with the modify operation or the constant :attr:`.LDAP.DELETE_ALL`:
 
   * The list may be empty for :attr:`.Mod.REPLACE` and :attr:`.Mod.DELETE`, both of which will cause all values for the
-    given attribute to be removed from the object. The list may not be empty for :attr:`.Mod.ADD`.
+    given attribute to be removed from the object. The list may not be empty for :attr:`.Mod.ADD`. You can also specify
+    the constant :attr:`.LDAP.DELETE_ALL` in place of any empty list. If you wish to warn about empty lists or require
+    the use of the constant, pass ``warn_empty_list=True`` or ``error_empty_list=True`` to the :class:`.LDAP`
+    constructor
   * A non-empty list for :attr:`.Mod.ADD` lists all new attribute values to add
   * A non-empty list for :attr:`.Mod.DELETE` lists specific attribute values to remove
   * A non-empty list for :attr:`.Mod.REPLACE` indicates ALL new values for the attribute - all others will be removed.
@@ -268,7 +282,7 @@ Using an :class:`.LDAPObject` instead::
 
     ldap.base.obj('uid=ashafer01,ou=people').modify([
         Mod(Mod.DELETE, 'mobile', ['+1 401 555 1234']),
-        Mod(Mod.DELETE, 'homePhone', []), # delete all homePhone values
+        Mod(Mod.DELETE, 'homePhone', LDAP.DELETE_ALL), # delete all homePhone values
     ])
 
 Again, an arbitrary number of :class:`.Mod` entries may be specified for each ``modify`` call.
@@ -333,8 +347,8 @@ Global Default                                   :class:`.LDAP` instance attribu
 :attr:`.LDAP.DEFAULT_SASL_FATAL_DOWNGRADE_CHECK` ``sasl_fatal_downgrade_check``    ``sasl_fatal_downgrade_check``
 :attr:`.LDAP.DEFAULT_CRITICALITY`                ``default_criticality``           ``default_criticality``
 :attr:`.LDAP.DEFAULT_VALIDATORS`                 ``validators``                    ``validators``
-:attr:`.LDAP.DEFAULT_WARN_EMPTY_LIST             ``warn_empty_list``               ``warn_empty_list``
-:attr:`.LDAP.DEFAULT_ERROR_EMPTY_LIST            ``error_empty_list``              ``error_empty_list``
+:attr:`.LDAP.DEFAULT_WARN_EMPTY_LIST`            ``warn_empty_list``               ``warn_empty_list``
+:attr:`.LDAP.DEFAULT_ERROR_EMPTY_LIST`           ``error_empty_list``              ``error_empty_list``
 ================================================ ================================= ==================================
 
 The :class:`.LDAP` instance attributes beginning with ``default_`` are used as the defaults for corresponding arguments

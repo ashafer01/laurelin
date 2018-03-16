@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from .constants import DELETE_ALL
 from .utils import CaseIgnoreDict
 import six
 
@@ -93,12 +94,15 @@ class AttrsDict(CaseIgnoreDict):
 
     @staticmethod
     def validate_values(attr_val_list):
-        """Validate that ``attr_val_list`` conforms to the required ``list[str or bytes]`` typing.
+        """Validate that ``attr_val_list`` conforms to the required ``list[str or bytes]`` typing. Also allows the
+        DELETE_ALL constant.
 
         :param list attr_val_list: The list to validate for use as an attribute value list.
         :rtype: None
         :raises TypeError: when the list is invalid
         """
+        if attr_val_list is DELETE_ALL:
+            return
         if not isinstance(attr_val_list, list):
             raise TypeError('must be list')
         for val in attr_val_list:
