@@ -114,10 +114,13 @@ class LDAP(Extensible):
     :param list[Validator] validators: A list of :class:`Validator` instances to apply to this connection.
     :param bool warn_empty_list: Default False. Set to True to emit a warning when an empty value list is passed to
                                  :meth:`.LDAP.modify`, :meth:`.LDAP.replace_attrs`, or :meth:`.LDAP.delete_attrs` or
-                                 their LDAPObject counterparts. This will be default True in a future release.
+                                 their LDAPObject counterparts.
     :param bool error_empty_list: Default False. Set to True to raise an exception when an empty value list is passed to
                                   :meth:`.LDAP.modify`, :meth:`.LDAP.replace_attrs`, or :meth:`.LDAP.delete_attrs` or
-                                  their LDAPObject counterparts. This will be default True in a future release.
+                                  their LDAPObject counterparts.
+    :param bool ignore_empty_list: Default False. Set to True to ignore empty value lists passed to
+                                   :meth:`.LDAP.modify`, :meth:`.LDAP.replace_attrs`, or :meth:`.LDAP.delete_attrs` or
+                                   their LDAPObject counterparts. This will be default True in a future release.
 
     The class can be used as a context manager, which will automatically unbind and close the connection when the
     context manager exits.
@@ -157,6 +160,7 @@ class LDAP(Extensible):
     DEFAULT_VALIDATORS = None
     DEFAULT_WARN_EMPTY_LIST = False
     DEFAULT_ERROR_EMPTY_LIST = False
+    DEFAULT_IGNORE_EMPTY_LIST = False
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -221,7 +225,7 @@ class LDAP(Extensible):
                  deref_aliases=None, strict_modify=None, ssl_verify=None, ssl_ca_file=None, ssl_ca_path=None,
                  ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
                  default_criticality=None, follow_referrals=None, validators=None, warn_empty_list=None,
-                 error_empty_list=None):
+                 error_empty_list=None, ignore_empty_list=None):
 
         # setup
         if server is None:
@@ -262,6 +266,8 @@ class LDAP(Extensible):
             warn_empty_list = LDAP.DEFAULT_WARN_EMPTY_LIST
         if error_empty_list is None:
             error_empty_list = LDAP.DEFAULT_ERROR_EMPTY_LIST
+        if ignore_empty_list is None:
+            ignore_empty_list = LDAP.DEFAULT_IGNORE_EMPTY_LIST
 
         self.default_search_timeout = search_timeout
         self.default_deref_aliases = deref_aliases
@@ -274,6 +280,7 @@ class LDAP(Extensible):
         self.sasl_fatal_downgrade_check = sasl_fatal_downgrade_check
         self.warn_empty_list = warn_empty_list
         self.error_empty_list = error_empty_list
+        self.ignore_empty_list = ignore_empty_list
 
         self._tagged_objects = {}
         self._sasl_mechs = None
@@ -982,6 +989,18 @@ class LDAP(Extensible):
             i = 0
             logger.debug('Modifying DN {0}'.format(dn))
             for mod in modlist:
+                if mod.op in (Mod.REPLACE, Mod.DELETE):
+                    if isinstance(mod.vals, list) and not mod.vals:
+                        if self.warn_empty_list:
+                            warn('empty list in replace/delete modify, will delete all values for attribute {0}'.format(
+                                mod.attr), LDAPWarning)
+                        if self.ignore_empty_list:
+                            logger.debug('> Ignoring Mod with empty value list: {0} {1}'.format(mod.op, mod.attr))
+                            continue
+                        if self.error_empty_list:
+                            raise LDAPError('empty list in replace/delete modify for attr {0}'.format(mod.attr))
+                    if mod.vals is DELETE_ALL:
+                        mod.vals = []
                 logger.debug('> {0}'.format(mod))
 
                 c = rfc4511.Change()
@@ -989,15 +1008,6 @@ class LDAP(Extensible):
                 pa = rfc4511.PartialAttribute()
                 pa.setComponentByName('type', rfc4511.AttributeDescription(mod.attr))
                 vals = rfc4511.Vals()
-                if mod.op in (Mod.REPLACE, Mod.DELETE):
-                    if isinstance(mod.vals, list) and not mod.vals:
-                        if self.error_empty_list:
-                            raise LDAPError('empty list in replace/delete modify for attr {0}'.format(mod.attr))
-                        if self.warn_empty_list:
-                            warn('empty list in replace/delete modify, will delete all values for attribute {0}'.format(
-                                 mod.attr), LDAPWarning)
-                    if mod.vals is DELETE_ALL:
-                        mod.vals = []
                 j = 0
                 for v in mod.vals:
                     vals.setComponentByPosition(j, rfc4511.AttributeValue(v))
@@ -1007,11 +1017,15 @@ class LDAP(Extensible):
 
                 cl.setComponentByPosition(i, c)
                 i += 1
-            mr.setComponentByName('changes', cl)
-            controls = self._process_ctrl_kwds('modify', ctrl_kwds, final=True)
-            mid = self.sock.send_message('modifyRequest', mr, controls)
-            logger.info('Sent modify request (ID {0}) for DN {1}'.format(mid, dn))
-            return self._success_result(mid, 'modifyResponse')
+            if i > 0:
+                mr.setComponentByName('changes', cl)
+                controls = self._process_ctrl_kwds('modify', ctrl_kwds, final=True)
+                mid = self.sock.send_message('modifyRequest', mr, controls)
+                logger.info('Sent modify request (ID {0}) for DN {1}'.format(mid, dn))
+                return self._success_result(mid, 'modifyResponse')
+            else:
+                logger.debug('All modlist items have been skipped for DN {0}'.format(dn))
+                return LDAPResponse()
         else:
             logger.debug('Not sending 0-length modlist for DN {0}'.format(dn))
             return LDAPResponse()

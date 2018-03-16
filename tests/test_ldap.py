@@ -632,6 +632,19 @@ class TestLDAP(unittest.TestCase):
         with self.assertRaises(exceptions.LDAPError):
             ldap.obj('o=foo', attrs_dict={'foo':['bar']}).delete_attrs({'foo': []})
 
+    def test_ignore_empty_list(self):
+        """Ensure emtpy value lists are ignored"""
+
+        mock_sock = MockLDAPSocket()
+        mock_sock.add_root_dse()
+        ldap = LDAP(mock_sock, ignore_empty_list=True)
+
+        mock_sock.clear_sent()
+
+        # this should succeed without sending a request to the server or expecting a response
+        ldap.modify('o=foo', [Mod(Mod.REPLACE, 'foo', [])])
+        self.assertEqual(mock_sock.num_sent(), 0)
+
 
 
 if __name__ == '__main__':

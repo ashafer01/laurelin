@@ -142,7 +142,8 @@ place of an empty attribute value list to remove all values for the attribute. F
     ldap.replace_attrs('cn=foo,dc=example,dc=org', {'someAttribute': LDAP.DELETE_ALL})
 
 If you wish to require the use of the constant instead of an empty list, pass ``error_empty_list=True`` to the
-:class:`.LDAP` constructor. This will be the default behavior in a future release.
+:class:`.LDAP` constructor. You can also pass ``ignore_empty_list=True`` to silently prevent these from being sent to
+the server (this will be the default behavior in a future release).
 
 
 LDAPObject Methods Intro
@@ -263,7 +264,8 @@ required with 3 arguments:
     given attribute to be removed from the object. The list may not be empty for :attr:`.Mod.ADD`. You can also specify
     the constant :attr:`.LDAP.DELETE_ALL` in place of any empty list. If you wish to warn about empty lists or require
     the use of the constant, pass ``warn_empty_list=True`` or ``error_empty_list=True`` to the :class:`.LDAP`
-    constructor
+    constructor. You can also pass ``ignore_empty_list=True`` to silently prevent these from being sent to the server
+    (this will be the default behavior in a future release).
   * A non-empty list for :attr:`.Mod.ADD` lists all new attribute values to add
   * A non-empty list for :attr:`.Mod.DELETE` lists specific attribute values to remove
   * A non-empty list for :attr:`.Mod.REPLACE` indicates ALL new values for the attribute - all others will be removed.
@@ -349,6 +351,7 @@ Global Default                                   :class:`.LDAP` instance attribu
 :attr:`.LDAP.DEFAULT_VALIDATORS`                 ``validators``                    ``validators``
 :attr:`.LDAP.DEFAULT_WARN_EMPTY_LIST`            ``warn_empty_list``               ``warn_empty_list``
 :attr:`.LDAP.DEFAULT_ERROR_EMPTY_LIST`           ``error_empty_list``              ``error_empty_list``
+:attr:`.LDAP.DEFAULT_IGNORE_EMPTY_LIST`          ``ignore_empty_list``             ``ignore_empty_list``
 ================================================ ================================= ==================================
 
 The :class:`.LDAP` instance attributes beginning with ``default_`` are used as the defaults for corresponding arguments
