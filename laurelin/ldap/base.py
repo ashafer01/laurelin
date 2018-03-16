@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 from . import controls
 from . import rfc4511
-from .constants import Scope, DerefAliases
+from .constants import Scope, DerefAliases, DELETE_ALL
 from .exceptions import *
 from .extensible import Extensible
 from .filter import parse as parse_filter
@@ -112,6 +112,12 @@ class LDAP(Extensible):
     :param bool default_criticality: Set to True to make controls critical by default, set to False to make non-critical
     :param bool follow_referrals: Automatically follow referral results
     :param list[Validator] validators: A list of :class:`Validator` instances to apply to this connection.
+    :param bool warn_empty_list: Default False. Set to True to emit a warning when an empty value list is passed to
+                                 :meth:`.LDAP.modify`, :meth:`.LDAP.replace_attrs`, or :meth:`.LDAP.delete_attrs` or
+                                 their LDAPObject counterparts. This will be default True in a future release.
+    :param bool error_empty_list: Default False. Set to True to raise an exception when an empty value list is passed to
+                                  :meth:`.LDAP.modify`, :meth:`.LDAP.replace_attrs`, or :meth:`.LDAP.delete_attrs` or
+                                  their LDAPObject counterparts. This will be default True in a future release.
 
     The class can be used as a context manager, which will automatically unbind and close the connection when the
     context manager exits.
@@ -126,6 +132,9 @@ class LDAP(Extensible):
             print('hello')
         # ldap is closed and unbound
     """
+
+    DELETE_ALL = DELETE_ALL
+    """Use with modify replace/delete in place of an attribute list to delete all values for the attribute"""
 
     # global defaults
     DEFAULT_SERVER = 'ldap://localhost'
@@ -146,6 +155,8 @@ class LDAP(Extensible):
     DEFAULT_SASL_FATAL_DOWNGRADE_CHECK = True
     DEFAULT_CRITICALITY = False
     DEFAULT_VALIDATORS = None
+    DEFAULT_WARN_EMPTY_LIST = False
+    DEFAULT_ERROR_EMPTY_LIST = False
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -209,7 +220,8 @@ class LDAP(Extensible):
     def __init__(self, server=None, base_dn=None, reuse_connection=None, connect_timeout=None, search_timeout=None,
                  deref_aliases=None, strict_modify=None, ssl_verify=None, ssl_ca_file=None, ssl_ca_path=None,
                  ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
-                 default_criticality=None, follow_referrals=None, validators=None):
+                 default_criticality=None, follow_referrals=None, validators=None, warn_empty_list=None,
+                 error_empty_list=None):
 
         # setup
         if server is None:
@@ -246,6 +258,10 @@ class LDAP(Extensible):
             follow_referrals = LDAP.DEFAULT_FOLLOW_REFERRALS
         if validators is None:
             validators = LDAP.DEFAULT_VALIDATORS
+        if warn_empty_list is None:
+            warn_empty_list = LDAP.DEFAULT_WARN_EMPTY_LIST
+        if error_empty_list is None:
+            error_empty_list = LDAP.DEFAULT_ERROR_EMPTY_LIST
 
         self.default_search_timeout = search_timeout
         self.default_deref_aliases = deref_aliases
@@ -256,6 +272,8 @@ class LDAP(Extensible):
 
         self.strict_modify = strict_modify
         self.sasl_fatal_downgrade_check = sasl_fatal_downgrade_check
+        self.warn_empty_list = warn_empty_list
+        self.error_empty_list = error_empty_list
 
         self._tagged_objects = {}
         self._sasl_mechs = None
@@ -971,6 +989,15 @@ class LDAP(Extensible):
                 pa = rfc4511.PartialAttribute()
                 pa.setComponentByName('type', rfc4511.AttributeDescription(mod.attr))
                 vals = rfc4511.Vals()
+                if mod.op in (Mod.REPLACE, Mod.DELETE):
+                    if isinstance(mod.vals, list) and not mod.vals:
+                        if self.error_empty_list:
+                            raise LDAPError('empty list in replace/delete modify for attr {0}'.format(mod.attr))
+                        if self.warn_empty_list:
+                            warn('empty list in replace/delete modify, will delete all values for attribute {0}'.format(
+                                 mod.attr), LDAPWarning)
+                    if mod.vals is DELETE_ALL:
+                        mod.vals = []
                 j = 0
                 for v in mod.vals:
                     vals.setComponentByPosition(j, rfc4511.AttributeValue(v))

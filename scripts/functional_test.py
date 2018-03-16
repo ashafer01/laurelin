@@ -85,5 +85,20 @@ for info in test_servers:
                              'wxyzab'],
             })
             print(o.format_ldif())
+
+            # test DELETE_ALL
+            test_rdn = 'ou=foo'
+            test_attr = 'description'
+            obj1 = ldap.base.add_child(test_rdn, {
+                'objectClass': ['organizationalUnit'],
+                'ou': ['foo'],
+                test_attr: ['foo']
+            })
+            assert test_attr in obj1
+            obj1.delete_attrs({test_attr: LDAP.DELETE_ALL})
+            assert test_attr not in obj1
+            obj2 = ldap.base.get_child(test_rdn)
+            assert test_attr not in obj2
+            obj2.delete()
     except Exception as e:
         raise Exception('Functional test failed on {0}: {1}'.format(info['name'], str(e)))

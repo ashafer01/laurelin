@@ -3,6 +3,7 @@
 from __future__ import absolute_import
 from .attributetype import get_attribute_type
 from .rfc4511 import Operation
+from .constants import DELETE_ALL
 import six
 
 
@@ -39,7 +40,7 @@ class Mod(object):
     def __init__(self, op, attr, vals):
         if (op != Mod.ADD) and (op != Mod.REPLACE) and (op != Mod.DELETE):
             raise ValueError()
-        if not isinstance(vals, list):
+        if vals is not DELETE_ALL and not isinstance(vals, list):
             vals = [vals]
         if (op == Mod.ADD) and (len(vals) == 0):
             raise ValueError('No values to add')

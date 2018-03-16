@@ -607,6 +607,32 @@ class TestLDAP(unittest.TestCase):
 
         self.assertEqual(expected_add_object, results[0])
 
+    def test_error_empty_list(self):
+        """Ensure the error_empty_list option is respected with all invocations"""
+
+        mock_sock = MockLDAPSocket()
+        mock_sock.add_root_dse()
+        ldap = LDAP(mock_sock, error_empty_list=True)
+
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.modify('o=foo', [Mod(Mod.REPLACE, 'foo', [])])
+
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.replace_attrs('o=foo', {'foo': []})
+
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.delete_attrs('o=foo', {'foo': []}, current={'foo':['bar']})
+
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.obj('o=foo').modify([Mod(Mod.REPLACE, 'foo', [])])
+
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.obj('o=foo').replace_attrs({'foo': []})
+
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.obj('o=foo', attrs_dict={'foo':['bar']}).delete_attrs({'foo': []})
+
+
 
 if __name__ == '__main__':
     unittest.main()

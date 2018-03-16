@@ -7,6 +7,24 @@ from .rfc4511 import (
 )
 
 
+class _DeleteAllAttrs(object):
+    """Sentinel object used to delete all attributes in replace or delete"""
+    def __bool__(self):
+        return False
+
+    def __nonzero__(self):
+        return False
+
+    def __len__(self):
+        return 0
+
+    def __repr__(self):
+        return '<delete all values>'
+
+
+DELETE_ALL = _DeleteAllAttrs()
+
+
 class Scope:
     """Scope constants. These instruct the server how far to take a search, relative to the base object"""
 

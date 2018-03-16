@@ -3,8 +3,8 @@ Testing Setup
 
 .. warning::
 
-   Testing has been moved to docker using public images. Check ``.travis.yml`` for details. It is maintained for
-   historical/documentation purposes. (Also still need to automate SASL testing)
+   Testing has been moved to docker using public images. Check ``.travis.yml`` for details. This page is maintained for
+   historical documentation purposes. (Also still need to automate SASL testing)
 
 System
 ------

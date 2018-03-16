@@ -333,6 +333,8 @@ Global Default                                   :class:`.LDAP` instance attribu
 :attr:`.LDAP.DEFAULT_SASL_FATAL_DOWNGRADE_CHECK` ``sasl_fatal_downgrade_check``    ``sasl_fatal_downgrade_check``
 :attr:`.LDAP.DEFAULT_CRITICALITY`                ``default_criticality``           ``default_criticality``
 :attr:`.LDAP.DEFAULT_VALIDATORS`                 ``validators``                    ``validators``
+:attr:`.LDAP.DEFAULT_WARN_EMPTY_LIST             ``warn_empty_list``               ``warn_empty_list``
+:attr:`.LDAP.DEFAULT_ERROR_EMPTY_LIST            ``error_empty_list``              ``error_empty_list``
 ================================================ ================================= ==================================
 
 The :class:`.LDAP` instance attributes beginning with ``default_`` are used as the defaults for corresponding arguments
