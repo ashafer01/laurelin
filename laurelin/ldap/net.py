@@ -189,30 +189,41 @@ class LDAPSocket(object):
             self._sock = ssl.wrap_socket(self._sock, ca_certs=ca_file, cert_reqs=verify_mode, ssl_version=proto)
 
         if verify:
-            # implement a consistent check_hostname according to RFC 4513 sec 3.1.3
             cert = self._sock.getpeercert()
             cert_cn = dict([e[0] for e in cert['subject']])['commonName']
-            if self.host == cert_cn:
-                logger.debug('Matched server identity to cert commonName')
-            else:
-                valid = False
-                tried = [cert_cn]
-                for type, value in cert.get('subjectAltName', []):
-                    if type == 'DNS' and value.startswith('*.'):
-                        valid = self.host.endswith(value[1:])
-                    else:
-                        valid = (self.host == value)
-                    tried.append(value)
-                    if valid:
-                        logger.debug('Matched server identity to cert {0} subjectAltName'.format(type))
-                        break
-                if not valid:
-                    raise LDAPConnectionError('Server identity "{0}" does not match any cert names: {1}'.format(
-                                              self.host, ', '.join(tried)))
+            self.check_hostname(cert_cn, cert)
         else:
             logger.debug('Skipping hostname validation')
         self.started_tls = True
         logger.debug('Installed TLS layer on #{0}'.format(self.ID))
+
+    def check_hostname(self, cert_cn, cert):
+        """SSL check_hostname according to RFC 4513 sec 3.1.3. Compares supplied values against ``self.host`` to
+        determine the validity of the cert.
+
+        :param str cert_cn: The common name of the cert
+        :param dict cert: A dictionary representing the rest of the cert. Checks key subjectAltNames for a list of
+                          (type, value) tuples, where type is 'DNS' or 'IP'. DNS supports leading wildcard.
+        :rtype: None
+        :raises LDAPConnectionError: if no supplied values match ``self.host``
+        """
+        if self.host == cert_cn:
+            logger.debug('Matched server identity to cert commonName')
+        else:
+            valid = False
+            tried = [cert_cn]
+            for type, value in cert.get('subjectAltName', []):
+                if type == 'DNS' and value.startswith('*.'):
+                    valid = self.host.endswith(value[1:])
+                else:
+                    valid = (self.host == value)
+                tried.append(value)
+                if valid:
+                    logger.debug('Matched server identity to cert {0} subjectAltName'.format(type))
+                    break
+            if not valid:
+                raise LDAPConnectionError('Server identity "{0}" does not match any cert names: {1}'.format(
+                    self.host, ', '.join(tried)))
 
     def sasl_init(self, mechs, **props):
         """Initialize a :class:`.puresasl.client.SASLClient`"""
