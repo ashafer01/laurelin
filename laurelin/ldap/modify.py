@@ -48,16 +48,32 @@ class Mod(object):
         self.attr = attr
         self.vals = vals
 
-    def __str__(self):
-        if len(self.vals) == 0:
-            vals = '<all values>'
-        else:
-            vals = str(self.vals)
-        return 'Mod({0}, {1}, {2})'.format(Mod.op_to_string(self.op), self.attr, vals)
-
     def __repr__(self):
-        return 'Mod(Mod.{0}, {1}, {2})'.format(Mod.op_to_string(self.op), repr(self.attr), repr(self.vals))
+        if self.vals:
+            vals = str(self.vals)
+        else:
+            vals = 'DELETE_ALL'
+        return 'Mod({0}, {1}, {2})'.format(repr(self.op), repr(self.attr), vals)
 
+
+def _mod_op_repr(operation_obj):
+    """Uses laurelin constant name representation for mod operations"""
+    try:
+        intval = int(operation_obj)
+        name = operation_obj.namedValues.getName(intval)
+        if name == 'add':
+            return 'Mod.ADD'
+        elif name == 'replace':
+            return 'Mod.REPLACE'
+        elif name == 'delete':
+            return 'Mod.DELETE'
+        else:
+            return '{0}({1})'.format(operation_obj.__class__.__name__, repr(name))
+    except Exception:
+        return '{0}(<schema object>)'.format(operation_obj.__class__.__name__)
+
+
+Operation.__repr__ = _mod_op_repr
 
 def Modlist(op, attrs_dict):
     """Generate a modlist from a dictionary"""
