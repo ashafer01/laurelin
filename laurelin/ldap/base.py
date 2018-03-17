@@ -1036,7 +1036,8 @@ class LDAP(Extensible):
         :param str dn: The DN of the object to modify
         :param attrs_dict: The new attributes to add to the object
         :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
-        :param current: The current known state of the object for use in validation
+        :param current: The current known state of the object. Used for ensuring we don't send duplicate attributes to
+                        the server and for validation.
         :type current: LDAPObject or None
         :return: A response object
         :rtype: LDAPResponse
@@ -1061,7 +1062,8 @@ class LDAP(Extensible):
         :param attrs_dict: The attributes to remove from the object. Specify an empty list for a value to delete all
                            values.
         :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
-        :param current: The current known state of the object for use in validation
+        :param current: The current known state of the object. Used to ensure we don't request that the server delete
+                        attribute values that don't exist and for validation.
         :type current: LDAPObject or None
         :return: A response object
         :rtype: LDAPResponse
