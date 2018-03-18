@@ -50,7 +50,7 @@ class Mod(object):
 
     def __repr__(self):
         if self.vals:
-            vals = str(self.vals)
+            vals = repr(self.vals)
         else:
             vals = 'DELETE_ALL'
         return 'Mod({0}, {1}, {2})'.format(repr(self.op), repr(self.attr), vals)
@@ -74,6 +74,7 @@ def _mod_op_repr(operation_obj):
 
 
 Operation.__repr__ = _mod_op_repr
+
 
 def Modlist(op, attrs_dict):
     """Generate a modlist from a dictionary"""

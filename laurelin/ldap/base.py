@@ -24,6 +24,7 @@ from .protoutils import (
     RESULT_compareTrue,
     RESULT_compareFalse,
     RESULT_referral,
+    pack,
     unpack,
     seq_to_list,
     get_string_component,
@@ -399,8 +400,9 @@ class LDAP(Extensible):
         br.setComponentByName('authentication', ac)
 
         req_ctrls = self._process_ctrl_kwds('bind', ctrl_kwds, final=True)
+        lm = pack('bindRequest', br, req_ctrls)
 
-        mid = self.sock.send_message('bindRequest', br, req_ctrls)
+        mid = self.sock.send_message(lm)
         logger.debug('Sent bind request (ID {0}) on connection #{1} for {2}'.format(mid, self.sock.ID, username))
         ret = self._success_result(mid, 'bindResponse')
         self.sock.bound = True
@@ -488,7 +490,8 @@ class LDAP(Extensible):
             ac.setComponentByName('sasl', sasl)
             br.setComponentByName('authentication', ac)
 
-            mid = self.sock.send_message('bindRequest', br, req_ctrls)
+            lm = pack('bindRequest', br, req_ctrls)
+            mid = self.sock.send_message(lm)
             logger.debug('Sent SASL bind request (ID {0}) on connection #{1}'.format(mid, self.sock.ID))
 
             mid, res, res_ctrls = unpack('bindResponse', self.sock.recv_one(mid))
@@ -522,7 +525,7 @@ class LDAP(Extensible):
 
         self.sock.refcount -= 1
         if force or self.sock.refcount == 0:
-            self.sock.send_message('unbindRequest', rfc4511.UnbindRequest())
+            self.sock.send_message(pack('unbindRequest', rfc4511.UnbindRequest()))
             self.sock.close()
             self.sock.unbound = True
             logger.info('Unbound on {0} (#{1})'.format(self.sock.uri, self.sock.ID))
@@ -711,7 +714,7 @@ class LDAP(Extensible):
         # check for allowed object keywords now that any control keywords have been removed from the dict
         _check_obj_kwds(kwds)
 
-        mid = self.sock.send_message('searchRequest', req, ctrls)
+        mid = self.sock.send_message(pack('searchRequest', req, ctrls))
         logger.info('Sent search request (ID {0}): base_dn={1}, scope={2}, filter={3}'.format(
                     mid, base_dn, scope, filter))
         return SearchResultHandle(self, mid, fetch_result_refs, follow_referrals, kwds)
@@ -741,8 +744,9 @@ class LDAP(Extensible):
         cr.setComponentByName('ava', ava)
 
         req_ctrls = self._process_ctrl_kwds('compare', ctrl_kwds, final=True)
+        lm = pack('compareRequest', cr, req_ctrls)
 
-        message_id = self.sock.send_message('compareRequest', cr, req_ctrls)
+        message_id = self.sock.send_message(lm)
         logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(message_id, dn, attr, value))
         msg = self.sock.recv_one(message_id)
         mid, res, res_ctrls = unpack('compareResponse', msg)
@@ -804,7 +808,8 @@ class LDAP(Extensible):
             i += 1
         ar.setComponentByName('attributes', al)
 
-        mid = self.sock.send_message('addRequest', ar, req_ctrls)
+        lm = pack('addRequest', ar, req_ctrls)
+        mid = self.sock.send_message(lm)
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mid, dn))
 
         lm = self.sock.recv_one(mid)
@@ -897,8 +902,9 @@ class LDAP(Extensible):
         """
         if self.sock.unbound:
             raise ConnectionUnbound()
-        controls = self._process_ctrl_kwds('delete', ctrl_kwds, final=True)
-        mid = self.sock.send_message('delRequest', rfc4511.DelRequest(dn), controls)
+        req_ctrls = self._process_ctrl_kwds('delete', ctrl_kwds, final=True)
+        lm = pack('delRequest', rfc4511.DelRequest(dn), req_ctrls)
+        mid = self.sock.send_message(lm)
         logger.info('Sent delete request (ID {0}) for DN {1}'.format(mid, dn))
         return self._success_result(mid, 'delResponse')
 
@@ -927,8 +933,9 @@ class LDAP(Extensible):
         mdr.setComponentByName('deleteoldrdn', clean_attr)
         if new_parent is not None:
             mdr.setComponentByName('newSuperior', rfc4511.NewSuperior(new_parent))
-        controls = self._process_ctrl_kwds('mod_dn', ctrl_kwds, final=True)
-        mid = self.sock.send_message('modDNRequest', mdr, controls)
+        req_ctrls = self._process_ctrl_kwds('mod_dn', ctrl_kwds, final=True)
+        lm = pack('modDNRequest', mdr, req_ctrls)
+        mid = self.sock.send_message(lm)
         logger.info('Sent modDN request (ID {0}) for DN {1} newRDN="{2}" newParent="{3}"'.format(
                     mid, dn, new_rdn, new_parent))
         return self._success_result(mid, 'modDNResponse')
@@ -1019,8 +1026,9 @@ class LDAP(Extensible):
                 i += 1
             if i > 0:
                 mr.setComponentByName('changes', cl)
-                controls = self._process_ctrl_kwds('modify', ctrl_kwds, final=True)
-                mid = self.sock.send_message('modifyRequest', mr, controls)
+                req_ctrls = self._process_ctrl_kwds('modify', ctrl_kwds, final=True)
+                lm = pack('modifyRequest', mr, req_ctrls)
+                mid = self.sock.send_message(lm)
                 logger.info('Sent modify request (ID {0}) for DN {1}'.format(mid, dn))
                 return self._success_result(mid, 'modifyResponse')
             else:
@@ -1133,7 +1141,8 @@ class LDAP(Extensible):
                 raise TypeError('extendedRequest value must be string or bytes')
             xr.setComponentByName('requestValue', rfc4511.RequestValue(value))
         req_ctrls = self._process_ctrl_kwds('ext', kwds)
-        mid = self.sock.send_message('extendedReq', xr, req_ctrls)
+        lm = pack('extendedReq', xr, req_ctrls)
+        mid = self.sock.send_message(lm)
         logger.info('Sent extended request ID={0} OID={1}'.format(mid, oid))
         return ExtendedResponseHandle(mid=mid, ldap_conn=self, **kwds)
 
@@ -1498,7 +1507,8 @@ class ResponseHandle(LDAPResponse):
         """Request to abandon an operation in progress"""
         if not self.abandoned:
             logger.info('Abandoning ID={0}'.format(self.message_id))
-            self.ldap_conn.sock.send_message('abandonRequest', rfc4511.AbandonRequest(self.message_id))
+            lm = pack('abandonRequest', rfc4511.AbandonRequest(self.message_id))
+            self.ldap_conn.sock.send_message(lm)
             self.abandoned = True
             self.ldap_conn.sock.abandonedMIDs.append(self.message_id)
         else:
