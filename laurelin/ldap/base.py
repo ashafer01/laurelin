@@ -162,6 +162,7 @@ class LDAP(Extensible):
     DEFAULT_WARN_EMPTY_LIST = False
     DEFAULT_ERROR_EMPTY_LIST = False
     DEFAULT_IGNORE_EMPTY_LIST = False
+    DEFAULT_REFERRAL_REBIND = True
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -226,7 +227,7 @@ class LDAP(Extensible):
                  deref_aliases=None, strict_modify=None, ssl_verify=None, ssl_ca_file=None, ssl_ca_path=None,
                  ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
                  default_criticality=None, follow_referrals=None, validators=None, warn_empty_list=None,
-                 error_empty_list=None, ignore_empty_list=None):
+                 error_empty_list=None, ignore_empty_list=None, referral_rebind=None):
 
         # setup
         if server is None:
@@ -269,6 +270,8 @@ class LDAP(Extensible):
             error_empty_list = LDAP.DEFAULT_ERROR_EMPTY_LIST
         if ignore_empty_list is None:
             ignore_empty_list = LDAP.DEFAULT_IGNORE_EMPTY_LIST
+        if referral_rebind is None:
+            referral_rebind = LDAP.DEFAULT_REFERRAL_REBIND
 
         self.default_search_timeout = search_timeout
         self.default_deref_aliases = deref_aliases
@@ -282,6 +285,7 @@ class LDAP(Extensible):
         self.warn_empty_list = warn_empty_list
         self.error_empty_list = error_empty_list
         self.ignore_empty_list = ignore_empty_list
+        self.referral_rebind = referral_rebind
 
         self._tagged_objects = {}
         self._sasl_mechs = None
@@ -719,13 +723,18 @@ class LDAP(Extensible):
                     mid, base_dn, scope, filter))
         return SearchResultHandle(self, mid, fetch_result_refs, follow_referrals, kwds)
 
-    def compare(self, dn, attr, value, **ctrl_kwds):
+    def compare(self, dn, attr, value, follow_referrals=None, **ctrl_kwds):
         """Ask the server if a particular DN has a matching attribute value. The comparison will take place following
         the schema-defined matching rules and syntax rules.
 
         :param str dn: The DN of the object
         :param str attr: The attribute name
         :param str value: The assertion value
+        :param bool follow_referrals: When the server knows that the dn is present on another server, follow
+                                      the referral and perform the compare on the other server. The default can be set
+                                      per connection by passing the `follow_referrals` keyword to the :class:`LDAP`
+                                      constructor, or set the global default by defining
+                                      :attr:`LDAP.DEFAULT_FOLLOW_REFERRALS`.
         :return: A response object, :func:`bool` evaluating to the result of the comparison
         :rtype: CompareResponse
         :raises ConnectionUnbound: if the connection has been unbound
@@ -736,6 +745,9 @@ class LDAP(Extensible):
         if self.sock.unbound:
             raise ConnectionUnbound()
 
+        if follow_referrals is None:
+            follow_referrals = self.default_follow_referrals
+
         cr = rfc4511.CompareRequest()
         cr.setComponentByName('entry', rfc4511.LDAPDN(six.text_type(dn)))
         ava = rfc4511.AttributeValueAssertion()
@@ -743,32 +755,49 @@ class LDAP(Extensible):
         ava.setComponentByName('assertionValue', rfc4511.AssertionValue(six.text_type(value)))
         cr.setComponentByName('ava', ava)
 
+        if follow_referrals:
+            orig_ctrl_kwds = ctrl_kwds.copy()
         req_ctrls = self._process_ctrl_kwds('compare', ctrl_kwds, final=True)
         lm = pack('compareRequest', cr, req_ctrls)
 
         message_id = self.sock.send_message(lm)
         logger.info('Sent compare request (ID {0}): {1} ({2} = {3})'.format(message_id, dn, attr, value))
         msg = self.sock.recv_one(message_id)
-        mid, res, res_ctrls = unpack('compareResponse', msg)
-        res = res.getComponentByName('resultCode')
+        mid, res_obj, res_ctrls = unpack('compareResponse', msg)
+        res = res_obj.getComponentByName('resultCode')
         if res == RESULT_compareTrue:
             logger.debug('Compared True (ID {0})'.format(mid))
             compare_result = True
         elif res == RESULT_compareFalse:
             logger.debug('Compared False (ID {0})'.format(mid))
             compare_result = False
+        elif follow_referrals and res == RESULT_referral:
+            logger.info('Following referral for compare (ID {0})'.format(message_id))
+            ref = res_obj.getComponentByName('referral')
+            uris = seq_to_list(ref)
+            rh = SearchReferenceHandle(uris)
+            uri, ldap_conn = rh.connect()
+            if uri.dn:
+                dn = uri.dn
+            with ldap_conn as ldap_conn:
+                return ldap_conn.compare(dn, attr, value, follow_referrals, **orig_ctrl_kwds)
         else:
             raise LDAPError('Got compare result {0} (ID {1})'.format(repr(res), mid))
         ret = CompareResponse(compare_result)
         controls.handle_response(ret, res_ctrls)
         return ret
 
-    def add(self, dn, attrs_dict, **kwds):
+    def add(self, dn, attrs_dict, follow_referrals=None, **kwds):
         """Add new object and return corresponding LDAPObject on success.
 
         :param str dn: The new object's DN
         :param attrs_dict: The new attributes for the object
         :type attrs_dict: dict(str, list[str or bytes]) or AttrsDict
+        :param bool follow_referrals: When the server knows that the dn or its parent is present on another server,
+                                      follow the referral and perform the add on the other server. The default can be
+                                      set per connection by passing the `follow_referrals` keyword to the :class:`LDAP`
+                                      constructor, or set the global default by defining
+                                      :attr:`LDAP.DEFAULT_FOLLOW_REFERRALS`.
         :return: The new object
         :rtype: LDAPObject
         :raises ConnectionUnbound: if the connection has been unbound
@@ -786,6 +815,11 @@ class LDAP(Extensible):
         if not isinstance(attrs_dict, dict):
             raise TypeError('attrs_dict must be dict')
 
+        if follow_referrals is None:
+            follow_referrals = self.default_follow_referrals
+
+        if follow_referrals:
+            orig_kwds = kwds.copy()
         req_ctrls = self._process_ctrl_kwds('add', kwds)
         obj = self.obj(dn, attrs_dict, **kwds)
 
@@ -813,12 +847,22 @@ class LDAP(Extensible):
         logger.info('Sent add request (ID {0}) for DN {1}'.format(mid, dn))
 
         lm = self.sock.recv_one(mid)
-        mid, res, res_ctrls = unpack('addResponse', lm)
-        res = res.getComponentByName('resultCode')
+        mid, res_obj, res_ctrls = unpack('addResponse', lm)
+        res = res_obj.getComponentByName('resultCode')
         if res == RESULT_success:
             logger.debug('LDAP operation (ID {0}) was successful'.format(mid))
             controls.handle_response(obj, res_ctrls)
             return obj
+        elif follow_referrals and res == RESULT_referral:
+            logger.info('Following referral for add (ID {0})'.format(mid))
+            ref = res_obj.getComponentByName('referral')
+            uris = seq_to_list(ref)
+            rh = SearchReferenceHandle(uris)
+            uri, ldap_conn = rh.connect()
+            with ldap_conn as ldap_conn:
+                if uri.dn:
+                    dn = uri.dn
+                return ldap_conn.add(dn, attrs_dict, follow_referrals, **orig_kwds)
         else:
             raise LDAPError('Got {0} for add (ID {1})'.format(repr(res), mid))
 
@@ -1677,6 +1721,17 @@ class LDAPURI(object):
         else:
             self.starttls = LDAPURI.DEFAULT_STARTTLS
 
+    def connect(self):
+        """Open a connection to the server described by the parsed URI
+
+        :return: The LDAP connection
+        :rtype: LDAP
+        """
+        ldap = LDAP(self.host_uri, reuse_connection=False)
+        if self.starttls:
+            ldap.start_tls()
+        return ldap
+
     def search(self, **kwds):
         """Perform the search operation described by the parsed URI
 
@@ -1685,9 +1740,7 @@ class LDAPURI(object):
 
          Additional keyword arguments are passed through into :meth:`LDAP.search`.
         """
-        ldap = LDAP(self.host_uri, reuse_connection=False)
-        if self.starttls:
-            ldap.start_tls()
+        ldap = self.connect()
         ret = ldap.search(self.dn, self.scope, filter=self.filter, attrs=self.attrs, **kwds)
         ldap.unbind()
         return ret
@@ -1718,3 +1771,53 @@ class SearchReferenceHandle(object):
             except LDAPConnectionError as e:
                 warn('Error connecting to URI {0} ({1})'.format(uri, six.text_type(e)), LDAPWarning)
         raise LDAPError('Could not complete reference URI search with any supplied URIs')
+
+
+class Referral(object):
+    def __init__(self, res_obj, meth_name, args, kwds, update_dn=None):
+        # build URI list
+        ref = res_obj.getComponentByName('referral')
+        uris = seq_to_list(ref)
+        self.uris = []
+        for uri in uris:
+            self.uris.append(LDAPURI(uri))
+
+        # flatten arguments for use in sets
+        rargs = []
+        for arg in args:
+            rargs.append(repr(arg))
+        rkwds = {}
+        for kwd, val in six.iteritems(kwds):
+            rkwds[kwd] = repr(val)
+        self.signature = (meth_name, rargs, rkwds)
+
+        self.meth_name = meth_name
+        self.args = args
+        self.kwds = kwds
+        self.update_dn = update_dn
+
+        self.visited_uri_params = {}
+
+    def create_chained_referral(self, res_obj, meth_name, args, kwds, update_dn=None):
+        ref = Referral(res_obj, meth_name, args, kwds, update_dn)
+        ref.visited_uri_params = self.visited_uri_params
+        return ref
+
+    def connect(self):
+        """Connect to the first available server"""
+        for uri in self.uris:
+            try:
+                if
+                return uri, uri.connect()
+            except LDAPConnectionError as e:
+                warn('Error connecting to URI {0} ({1})'.format(uri, six.text_type(e)), LDAPWarning)
+        raise LDAPError('Could not connect with any supplied URIs')
+
+    def execute(self):
+        uri, ldap_conn = self.rh.connect()
+        if uri.dn and self.update_dn:
+            dn = uri.dn
+            self.update_dn(dn, self.args, self.kwds)
+        with ldap_conn as ldap_conn:
+            ret = getattr(ldap_conn, self.meth_name)(*self.args, **self.kwds)
+            self.visited_uri_params[self.]
