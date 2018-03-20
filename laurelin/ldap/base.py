@@ -1807,7 +1807,6 @@ class Referral(object):
         """Connect to the first available server"""
         for uri in self.uris:
             try:
-                if
                 return uri, uri.connect()
             except LDAPConnectionError as e:
                 warn('Error connecting to URI {0} ({1})'.format(uri, six.text_type(e)), LDAPWarning)
@@ -1820,4 +1819,4 @@ class Referral(object):
             self.update_dn(dn, self.args, self.kwds)
         with ldap_conn as ldap_conn:
             ret = getattr(ldap_conn, self.meth_name)(*self.args, **self.kwds)
-            self.visited_uri_params[self.]
+            #self.visited_uri_params[self.]
