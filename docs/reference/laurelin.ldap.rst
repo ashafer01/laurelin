@@ -36,6 +36,14 @@ laurelin\.ldap\.base module
     :undoc-members:
     :show-inheritance:
 
+laurelin\.ldap\.config module
+-----------------------------
+
+.. automodule:: laurelin.ldap.config
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 laurelin\.ldap\.constants module
 --------------------------------
 
