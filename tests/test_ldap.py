@@ -473,9 +473,14 @@ class TestLDAP(unittest.TestCase):
 
     def test_activate_extension(self):
         """Ensure extension activation/loading works"""
-        netgroups = LDAP.activate_extension('laurelin.extensions.netgroups')
+        ext = 'laurelin.extensions.netgroups'
+        netgroups = LDAP.activate_extension(ext)
         self.assertIsInstance(netgroups, ModuleType)
         self.assertTrue(hasattr(LDAP, 'get_netgroup'))
+        self.assertTrue(hasattr(netgroups, 'LAURELIN_ACTIVATED'))
+
+        # ensure activating again does not cause an error
+        LDAP.activate_extension(ext)
 
         with self.assertRaises(ImportError):
             LDAP.activate_extension('i.am.not.a.module')

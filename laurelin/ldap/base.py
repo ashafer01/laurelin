@@ -208,8 +208,12 @@ class LDAP(Extensible):
         :rtype: module
         """
         mod = import_module(module_name)
+        if hasattr(mod, 'LAURELIN_ACTIVATED'):
+            logger.debug("Extension {0} already activated".format(module_name))
+            return mod
         if hasattr(mod, 'activate_extension'):
             mod.activate_extension()
+        mod.LAURELIN_ACTIVATED = True
         logger.info("Activated extension {0} (File: {1})".format(module_name, mod.__file__))
         return mod
 
