@@ -46,7 +46,4 @@ setup(
     namespace_packages=['laurelin', 'laurelin.extensions'],
     packages=find_packages(),
     install_requires=install_requires,
-    extras_require={
-        'YAML': ['pyyaml'],
-    },
 )

@@ -1,13 +1,11 @@
+"""Provides support for establishing an LDAP connection and environment via config files and dicts"""
+
+
 from .base import LDAP
 from .constants import Scope
 import json
 import six
-
-try:
-    import yaml
-    have_yaml = True
-except ImportError:
-    have_yaml = False
+import yaml
 
 
 def set_global_config(global_config_dict):
@@ -158,9 +156,9 @@ def load_file(path, file_decoder=None):
           - rdn: ou=netgroups
             tag: netgroup_base
 
-    Note: The `pyyaml` package is listed as an "extra" requirement of laurelin, meaning it wont be installed by default.
-    If you intend to use this feature you can specify your laurelin requirement as ``laurelin-ldap[YAML]`` to include
-    it, or just manually include ``pyyaml`` in your requirements list.
+    Q: Should I use global or connection to configure connection parameters? A: Use connection if you want the new
+    connection to be established and returned when the config is loaded. On the other hand, a properly configured global
+    section means you can call the :class:`.LDAP` contructor with no parameters.
 
     :param path: A path to a config file. Provides support for YAML and JSON format, or you can specify your own decoder
                  that returns a dict.
@@ -172,10 +170,7 @@ def load_file(path, file_decoder=None):
     """
     if file_decoder is None:
         if path.endswith('.yml') or path.endswith('.yaml'):
-            if have_yaml:
-                file_decoder = yaml.load
-            else:
-                raise RuntimeError('Run `pip install pyyaml` to load YAML files')
+            file_decoder = yaml.load
         elif path.endswith('.json'):
             file_decoder = json.load
         else:
