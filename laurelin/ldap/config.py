@@ -51,7 +51,8 @@ def create_connection(config_dict):
     """Create a new connection from a config dict formatted as follows::
 
         {'connection': {
-         <constructor param>: <constructor value>,
+            'start_tls': <bool>,  # optional, default False
+            <constructor param>: <constructor value>,
          },
          'objects': [  # optional
             {'dn': <object dn>,  # OR...
