@@ -140,7 +140,7 @@ def load_file(path, file_decoder=None):
           - laurelin.extensions.netgroups
         global:
           CA_PATH: /etc/ldap/cacerts
-          IGNORE_EMPTY_LISTS: true
+          IGNORE_EMPTY_LIST: true
         connection:
           server: ldap://dir01.example.org
           start_tls: true
@@ -165,8 +165,7 @@ def load_file(path, file_decoder=None):
     :param file_decoder: A callable returning a dict when passed a file-like object
     :return: The LDAP connection if one was defined, None otherwise
     :rtype: LDAP or None
-    :raises RuntimeError: if a yaml file is supplied and pyyaml is not installed, or if an unsupported file extension
-                          was given without the ``file_decoder`` argument.
+    :raises RuntimeError: if an unsupported file extension was given without the ``file_decoder`` argument.
     """
     if file_decoder is None:
         if path.endswith('.yml') or path.endswith('.yaml'):
@@ -174,7 +173,7 @@ def load_file(path, file_decoder=None):
         elif path.endswith('.json'):
             file_decoder = json.load
         else:
-            raise RuntimeError('Unsupported file type, must be YAML or JSON. Specify file_decoder argument.')
+            raise RuntimeError('Unsupported file type, must be YAML or JSON, or specify file_decoder argument')
     with open(path) as f:
         config_dict = file_decoder(f)
     if 'global' in config_dict:
