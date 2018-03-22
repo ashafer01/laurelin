@@ -9,7 +9,7 @@ from warnings import warn
 
 
 class MockLDAPSocket(LDAPSocket):
-    def __init__(self):
+    def __init__(self, *args, **kwds):
         self._prop_init()
         self._outgoing_queue = deque()
         self._sock = None
@@ -122,3 +122,9 @@ class MockLDAPSocket(LDAPSocket):
 
     def start_tls(self, verify=True, ca_file=None, ca_path=None, ca_data=None):
         warn('start_tls not possible with mock socket')
+
+
+class MockSockRootDSE(MockLDAPSocket):
+    def __init__(self, *args, **kwds):
+        MockLDAPSocket.__init__(self, *args, **kwds)
+        self.add_root_dse()
