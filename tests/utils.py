@@ -50,3 +50,17 @@ def load_schema():
     reload(schema)
     return import_module(schema_mod)
 
+
+def import_install_mock():
+    try:
+        import unittest.mock as mock
+        return mock
+    except ImportError:
+        try:
+            import mock
+            return mock
+        except ImportError:
+            import pip
+            pip.main(['install', 'mock'])
+            import mock
+            return mock

@@ -8,6 +8,19 @@ import six
 import yaml
 
 
+def normalize_global_config_param(key):
+    """Normalize a global config key. Does not check validity of the key.
+
+    :param str key: User-supplied global config key
+    :return: The normalized key formatted as an attribute of :class:`.LDAP`
+    :rtype: str
+    """
+    key = key.upper()
+    if not key.startswith('DEFAULT_'):
+        key = 'DEFAULT_'+key
+    return key
+
+
 def set_global_config(global_config_dict):
     """Set the global defaults. The dict must be formatted as follows::
 
@@ -26,9 +39,7 @@ def set_global_config(global_config_dict):
     bad = []
     for key, val in six.iteritems(global_config_dict['global']):
         orig_key = key
-        key = key.upper()
-        if not key.startswith('DEFAULT_'):
-            key = 'DEFAULT_'+key
+        key = normalize_global_config_param(key)
         if hasattr(LDAP, key):
             setattr(LDAP, key, val)
         else:
@@ -53,6 +64,8 @@ def activate_extensions(config_dict):
 
 
 def _create_single_object(ldap, obj_config_dict):
+    if 'rdn' in obj_config_dict and 'dn' in obj_config_dict:
+        raise TypeError('Choose only one of "rdn" or "dn"')
     if 'rdn' in obj_config_dict:
         objmeth = ldap.base.obj
     elif 'dn' in obj_config_dict:
@@ -139,7 +152,7 @@ def load_file(path, file_decoder=None):
           - laurelin.extensions.descattrs
           - laurelin.extensions.netgroups
         global:
-          CA_PATH: /etc/ldap/cacerts
+          SSL_CA_PATH: /etc/ldap/cacerts
           IGNORE_EMPTY_LIST: true
         connection:
           server: ldap://dir01.example.org
