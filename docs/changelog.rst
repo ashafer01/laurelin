@@ -1,6 +1,15 @@
 Changelog
 =========
 
+1.3.0
+-----
+
+Released 2018.03.22
+
+* Added config file support, see :mod:`.laurelin.ldap.config`
+* Fixed: ensured extensions can be safely activated multiple times
+* Fixed: :class:`.Mod` constants ``repr`` updated for consistency
+
 1.2.0
 -----
 

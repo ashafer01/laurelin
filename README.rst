@@ -30,6 +30,7 @@ Features Overview
 * Intelligent modification will never send existing attribute values to the server, nor will it request deletion of
   attribute values that do not exist. This prevents many unnecessary server errors. Laurelin will go as far as to query
   the object for you before modifying it to ensure you don't see pointless errors (if you want it to).
+* Full support for configuring laurelin and connecting to a server from a config file
 * Custom validation. You can define validators which check new objects and modify operations for correctness before
   sending them to the server. Since you control this code, this can be anything from a simple regex check against a
   particular attribute value, to a complex approval queue mechanism.

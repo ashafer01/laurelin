@@ -169,10 +169,6 @@ def load_file(path, file_decoder=None):
           - rdn: ou=netgroups
             tag: netgroup_base
 
-    Q: Should I use global or connection to configure connection parameters? A: Use connection if you want the new
-    connection to be established and returned when the config is loaded. On the other hand, a properly configured global
-    section means you can call the :class:`.LDAP` contructor with no parameters.
-
     :param path: A path to a config file. Provides support for YAML and JSON format, or you can specify your own decoder
                  that returns a dict.
     :param file_decoder: A callable returning a dict when passed a file-like object
@@ -189,6 +185,16 @@ def load_file(path, file_decoder=None):
             raise RuntimeError('Unsupported file type, must be YAML or JSON, or specify file_decoder argument')
     with open(path) as f:
         config_dict = file_decoder(f)
+    return load_config_dict(config_dict)
+
+
+def load_config_dict(config_dict):
+    """Load config parameters from a dictionary. Must be formatted in the same was as ``load_file``
+
+    :param dict config_dict: The config dictionary. See format in ``load_file``.
+    :return: The LDAP connection if one was defined, None otherwise
+    :rtype: LDAP or None
+    """
     if 'global' in config_dict:
         set_global_config(config_dict)
     if 'extensions' in config_dict:
