@@ -1,22 +1,44 @@
 #!/usr/bin/env python
-from laurelin.ldap import LDAP, LDAPObject
+from laurelin.ldap import LDAP, LDAPObject, config
 from laurelin.ldap.schema import SchemaValidator
 
 test_servers = [
-    {'name': 'OpenLDAP',
-     'uri': 'ldap://localhost:10389',
-     'bind_dn': 'cn=admin,dc=example,dc=org',
-     'pw': 'admin'},
-    {'name': 'OpenLDAP ldaps',
-     'uri': 'ldaps://localhost:10636',
-     'start_tls': False,
-     'bind_dn': 'cn=admin,dc=example,dc=org',
-     'pw': 'admin'},
-    {'name': '389 Directory Server',
-     'uri': 'ldap://localhost:11389',
-     'start_tls': False,
-     'bind_dn': 'cn=Directory Manager',
-     'pw': 'password'},
+    {
+        'name': 'OpenLDAP',
+        'connection': {
+            'server': 'ldap://localhost:10389',
+            'start_tls': True,
+            'ssl_verify': False,
+            'simple_bind': {
+                'username': 'cn=admin,dc=example,dc=org',
+                'password': 'admin'
+            },
+            'validators': [SchemaValidator()]
+        }
+    }, {
+        'name': 'OpenLDAP ldaps',
+        'connection': {
+            'server': 'ldaps://localhost:10636',
+            'ssl_verify': False,
+            'start_tls': False,
+            'simple_bind': {
+                'username': 'cn=admin,dc=example,dc=org',
+                'password': 'admin'
+            },
+            'validators': [SchemaValidator()]
+        }
+    }, {
+        'name': '389 Directory Server',
+        'connection': {
+            'server': 'ldap://localhost:11389',
+            'start_tls': False,
+            'simple_bind': {
+                'username': 'cn=Directory Manager',
+                'password': 'password'
+            },
+            'validators': [SchemaValidator()]
+        }
+    }
 ]
 
 LDAP.enable_logging()
@@ -24,10 +46,7 @@ LDAP.activate_extension('laurelin.extensions.descattrs')
 for info in test_servers:
     print('Testing {0}'.format(info['name']))
     try:
-        with LDAP(info['uri'], validators=[SchemaValidator()], ssl_verify=False) as ldap:
-            if info.get('start_tls', True):
-                ldap.start_tls()
-            ldap.simple_bind(username=info['bind_dn'], password=info['pw'])
+        with config.create_connection(info) as ldap:
 
             print(ldap.root_dse.format_ldif())
 
