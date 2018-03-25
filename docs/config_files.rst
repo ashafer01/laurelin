@@ -80,6 +80,9 @@ the first object in the config file example above::
     ldap = config.load_file('/path/to/file.yaml')
     posix_users = ldap.tag('posix_user_base')
 
+Its important to note that the server is not queried when creating these objects, so they will not have any local
+attributes. If you require local attributes, you can all :meth:`.LDAPObject.refresh` on the object.
+
 Global vs. Connection
 ---------------------
 
