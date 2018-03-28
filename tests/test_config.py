@@ -10,6 +10,9 @@ mock = utils.import_install_mock()
 
 
 class TestConfig(unittest.TestCase):
+    def setUp(self):
+        self.schema = utils.load_schema()
+
     def test_normalize_global_config_param(self):
         """Ensure normalize_global_config_param functions correctly"""
         tests = [
@@ -107,3 +110,17 @@ class TestConfig(unittest.TestCase):
             'relative_search_scope': 'one',
         }]})
         self.assertIsInstance(ldap.tag(tag), LDAPObject)
+
+        conn['validators'] = ['laurelin.ldap.schema.SchemaValidator']
+        ldap = config.create_connection({'connection': conn})
+        self.assertIsInstance(ldap.validators[0], self.schema.SchemaValidator)
+
+        validator = self.schema.SchemaValidator()
+        conn['validators'] = [validator]
+        ldap = config.create_connection({'connection': conn})
+        self.assertIs(ldap.validators[0], validator)
+
+        conn['validators'] = [('foo',)]
+        with self.assertRaises(TypeError):
+            config.create_connection({'connection': conn})
+        del conn['validators']

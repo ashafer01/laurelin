@@ -3,9 +3,11 @@
 
 from .base import LDAP
 from .constants import Scope
+from .validation import Validator
 import json
 import six
 import yaml
+from importlib import import_module
 
 
 def normalize_global_config_param(key):
@@ -108,6 +110,9 @@ def create_connection(config_dict):
 
     ``<constructor param>`` must be one of the :class:`.LDAP` constructor keyword arguments.
 
+    For ``validators`` you can optionally give the full path to the validator to use as a string, e.g.
+    ``['laurelin.ldap.schema.SchemaValidator']``
+
     For objects (optional):
 
     * If the ``dn`` parameter is specified, it is taken as an absolute DN.
@@ -132,6 +137,21 @@ def create_connection(config_dict):
     sasl_bind = conn_config_dict.pop('sasl_bind', False)
     if simple_bind and sasl_bind:
         raise TypeError('choose only one of simple_bind or sasl_bind')
+    validators = 'validators'
+    if validators in conn_config_dict:
+        instances = []
+        for v in conn_config_dict[validators]:
+            if isinstance(v, six.string_types):
+                modname, objname = v.rsplit('.', 1)
+                mod = import_module(modname)
+                vcls = getattr(mod, objname)
+                vobj = vcls()
+                instances.append(vobj)
+            elif isinstance(v, Validator):
+                instances.append(v)
+            else:
+                raise TypeError('"validators" list must be str or laurelin.ldap.validation.Validator')
+        conn_config_dict[validators] = instances
     ldap = LDAP(**conn_config_dict)
     if start_tls:
         ldap.start_tls()
