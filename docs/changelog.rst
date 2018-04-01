@@ -1,6 +1,15 @@
 Changelog
 =========
 
+1.3.1
+-----
+
+Released 2018.04.01
+
+* Fixed logic bug in :class:`.SchemaValidator` when an object has two or more object classes that require one or more
+  of the same attributes
+* Fixed: allowed string ``some.module.Class`` specification for validators in config files
+
 1.3.0
 -----
 
