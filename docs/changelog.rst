@@ -1,6 +1,13 @@
 Changelog
 =========
 
+Next
+----
+
+Not yet released
+
+* Added :meth:`.LDAP.disable_validation` which creates a context with any or all validators skipped
+
 1.3.1
 -----
 

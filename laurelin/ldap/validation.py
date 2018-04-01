@@ -45,3 +45,34 @@ class Validator(object):
         :raises LDAPValidationError: if the attribute is invalid in any way
         """
         raise NotImplementedError()
+
+
+class DisabledValidationContext(object):
+    """This should be created by calling :meth:`.LDAP.disable_validation` and never directly instantiated."""
+
+    def __init__(self, ldap, disabled_validators=None):
+        self.ldap = ldap
+        self.orig_validators = []
+        self.disabled_validators = set()
+        if disabled_validators:
+            for val_spec in disabled_validators:
+                if isinstance(val_spec, six.string_types):
+                    self.disabled_validators.add(val_spec)
+                elif issubclass(val_spec, Validator):
+                    self.disabled_validators.add(val_spec.__name__)
+                else:
+                    raise TypeError('Invalid disabled validator spec, must be string class name or Validator subclass')
+
+    def __enter__(self):
+        new_validators = []
+        for v in self.ldap.validators:
+            self.orig_validators.append(v)
+            if not self.disabled_validators:
+                continue
+            if v.__class__.__name__ in self.disabled_validators:
+                continue
+            new_validators.append(v)
+        self.ldap.validators = new_validators
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.ldap.validators = self.orig_validators

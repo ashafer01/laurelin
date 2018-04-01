@@ -28,7 +28,7 @@ from .protoutils import (
     seq_to_list,
     get_string_component,
 )
-from .validation import Validator
+from .validation import Validator, DisabledValidationContext
 
 import logging
 import re
@@ -1460,6 +1460,39 @@ class LDAP(Extensible):
                 raise ValueError('changetype {0} unknown'.format(changetype))
 
         return ldap_responses
+
+    def disable_validation(self, disabled_validators=None):
+        """Returns a context manager which temporarily disables validation. If any server errors are generated, they
+        will still be propagated.
+
+        Example::
+
+            from laurelin.ldap import LDAP
+            from laurelin.ldap.exceptions import LDAPValidationError
+            from laurelin.ldap.schema import SchemaValidator
+
+            with LDAP(validators=[SchemaValidator()]) as ldap:
+                # make validated queries
+                ldap.base.add_child('cn=foo', {<valid object>})
+
+                try:
+                    ldap.base.add_child('cn=bar', {<invalid object>})
+                except LDAPValidationError:
+                    pass
+
+                with ldap.disable_validation(['SchemaValidator']):
+                    # make queries without validation
+                    ldap.base.add_child('cn=bar', {<invalid object>})
+                    # NOTE: if the object is actually invalid, a server error may still occur
+
+                # carry on with validation restored...
+
+        :param disabled_validators: Optional, a list of string class names or Validator classes to disable. By default
+                                    all validators will be disabled.
+        :return: A context manager which temporarily disables validation
+        :rtype: DisabledValidationContext
+        """
+        return DisabledValidationContext(self, disabled_validators)
 
 
 class LDAPResponse(object):

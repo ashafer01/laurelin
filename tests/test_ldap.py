@@ -650,6 +650,44 @@ class TestLDAP(unittest.TestCase):
         ldap.modify('o=foo', [Mod(Mod.REPLACE, 'foo', [])])
         self.assertEqual(mock_sock.num_sent(), 0)
 
+    def test_disable_validation(self):
+        """Exercise disable_validation()"""
+        class MockValidator(Validator):
+            def validate_object(self, obj, write=True):
+                raise exceptions.LDAPValidationError()
+
+            def validate_modify(self, dn, modlist, current):
+                raise exceptions.LDAPValidationError()
+
+            def _validate_attribute(self, attr_name, values, write):
+                raise exceptions.LDAPValidationError()
+
+        mock_sock = MockLDAPSocket()
+        mock_sock.add_root_dse()
+        ldap = LDAP(mock_sock, validators=[MockValidator()], strict_modify=True)
+
+        # ensure validation gets run
+        with self.assertRaises(exceptions.LDAPValidationError):
+            ldap.base.add_child('cn=foo', {})
+
+        # ensure validation does not get run
+        mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
+        with ldap.disable_validation():
+            ldap.base.add_attrs({'foo': 'bar'})
+
+        # ensure validation has been restored
+        with self.assertRaises(exceptions.LDAPValidationError):
+            ldap.base.add_child('cn=foo', {})
+
+        # test disabling specific validator by class
+        mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
+        with ldap.disable_validation([MockValidator]):
+            ldap.base.add_attrs({'foo': 'bar'})
+
+        # test disabling specific validator by class name
+        mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
+        with ldap.disable_validation(['MockValidator']):
+            ldap.base.add_attrs({'foo': 'bar'})
 
 
 if __name__ == '__main__':
