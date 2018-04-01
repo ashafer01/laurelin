@@ -36,20 +36,27 @@ class SchemaValidator(Validator):
             object_classes = obj['objectClass']
         except KeyError:
             raise LDAPValidationError('missing objectClass')
-        attrs = list(obj.keys())
+        required_attrs = set()
+        allowed_attrs = set()
         for oc_name in object_classes:
             oc = get_object_class(oc_name)
-            for reqd_attr in oc.must:
-                if reqd_attr not in attrs:
-                    raise LDAPValidationError('missing attribute {0} required by objectClass {1}'.format(
-                                              reqd_attr, oc_name))
-                else:
-                    attrs.remove(reqd_attr)
-            for attr in attrs:
-                if attr in oc.may:
-                    attrs.remove(attr)
-        if attrs:
-            disallowed_attrs = ','.join(attrs)
+            required_attrs.update(oc.must)
+            allowed_attrs.update(oc.may)
+        disallowed_attrs = []
+        for attr in obj.keys():
+            if attr in required_attrs:
+                required_attrs.remove(attr)
+            elif attr in allowed_attrs:
+                pass
+            else:
+                disallowed_attrs.append(attr)
+        if required_attrs:
+            missing_required = ','.join(required_attrs)
+            oc_names = ','.join(object_classes)
+            raise LDAPValidationError('missing attributes {0} required by objectClasses {1}'.format(
+                                      missing_required, oc_names))
+        if disallowed_attrs:
+            disallowed_attrs = ','.join(disallowed_attrs)
             oc_names = ','.join(object_classes)
             raise LDAPValidationError('attributes {0} are not permitted with objectClasses {1}'.format(
                                       disallowed_attrs, oc_names))
