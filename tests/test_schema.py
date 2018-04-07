@@ -119,6 +119,5 @@ class TestSchemaValidator(unittest.TestCase):
             sv.validate_object(obj_with_oper)
 
 
-
 if __name__ == '__main__':
     unittest.main()

@@ -626,7 +626,7 @@ class TestLDAP(unittest.TestCase):
             ldap.replace_attrs('o=foo', {'foo': []})
 
         with self.assertRaises(exceptions.LDAPError):
-            ldap.delete_attrs('o=foo', {'foo': []}, current={'foo':['bar']})
+            ldap.delete_attrs('o=foo', {'foo': []}, current={'foo': ['bar']})
 
         with self.assertRaises(exceptions.LDAPError):
             ldap.obj('o=foo').modify([Mod(Mod.REPLACE, 'foo', [])])
@@ -635,7 +635,7 @@ class TestLDAP(unittest.TestCase):
             ldap.obj('o=foo').replace_attrs({'foo': []})
 
         with self.assertRaises(exceptions.LDAPError):
-            ldap.obj('o=foo', attrs_dict={'foo':['bar']}).delete_attrs({'foo': []})
+            ldap.obj('o=foo', attrs_dict={'foo': ['bar']}).delete_attrs({'foo': []})
 
     def test_ignore_empty_list(self):
         """Ensure emtpy value lists are ignored"""

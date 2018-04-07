@@ -16,13 +16,14 @@ test_servers = [
             'validators': [SchemaValidator()]
         }
     }, {
-        'name': 'OpenLDAP ldaps',
+        'name': 'OpenLDAP ldaps/sasl',
         'connection': {
             'server': 'ldaps://localhost:10636',
             'ssl_verify': False,
             'start_tls': False,
-            'simple_bind': {
-                'username': 'cn=admin,dc=example,dc=org',
+            'sasl_bind': {
+                'mech': 'DIGEST-MD5',
+                'username': 'admin',
                 'password': 'admin'
             },
             'validators': [SchemaValidator()]

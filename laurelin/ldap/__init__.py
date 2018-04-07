@@ -30,6 +30,7 @@ __all__ = [
     'LDAPURI',
     'Scope',
     'DerefAliases',
+    'DELETE_ALL',
     'critical',
     'optional',
     'LDAPError',
