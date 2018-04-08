@@ -9,6 +9,7 @@ from laurelin.ldap import (
 )
 import laurelin.ldap.base
 import inspect
+import six
 import unittest
 from .mock_ldapsocket import MockLDAPSocket
 from types import ModuleType
@@ -688,6 +689,64 @@ class TestLDAP(unittest.TestCase):
         mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
         with ldap.disable_validation(['MockValidator']):
             ldap.base.add_attrs({'foo': 'bar'})
+
+    def test_sasl_bind(self):
+        """Verify sasl_bind functions correctly"""
+        mech = 'DIGEST-MD5'
+        root_dse = {
+            'supportedSASLMechanisms': [mech],
+            'namingContexts': ['o=testing'],
+        }
+        mock_sock = MockLDAPSocket()
+        mock_sock.add_search_res_entry('', root_dse),
+        mock_sock.add_search_res_done('')
+        ldap = LDAP(mock_sock)
+
+        mock_sock.clear_sent()
+
+        challenge1 = 'foo'
+        challenge2 = 'bar'
+
+        mock_sock.add_sasl_bind_in_progress(challenge1)
+        mock_sock.add_sasl_bind_in_progress(challenge2)
+        mock_sock.add_bind_success()
+        mock_sock.add_search_res_entry('', root_dse),
+        mock_sock.add_search_res_done('')
+
+        ldap.sasl_bind(mech, username='foo', password='foo')
+
+        # initial bind request + 2 challenge responses + root DSE refresh
+        self.assertEqual(mock_sock.num_sent(), 4)
+
+        def get_sasl_cred(br):
+            ac = br.getComponentByName('authentication')
+            sasl = ac.getComponentByName('sasl')
+            return six.text_type(sasl.getComponentByName('credentials'))
+
+        mock_sock.read_sent()  # initial bind request
+        lm = mock_sock.read_sent()  # first challenge response
+        mid, br, ctrls = protoutils.unpack('bindRequest', lm)
+        self.assertEqual(get_sasl_cred(br), challenge1)
+        lm = mock_sock.read_sent()  # second challenge response
+        mid, br, ctrls = protoutils.unpack('bindRequest', lm)
+        self.assertEqual(get_sasl_cred(br), challenge2)
+
+    def test_sasl_bind_fail(self):
+        """Verify sasl_bind fails correctly"""
+        mech = 'DIGEST-MD5'
+        root_dse = {
+            'supportedSASLMechanisms': [mech],
+            'namingContexts': ['o=testing'],
+        }
+        mock_sock = MockLDAPSocket()
+        mock_sock.add_search_res_entry('', root_dse),
+        mock_sock.add_search_res_done('')
+        ldap = LDAP(mock_sock)
+
+        mock_sock.add_ldap_result(rfc4511.BindResponse, 'bindResponse', result_code=protoutils.RESULT_compareFalse)
+        with self.assertRaises(exceptions.LDAPError):
+            ldap.sasl_bind(mech, username='foo', password='foo')
+
 
 
 if __name__ == '__main__':

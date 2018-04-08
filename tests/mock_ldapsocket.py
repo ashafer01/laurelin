@@ -7,6 +7,8 @@ from pyasn1.codec.ber.encoder import encode as ber_encode
 from pyasn1.codec.ber.decoder import decode as ber_decode
 from warnings import warn
 
+from .mock_saslclient import MockSASLClient
+
 
 class MockLDAPSocket(LDAPSocket):
     def __init__(self, *args, **kwds):
@@ -59,6 +61,19 @@ class MockLDAPSocket(LDAPSocket):
                              msg='THIS IS A TEST OBJECT',
                              controls=controls,
                              referral=referral)
+
+    def add_sasl_bind_in_progress(self, challenge):
+        br = rfc4511.BindResponse()
+        br.setComponentByName('resultCode', rfc4511.ResultCode('saslBindInProgress'))
+        br.setComponentByName('serverSaslCreds', rfc4511.ServerSaslCreds(challenge))
+        br.setComponentByName('matchedDN', rfc4511.LDAPDN(''))
+        br.setComponentByName('diagnosticMessage', rfc4511.LDAPString(''))
+        mid = self._next_add_message_id
+        self._next_add_message_id += 1
+        self.add_message(protoutils.pack(mid, 'bindResponse', br))
+
+    def add_bind_success(self):
+        self.add_ldap_result(rfc4511.BindResponse, 'bindResponse')
 
     def add_ldap_result(self, cls, op, result_code=protoutils.RESULT_success, dn='', msg='', controls=None,
                         referral=None):
@@ -119,6 +134,10 @@ class MockLDAPSocket(LDAPSocket):
 
     def close(self):
         pass
+
+    def sasl_init(self, mechs, **props):
+        self._sasl_client = MockSASLClient()
+        self._sasl_client.choose_mechanism(mechs)
 
     def start_tls(self, verify=True, ca_file=None, ca_path=None, ca_data=None):
         warn('start_tls not possible with mock socket')
