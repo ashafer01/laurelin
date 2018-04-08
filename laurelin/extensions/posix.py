@@ -17,12 +17,65 @@ You should begin by tagging base objects for users and groups::
                                relative_search_scope=Scope.ONE,
                                rdn_attr='cn')
 
+Adding Users and Groups
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The :meth:`LDAP.add_user` and :meth:`LDAP.add_group` methods work by taking attribute names as keyword arguments.
+Since many user and group attributes have the single-value constraint, passing a list of values is optional.
+
+The extension will also automatically attempt to fill missing required attributes. This includes ``objectClass`` for
+both users and groups, ``uidNumber`` for users, and ``gidNumber`` for groups.
+
+By default any gaps will be filled in your uid/gid number range. You can turn this feature off, and automatically
+increment the highest number by passing ``fill_gaps=False``. You can also set the module level attribute
+:attr:`.posix.DEFAULT_FILL_GAPS` to change the default setting.
+
+Configuration Reference
+^^^^^^^^^^^^^^^^^^^^^^^
+
+:attr:`.posix.MIN_AUTO_UID_NUMBER`
+    Default ``1000``. The minimum uidNumber that will be automatically filled when missing from a new user creation.
+
+:attr:`.posix.MIN_AUTO_GID_NUMBER`
+    Default ``1000``. The minimum gidNumber that will be automatically filled when missing from a new group creation.
+
+:attr:`.posix.DEFAULT_GIDNUMBER`
+    Default ``1000``. The default gidNumber that will be automatically filled when missing from a new user creation.
+
+:attr:`.posix.USER_RDN_ATTR`
+    Default ``'uid'``. The default RDN attribute to use when creating new users.
+
+:attr:`.posix.GROUP_RDN_ATTR`
+    Default ``'cn'``. The default RDN attribute to use when creating new groups.
+
+:attr:`.posix.HOMEDIR_FORMAT`
+    Default ``'/home/{uid}'``. Gets string formatted with the attribute keywords before getting used as the default
+    ``homeDirectory`` attribute.
+
+:attr:`.posix.DEFAULT_FILL_GAPS`
+    Default ``True``. When generating uidNumber or gidNumber, fill gaps in the range. Set ``False`` to use the highest
+    known id number incremented by default.
+
+:func:`.posix.set_user_placement_func`
+    Pass this a new function that accepts an :class:`LDAP` instance as well as all of the attribute keywords passed to
+    :meth:`LDAP.add_user`. It should return a new parent DN string for the user object. The RDN will be automatically
+    generated seperately.
+
+:func:`.posix.set_group_placement_func`
+    Pass this a new function that accepts an :class:`LDAP` instance as well as all of the attribute keywords passed to
+    :meth:`LDAP.add_group`. It should return a new parent DN string for the group object. The RDN will be
+    automatically generated seperately.
+
+
 """
 from __future__ import absolute_import
 from laurelin.ldap import LDAP, LDAPObject, LDAPError
 from laurelin.ldap.attributetype import AttributeType
 from laurelin.ldap.objectclass import ObjectClass, get_object_class
 from laurelin.ldap.utils import CaseIgnoreDict
+
+# needed?
+import laurelin.ldap.schema
 
 
 USERS_BASE_TAG = 'posix_users_base'
@@ -34,7 +87,7 @@ def tag_flat_placement(tag):
     def flat_placement(ldap, **kwds):
         """Place all objects directly below the user base"""
         return ldap.tag(tag).dn
-    return flat_placement()
+    return flat_placement
 
 
 _user_placement_func = tag_flat_placement(USERS_BASE_TAG)
@@ -168,11 +221,10 @@ AttributeType('''
           SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
 ''')
 
+# utility stuff
+
 USER_OBJECT_CLASS = _posix_account.names[0]
 GROUP_OBJECT_CLASS = _posix_group.names[0]
-
-USER_FILTER = '(objectClass={0})'.format(USER_OBJECT_CLASS)
-GROUP_FILTER = '(objectClass={0})'.format(GROUP_OBJECT_CLASS)
 
 USER_ATTRS = set(_posix_account.must)
 USER_ATTRS.update(_posix_account.may)
@@ -180,12 +232,22 @@ USER_ATTRS.update(_posix_account.may)
 GROUP_ATTRS = set(_posix_group.must)
 GROUP_ATTRS.update(_posix_group.may)
 
-DEFAULT_USER_RDN_ATTR = 'uid'
-DEFAULT_GROUP_RDN_ATTR = 'cn'
-
 USER_AUTO_CLASSES = ['shadowAccount', 'inetOrgPerson', 'organizationalPerson', 'person']
 """These classes will be searched in order to automatically add objectClasses when adding accounts. posixAccount is
 always included."""
+
+# settings
+
+MIN_AUTO_UID_NUMBER = 1000
+MIN_AUTO_GID_NUMBER = 1000
+
+USER_RDN_ATTR = 'uid'
+GROUP_RDN_ATTR = 'cn'
+HOMEDIR_FORMAT = '/home/{uid}'
+DEFAULT_GIDNUMBER = 1000
+DEFAULT_FILL_GAPS = True
+
+# LDAP extension methods
 
 _LDAP_methods = []
 
@@ -228,10 +290,146 @@ _LDAP_methods.append(get_group)
 
 def _place_user(self, **kwds):
     parent_dn = _user_placement_func(self, **kwds)
-    return '{0}={1},{2}'.format(DEFAULT_USER_RDN_ATTR, kwds[DEFAULT_USER_RDN_ATTR], parent_dn)
+    return '{0}={1},{2}'.format(USER_RDN_ATTR, kwds[USER_RDN_ATTR], parent_dn)
 
 
 _LDAP_methods.append(_place_user)
+
+
+def _get_uid_numbers(self):
+    uid_numbers = []
+    with self.tag(USERS_BASE_TAG).search(filter='(uidNumber=*)', attrs=['uidNumber']) as search:
+        for user in search:
+            uid_number = int(user['uidNumber'][0])
+            if uid_number >= MIN_AUTO_UID_NUMBER:
+                uid_numbers.append(uid_number)
+    return uid_numbers
+
+
+_LDAP_methods.append(_get_uid_numbers)
+
+
+def add_user(self, **kwds):
+    """add_user(**kwds)
+
+    Add a new user. Pass attributes as keywords. Single-value attributes DO NOT need to be wrapped in a list.
+
+    The DN will be automatically generated using the user placement function and the passed attribute keywords. The
+    default placement function puts all objects directly below the tagged base user object.
+
+    ``uid`` is required by this function as well as the object class.
+
+    ``objectClass`` will be automatically filled based on attributes used. You can use any posixAccount attributes, as
+    well as those in :attr:`.posix.USER_AUTO_CLASSES`.
+
+    ``uidNumber`` is required by the object class, and searches for all uidNumbers below the tagged user base to find
+    an available id number. Respects the ``fill_gaps`` keyword argument which defaults True, and determines whether or
+    not to fill gaps in the id number range, or to always increment the highest id number.
+
+    ``gidNumber``, or the user's primary group, is required by the spec. If not specified, defaults to
+    :attr:`.posix.DEFAULT_GIDNUMBER`.
+
+    ``cn`` is required by the object class and if not specified, defaults to ``uid``.
+
+    ``homeDirectory`` is required by the object class, and defaults to using :attr:`.posix.HOMEDIR_FORMAT` to generate
+    the directory from the other user attribute keywords.
+
+    :return: The newly created user object
+    :rtype: LDAPObject
+    """
+    kwds = CaseIgnoreDict(kwds)
+    if 'uid' not in kwds:
+        raise TypeError('Missing required keyword uid')
+    if 'uidNumber' not in kwds:
+        fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
+        all_uidnumbers = self._get_uid_numbers()
+        my_uidnumber = _find_available_idnumber(all_uidnumbers, fill_gaps)
+        kwds['uidNumber'] = [my_uidnumber]
+    if 'cn' not in kwds:
+        kwds['cn'] = kwds['uid']
+    if 'homeDirectory' not in kwds:
+        kwds['homeDirectory'] = [HOMEDIR_FORMAT.format(kwds)]
+    if 'gidNumber' not in kwds:
+        kwds['gidNumber'] = [str(DEFAULT_GIDNUMBER)]
+    if 'objectClass' not in kwds:
+        kwds['objectClass'] = _get_user_object_classes(list(kwds.keys()))
+    for attr in kwds:
+        if not isinstance(kwds[attr], list):
+            kwds[attr] = list(kwds[attr])
+    dn = self._place_user(**kwds)
+    return self.add(dn, kwds)
+
+
+_LDAP_methods.append(add_user)
+
+
+def _place_group(self, **kwds):
+    parent_dn = _group_placement_func(self, **kwds)
+    return '{0}={1},{2}'.format(GROUP_RDN_ATTR, kwds[GROUP_RDN_ATTR], parent_dn)
+
+
+_LDAP_methods.append(_place_group)
+
+
+def add_group(self, **kwds):
+    """add_group(**kwds)
+
+    Create a new group. Pass attributes as keywords. Single-value attributes DO NOT need to be wrapped in a list.
+
+    The DN will be automatically generated using the group placement function and the passed attribute keywords. The
+    default placement function puts all objects directly below the tagged base group object.
+
+    ``cn`` is required by this function as well as the object class.
+
+    ``objectClass`` will be automatically set to ``posixGroup`` if not defined.
+
+    ``gidNumber`` is required by the object class, and searches for all gidNumbers below the tagged group base to find
+    an available id number. Respects the ``fill_gaps`` keyword argument which defaults True, and determines whether or
+    not to fill gaps in the id number range, or to always increment the highest id number.
+
+    :return: The new group object
+    :rtype: LDAPObject
+    """
+    kwds = CaseIgnoreDict(kwds)
+    if 'cn' not in kwds:
+        raise TypeError('Missing required keyword cn')
+    if 'gidNumber' not in kwds:
+        fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
+        all_gidnumbers = self._get_gid_numbers()
+        my_gidnumber = _find_available_idnumber(all_gidnumbers, fill_gaps)
+        kwds['gidNumber'] = [my_gidnumber]
+    if 'objectClass' not in kwds:
+        kwds['objectClass'] = [GROUP_OBJECT_CLASS]
+    for attr in kwds:
+        if not isinstance(kwds[attr], list):
+            kwds[attr] = list(kwds[attr])
+    dn = self._place_group(**kwds)
+    return self.add(dn, kwds)
+
+
+_LDAP_methods.append(add_group)
+
+
+# activation function
+
+
+def activate_extension():
+    LDAP.EXTEND(_LDAP_methods)
+
+
+# private functions
+
+
+def _find_available_idnumber(id_numbers, fill_gaps):
+    id_numbers.sort()
+    if fill_gaps:
+        for i in range(len(id_numbers)-1):
+            id_number = id_numbers[i]
+            if id_number+1 < id_numbers[i+1]:
+                return str(id_number+1)
+        return str(id_number+1)
+    else:
+        return str(id_numbers[-1]+1)
 
 
 def _get_user_object_classes(attrs):
@@ -257,46 +455,6 @@ def _get_user_object_classes(attrs):
     if attrs:
         raise LDAPPOSIXError('Could not find objectClass for attributes: ' + ','.join(attrs))
     return list(object_classes)
-
-
-def add_user(self, **kwds):
-    kwds = CaseIgnoreDict(kwds)
-    if 'objectClass' not in kwds:
-        kwds['objectClass'] = _get_user_object_classes(list(kwds.keys()))
-    for attr in kwds:
-        if not isinstance(kwds[attr], list):
-            kwds[attr] = list(kwds[attr])
-    dn = self._place_user(**kwds)
-    return self.add(dn, kwds)
-
-
-_LDAP_methods.append(add_user)
-
-
-def _place_group(self, **kwds):
-    parent_dn = _group_placement_func(self, **kwds)
-    return '{0}={1},{2}'.format(DEFAULT_GROUP_RDN_ATTR, kwds[DEFAULT_GROUP_RDN_ATTR], parent_dn)
-
-
-_LDAP_methods.append(_place_group)
-
-
-def add_group(self, **kwds):
-    kwds = CaseIgnoreDict(kwds)
-    if 'objectClass' not in kwds:
-        kwds['objectClass'] = [GROUP_OBJECT_CLASS]
-    for attr in kwds:
-        if not isinstance(kwds[attr], list):
-            kwds[attr] = list(kwds[attr])
-    dn = self._place_group(**kwds)
-    return self.add(dn, kwds)
-
-
-_LDAP_methods.append(add_group)
-
-
-def activate_extension():
-    LDAP.EXTEND(_LDAP_methods)
 
 
 class LDAPPOSIXError(LDAPError):
