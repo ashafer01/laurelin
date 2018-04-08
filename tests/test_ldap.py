@@ -748,6 +748,5 @@ class TestLDAP(unittest.TestCase):
             ldap.sasl_bind(mech, username='foo', password='foo')
 
 
-
 if __name__ == '__main__':
     unittest.main()
