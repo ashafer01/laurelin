@@ -121,7 +121,7 @@ _posix_account = ObjectClass('''
           MAY ( userPassword $ loginShell $ gecos $ description ) )
 ''')
 
-ObjectClass('''
+_shadow_account = ObjectClass('''
         ( 1.3.6.1.1.1.2.1 NAME 'shadowAccount'
           DESC 'Additional attributes for shadow passwords'
           SUP top AUXILIARY
@@ -236,10 +236,6 @@ USER_ATTRS.update(_posix_account.may)
 
 GROUP_ATTRS = set(_posix_group.must)
 GROUP_ATTRS.update(_posix_group.may)
-
-USER_AUTO_CLASSES = ['shadowAccount', 'inetOrgPerson', 'organizationalPerson', 'person']
-"""These classes will be searched in order to automatically add objectClasses when adding accounts. posixAccount is
-always included."""
 
 # settings
 
@@ -614,6 +610,17 @@ def _find_available_idnumber(id_numbers, min, fill_gaps):
         return str(id_numbers[-1]+1)
 
 
+def _get_oc_attrs(oc):
+    oc_attrs = set(oc.must)
+    oc_attrs.update(oc.may)
+    return oc_attrs
+
+
+def _get_oc_name_attrs(oc_name):
+    oc = get_object_class(oc_name)
+    return _get_oc_attrs(oc)
+
+
 def _get_user_object_classes(attrs):
     """Find a minimal list of objectClass attributes to support the given list of attribute names"""
     attrs = set(attrs)
@@ -623,17 +630,30 @@ def _get_user_object_classes(attrs):
             attrs.remove(attr)
         except KeyError:
             pass
-    for oc_name in USER_AUTO_CLASSES:
-        oc = get_object_class(oc_name)
-        oc_attrs = set(oc.must)
-        oc_attrs.update(oc.may)
-        for attr in attrs:
-            if attr in oc_attrs:
-                object_classes.add(oc_name)
+
+    shadow_account = False
+    for attr in _get_oc_attrs(_shadow_account):
+        try:
+            attrs.remove(attr)
+            shadow_account = True
+        except KeyError:
+            pass
+    if shadow_account:
+        object_classes.add(_shadow_account.names[0])
+
+    inheritance_chain = ['top', 'person', 'organizationalPerson', 'inetOrgPerson']
+    max_index = -1
+    for i, oc_name in enumerate(inheritance_chain):
+        for attr in _get_oc_name_attrs(oc_name):
+            try:
                 attrs.remove(attr)
-                oc_attrs.remove(attr)
-                if not oc_attrs:
-                    break
+                if i > max_index:
+                    max_index = i
+            except KeyError:
+                pass
+    if max_index > -1:
+        object_classes.add(inheritance_chain[max_index])
+
     if attrs:
         raise LDAPPOSIXError('Could not find objectClass for attributes: ' + ','.join(attrs))
     return list(object_classes)
