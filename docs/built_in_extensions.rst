@@ -41,7 +41,28 @@ POSIX Users and Groups
 
    .. autofunction:: laurelin.extensions.posix.add_user
 
+   .. autofunction:: laurelin.extensions.posix.update_user
+
    .. autofunction:: laurelin.extensions.posix.add_group
+
+   .. autofunction:: laurelin.extensions.posix.update_group
+
+   .. autofunction:: laurelin.extensions.posix.add_group_members
+
+   .. autofunction:: laurelin.extensions.posix.delete_group_members
+
+.. class:: LDAPObject
+   :noindex:
+
+   The following new methods get bound to :class:`.laurelin.ldap.LDAPObject` upon extension activation:
+
+   .. autofunction:: laurelin.extensions.posix.obj_update_user
+
+   .. autofunction:: laurelin.extensions.posix.obj_update_group
+
+   .. autofunction:: laurelin.extensions.posix.obj_add_group_members
+
+   .. autofunction:: laurelin.extensions.posix.obj_delete_group_members
 
 NIS Netgroups
 -------------

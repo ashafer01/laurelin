@@ -24,7 +24,12 @@ The :meth:`LDAP.add_user` and :meth:`LDAP.add_group` methods work by taking attr
 Since many user and group attributes have the single-value constraint, passing a list of values is optional.
 
 The extension will also automatically attempt to fill missing required attributes. This includes ``objectClass`` for
-both users and groups, ``uidNumber`` for users, and ``gidNumber`` for groups.
+both users and groups, ``uidNumber``, ``gidNumber``, ``cn``, ``homeDirectory``, for users, and ``gidNumber`` for groups.
+
+For both users and groups, the DN will be automatically constructed (if not specified with the ``dn`` keyword) by using
+a *placement function*. There is both a user and group placement function. It takes in the attribute keywords passed to
+the add function, and returns a new **parent** DN. The RDN is generated using the configured default RDN attribute. See
+the reference below for how to specify placement functions.
 
 By default any gaps will be filled in your uid/gid number range. You can turn this feature off, and automatically
 increment the highest number by passing ``fill_gaps=False``. You can also set the module level attribute
@@ -314,17 +319,18 @@ def add_user(self, **kwds):
 
     Add a new user. Pass attributes as keywords. Single-value attributes DO NOT need to be wrapped in a list.
 
-    The DN will be automatically generated using the user placement function and the passed attribute keywords. The
-    default placement function puts all objects directly below the tagged base user object.
+    If the ``dn`` keyword is not passed, the DN will be automatically generated using the user placement function and
+    the passed attribute keywords. The default placement function puts all objects directly below the tagged base user
+    object.
 
     ``uid`` is required by this function as well as the object class.
 
     ``objectClass`` will be automatically filled based on attributes used. You can use any posixAccount attributes, as
-    well as those in :attr:`.posix.USER_AUTO_CLASSES`.
+    well as those in :attr:`.posix.USER_AUTO_CLASSES`. You can also specify the ``objectClass`` yourself.
 
-    ``uidNumber`` is required by the object class, and searches for all uidNumbers below the tagged user base to find
-    an available id number. Respects the ``fill_gaps`` keyword argument which defaults True, and determines whether or
-    not to fill gaps in the id number range, or to always increment the highest id number.
+    ``uidNumber`` is required by the object class. If not supplied, performs a search for all uidNumbers below the
+    tagged user base to find an available id number. Respects the ``fill_gaps`` keyword argument which defaults True,
+    and determines whether or not to fill gaps in the id number range, or to always increment the highest id number.
 
     ``gidNumber``, or the user's primary group, is required by the spec. If not specified, defaults to
     :attr:`.posix.DEFAULT_GIDNUMBER`.
@@ -340,8 +346,12 @@ def add_user(self, **kwds):
     kwds = CaseIgnoreDict(kwds)
     if 'uid' not in kwds:
         raise TypeError('Missing required keyword uid')
+    if 'dn' in kwds:
+        dn = kwds.pop('dn')
+    else:
+        dn = self._place_user(**kwds)
+    fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
     if 'uidNumber' not in kwds:
-        fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
         all_uidnumbers = self._get_uid_numbers()
         my_uidnumber = _find_available_idnumber(all_uidnumbers, fill_gaps)
         kwds['uidNumber'] = [my_uidnumber]
@@ -353,14 +363,28 @@ def add_user(self, **kwds):
         kwds['gidNumber'] = [str(DEFAULT_GIDNUMBER)]
     if 'objectClass' not in kwds:
         kwds['objectClass'] = _get_user_object_classes(list(kwds.keys()))
-    for attr in kwds:
-        if not isinstance(kwds[attr], list):
-            kwds[attr] = list(kwds[attr])
-    dn = self._place_user(**kwds)
-    return self.add(dn, kwds)
+    attrs_dict = _kwds_to_attrs_dict(kwds)
+    return self.add(dn, attrs_dict)
 
 
 _LDAP_methods.append(add_user)
+
+
+def update_user(self, dn, **kwds):
+    """update_user(dn, **kwds)
+
+    Update attributes on a user object. Performs a modify replace operation, allowing new attributes to be added,
+    existing attributes to be replaced, and all values for an attribute to be deleted.
+
+    Pass attribute keywords with new values. Single-value attributes DO NOT need to be wrapped in a list.
+
+    :param str dn: The DN of the user to update
+    :return: None
+    """
+    self.replace_attrs(dn, _kwds_to_attrs_dict(kwds))
+
+
+_LDAP_methods.append(update_user)
 
 
 def _place_group(self, **kwds):
@@ -376,16 +400,17 @@ def add_group(self, **kwds):
 
     Create a new group. Pass attributes as keywords. Single-value attributes DO NOT need to be wrapped in a list.
 
-    The DN will be automatically generated using the group placement function and the passed attribute keywords. The
-    default placement function puts all objects directly below the tagged base group object.
+    If the ``dn`` keyword is not passed, the DN will be automatically generated using the group placement function and
+    the passed attribute keywords. The default placement function puts all objects directly below the tagged base
+    group object.
 
     ``cn`` is required by this function as well as the object class.
 
     ``objectClass`` will be automatically set to ``posixGroup`` if not defined.
 
-    ``gidNumber`` is required by the object class, and searches for all gidNumbers below the tagged group base to find
-    an available id number. Respects the ``fill_gaps`` keyword argument which defaults True, and determines whether or
-    not to fill gaps in the id number range, or to always increment the highest id number.
+    ``gidNumber`` is required by the object class. If not supplied, performs a search for all gidNumbers below the
+    tagged group base to find an available id number. Respects the ``fill_gaps`` keyword argument which defaults True,
+    and determines whether or not to fill gaps in the id number range, or to always increment the highest id number.
 
     :return: The new group object
     :rtype: LDAPObject
@@ -393,6 +418,10 @@ def add_group(self, **kwds):
     kwds = CaseIgnoreDict(kwds)
     if 'cn' not in kwds:
         raise TypeError('Missing required keyword cn')
+    if 'dn' in kwds:
+        dn = kwds.pop('dn')
+    else:
+        dn = self._place_group(**kwds)
     if 'gidNumber' not in kwds:
         fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
         all_gidnumbers = self._get_gid_numbers()
@@ -400,14 +429,145 @@ def add_group(self, **kwds):
         kwds['gidNumber'] = [my_gidnumber]
     if 'objectClass' not in kwds:
         kwds['objectClass'] = [GROUP_OBJECT_CLASS]
-    for attr in kwds:
-        if not isinstance(kwds[attr], list):
-            kwds[attr] = list(kwds[attr])
-    dn = self._place_group(**kwds)
-    return self.add(dn, kwds)
+    attrs_dict = _kwds_to_attrs_dict(kwds)
+    return self.add(dn, attrs_dict)
 
 
 _LDAP_methods.append(add_group)
+
+
+def update_group(self, dn, **kwds):
+    """update_group(dn, **kwds)
+
+    Update attributes on a group object. Performs a modify replace operation, allowing new attributes to be added,
+    existing attributes to be replaced, and all values for an attribute to be deleted.
+
+    Pass attribute keywords with new values. Single-value attributes DO NOT need to be wrapped in a list.
+
+    :param str dn: The DN of the group to update
+    :return: None
+    """
+    self.replace_attrs(dn, _kwds_to_attrs_dict(kwds))
+
+
+_LDAP_methods.append(update_group)
+
+
+def add_group_members(self, dn, member_uid):
+    """add_group_members(dn, member_uid)
+
+    Add new members to a POSIX group
+
+    :param str dn: The DN of the group to add members to
+    :param list[str] member_uid: A list of new member usernames to add
+    :return: None
+    """
+    self.add_attrs(dn, {'memberUid': member_uid})
+
+
+_LDAP_methods.append(add_group_members)
+
+
+def delete_group_members(self, dn, member_uid):
+    """delete_group_members(dn, member_uid)
+
+    Delete members from a POSIX group
+
+    :param str dn: The DN/ of the group to remove members from
+    :param list[str] member_uid: A list of member usernames to delete
+    :return: None
+    """
+    self.delete_attrs(dn, {'memberUid': member_uid})
+
+
+_LDAP_methods.append(delete_group_members)
+
+
+# LDAPObject extensions methods
+
+_LDAPObject_methods = []
+
+
+def _require_user(self):
+    if not self.has_object_class(USER_OBJECT_CLASS):
+        raise RuntimeError('objectClass {0} is required'.format(USER_OBJECT_CLASS))
+
+
+_LDAPObject_methods.append(_require_user)
+
+
+def _require_group(self):
+    if not self.has_object_class(GROUP_OBJECT_CLASS):
+        raise RuntimeError('objectClass {0} is required'.format(GROUP_OBJECT_CLASS))
+
+
+_LDAPObject_methods.append(_require_group)
+
+
+def obj_update_user(self, **kwds):
+    """obj_update_user(**kwds)
+
+    Update attributes on this user object. Performs a modify replace operation, allowing new attributes to be added,
+    existing attributes to be replaced, and all values for an attribute to be deleted.
+
+    Pass attribute keywords with new values. Single-value attributes DO NOT need to be wrapped in a list.
+
+    :return: None
+    """
+    self._require_user()
+    self.replace_attrs(_kwds_to_attrs_dict(kwds))
+
+
+obj_update_user.__name__ = 'update_user'
+_LDAPObject_methods.append(obj_update_user)
+
+
+def obj_update_group(self, **kwds):
+    """obj_update_group(**kwds)
+
+    Update attributes on this group object. Performs a modify replace operation, allowing new attributes to be added,
+    existing attributes to be replaced, and all values for an attribute to be deleted.
+
+    Pass attribute keywords with new values. Single-value attributes DO NOT need to be wrapped in a list.
+
+    :return: None
+    """
+    self._require_group()
+    self.replace_attrs(_kwds_to_attrs_dict(kwds))
+
+
+obj_update_group.__name__ = 'update_group'
+_LDAPObject_methods.append(obj_update_group)
+
+
+def obj_add_group_members(self, member_uid):
+    """obj_add_group_members(member_uid)
+
+    Add new members to this POSIX group
+
+    :return: None
+    """
+    self._require_group()
+    self.add_attrs({'memberUid': member_uid})
+
+
+obj_add_group_members.__name__ = 'add_group_members'
+_LDAPObject_methods.append(obj_add_group_members)
+
+
+def obj_delete_group_members(self, member_uid):
+    """obj_delete_group_members(member_uid)
+
+    Delete members from this POSIX group
+
+    :return: None
+    """
+    self._require_group()
+    self.delete_attrs({'memberUid': member_uid})
+
+
+obj_delete_group_members.__name__ = 'delete_group_members'
+_LDAPObject_methods.append(obj_delete_group_members)
 
 
 # activation function
@@ -415,9 +575,17 @@ _LDAP_methods.append(add_group)
 
 def activate_extension():
     LDAP.EXTEND(_LDAP_methods)
+    LDAPObject.EXTEND(_LDAPObject_methods)
 
 
 # private functions
+
+def _kwds_to_attrs_dict(kwds):
+    for attr in kwds:
+        val = kwds[attr]
+        if not isinstance(val, list):
+            kwds[attr] = [val]
+    return kwds
 
 
 def _find_available_idnumber(id_numbers, fill_gaps):
