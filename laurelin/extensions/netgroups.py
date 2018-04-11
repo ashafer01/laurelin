@@ -77,8 +77,6 @@ from laurelin.ldap.rules import RegexSyntaxRule
 import six
 
 TAG = 'netgroup_base'
-OBJECT_CLASS = 'nisNetgroup'
-NETGROUP_ATTRS = ['cn', 'nisNetgroupTriple', 'memberNisNetgroup', 'objectClass']
 
 _TRIPLE_RE = '^\(([^,]*),([^,]*),([^)]*)\)$'
 
@@ -86,7 +84,7 @@ _TRIPLE_RE = '^\(([^,]*),([^,]*),([^)]*)\)$'
 ## Schema definitions from RFC 2307
 
 
-ObjectClass('''
+_nis_netgroup = ObjectClass('''
 ( 1.3.6.1.1.1.2.8 NAME 'nisNetgroup' SUP top STRUCTURAL
   MUST cn
   MAY ( nisNetgroupTriple $ memberNisNetgroup $ description ) )
@@ -112,6 +110,11 @@ class nisNetgroupTripleSytnax(RegexSyntaxRule):
     DESC = 'NIS netgroup triple'
     regex = _TRIPLE_RE
 
+
+# constants
+
+OBJECT_CLASS = _nis_netgroup.names[0]
+NETGROUP_ATTRS = _nis_netgroup.must + _nis_netgroup.may
 
 ## LDAP extension methods
 
