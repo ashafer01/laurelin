@@ -353,7 +353,7 @@ def add_user(self, **kwds):
     fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
     if 'uidNumber' not in kwds:
         all_uidnumbers = self._get_uid_numbers()
-        my_uidnumber = _find_available_idnumber(all_uidnumbers, fill_gaps)
+        my_uidnumber = _find_available_idnumber(all_uidnumbers, MIN_AUTO_UID_NUMBER, fill_gaps)
         kwds['uidNumber'] = [my_uidnumber]
     if 'cn' not in kwds:
         kwds['cn'] = kwds['uid']
@@ -425,7 +425,7 @@ def add_group(self, **kwds):
     if 'gidNumber' not in kwds:
         fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
         all_gidnumbers = self._get_gid_numbers()
-        my_gidnumber = _find_available_idnumber(all_gidnumbers, fill_gaps)
+        my_gidnumber = _find_available_idnumber(all_gidnumbers, MIN_AUTO_GID_NUMBER, fill_gaps)
         kwds['gidNumber'] = [my_gidnumber]
     if 'objectClass' not in kwds:
         kwds['objectClass'] = [GROUP_OBJECT_CLASS]
@@ -588,14 +588,28 @@ def _kwds_to_attrs_dict(kwds):
     return kwds
 
 
-def _find_available_idnumber(id_numbers, fill_gaps):
+def _find_available_idnumber(id_numbers, min, fill_gaps):
+    if not id_numbers:
+        return str(min)
+    n_id_numbers = len(id_numbers)
+    if n_id_numbers == 1:
+        idn = id_numbers[0]
+        if fill_gaps and idn != min:
+            return str(min)
+        else:
+            return str(idn+1)
+    unique_id_numbers = set(id_numbers)
+    if len(unique_id_numbers) != n_id_numbers:
+        raise LDAPPOSIXError('Duplicate ID numbers')
     id_numbers.sort()
     if fill_gaps:
+        if id_numbers[0] != min:
+            return str(min)
         for i in range(len(id_numbers)-1):
             id_number = id_numbers[i]
             if id_number+1 < id_numbers[i+1]:
                 return str(id_number+1)
-        return str(id_number+1)
+        return str(id_numbers[i+1]+1)
     else:
         return str(id_numbers[-1]+1)
 
