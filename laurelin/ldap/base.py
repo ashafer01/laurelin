@@ -314,13 +314,17 @@ class LDAP(Extensible):
         self.sock.refcount += 1
 
         # Validation setup
+        self.validators = []
         if validators is None:
             validators = []
         for validator in validators:
+            if isinstance(validator, six.class_types):
+                validator = validator()
             if not isinstance(validator, Validator):
                 raise TypeError('Validators must subclass laurelin.ldap.validation.Validator')
             logger.info('Using validator {0}'.format(validator.__class__.__name__))
-        self.validators = validators
+            validator.ldap_conn = self
+            self.validators.append(validator)
 
         # find base_dn
         self.refresh_root_dse()
