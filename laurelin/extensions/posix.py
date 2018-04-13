@@ -77,7 +77,7 @@ from __future__ import absolute_import
 from laurelin.ldap import LDAP, LDAPObject, LDAPError
 from laurelin.ldap.attributetype import AttributeType
 from laurelin.ldap.objectclass import ObjectClass, get_object_class
-from laurelin.ldap.utils import CaseIgnoreDict
+from laurelin.ldap.utils import CaseIgnoreDict, get_one_result
 
 # needed?
 import laurelin.ldap.schema
@@ -253,6 +253,24 @@ DEFAULT_FILL_GAPS = True
 _LDAP_methods = []
 
 
+def find_user(self, **kwds):
+    """find_user(**kwds)
+
+    Find a user object based on attributes other than the RDN.
+
+    Give attributes to search with as keywords. Wrapping single-value attributes in a list is OPTIONAL.
+
+    You can specify the ``attrs`` keyword to limit attributes retrieved from the server.
+    """
+    attrs = kwds.pop('attrs', None)
+    filter = _kwds_to_filter(kwds)
+    res = list(self.tag(USERS_BASE_TAG).search(filter=filter, attrs=attrs, limit=2))
+    return get_one_result(res)
+
+
+_LDAP_methods.append(find_user)
+
+
 def get_user(self, rdn, attrs=None):
     """get_user(rdn, attrs=None)
 
@@ -268,6 +286,19 @@ def get_user(self, rdn, attrs=None):
 
 
 _LDAP_methods.append(get_user)
+
+
+def find_group(self, **kwds):
+    """find_group(**kwds)
+
+    Find a group object based on attributes other than the RDN.
+
+    Give attributes to search with as keywords. Wrapping single-value attributes in a list is OPTIONAL.
+    """
+    attrs = kwds.pop('attrs', None)
+    filter = _kwds_to_filter(kwds)
+    res = list(self.tag(GROUPS_BASE_TAG).search(filter=filter, attrs=attrs, limit=2))
+    return get_one_result(res)
 
 
 def get_group(self, rdn, attrs=None):
@@ -322,7 +353,8 @@ def add_user(self, **kwds):
     ``uid`` is required by this function as well as the object class.
 
     ``objectClass`` will be automatically filled based on attributes used. You can use any posixAccount attributes, as
-    well as those in :attr:`.posix.USER_AUTO_CLASSES`. You can also specify the ``objectClass`` yourself.
+    well as those in ``shadowAccount``, ``person``, ``organizationalPerson`` and ``inetOrgPerson``. You can also specify
+    the ``objectClass`` yourself.
 
     ``uidNumber`` is required by the object class. If not supplied, performs a search for all uidNumbers below the
     tagged user base to find an available id number. Respects the ``fill_gaps`` keyword argument which defaults True,
@@ -342,10 +374,6 @@ def add_user(self, **kwds):
     kwds = CaseIgnoreDict(kwds)
     if 'uid' not in kwds:
         raise TypeError('Missing required keyword uid')
-    if 'dn' in kwds:
-        dn = kwds.pop('dn')
-    else:
-        dn = self._place_user(**kwds)
     fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
     if 'uidNumber' not in kwds:
         all_uidnumbers = self._get_uid_numbers()
@@ -357,6 +385,10 @@ def add_user(self, **kwds):
         kwds['homeDirectory'] = [HOMEDIR_FORMAT.format(kwds)]
     if 'gidNumber' not in kwds:
         kwds['gidNumber'] = [str(DEFAULT_GIDNUMBER)]
+    if 'dn' in kwds:
+        dn = kwds.pop('dn')
+    else:
+        dn = self._place_user(**kwds)
     if 'objectClass' not in kwds:
         kwds['objectClass'] = _get_user_object_classes(list(kwds.keys()))
     attrs_dict = _kwds_to_attrs_dict(kwds)
@@ -377,6 +409,7 @@ def update_user(self, dn, **kwds):
     :param str dn: The DN of the user to update
     :return: None
     """
+    # TODO update objectClass - need to know current attrs to combine with new
     self.replace_attrs(dn, _kwds_to_attrs_dict(kwds))
 
 
@@ -414,10 +447,6 @@ def add_group(self, **kwds):
     kwds = CaseIgnoreDict(kwds)
     if 'cn' not in kwds:
         raise TypeError('Missing required keyword cn')
-    if 'dn' in kwds:
-        dn = kwds.pop('dn')
-    else:
-        dn = self._place_group(**kwds)
     if 'gidNumber' not in kwds:
         fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
         all_gidnumbers = self._get_gid_numbers()
@@ -425,6 +454,10 @@ def add_group(self, **kwds):
         kwds['gidNumber'] = [my_gidnumber]
     if 'objectClass' not in kwds:
         kwds['objectClass'] = [GROUP_OBJECT_CLASS]
+    if 'dn' in kwds:
+        dn = kwds.pop('dn')
+    else:
+        dn = self._place_group(**kwds)
     attrs_dict = _kwds_to_attrs_dict(kwds)
     return self.add(dn, attrs_dict)
 
@@ -511,6 +544,7 @@ def obj_update_user(self, **kwds):
     :return: None
     """
     self._require_user()
+    # TODO objectClasses
     self.replace_attrs(_kwds_to_attrs_dict(kwds))
 
 
@@ -584,6 +618,19 @@ def _kwds_to_attrs_dict(kwds):
     return kwds
 
 
+def _kwds_to_filter(kwds):
+    and_items = ''
+    for attr in kwds:
+        values = kwds[attr]
+        if isinstance(values, list):
+            for value in values:
+                and_items += '({0}={1})'.format(attr, value)
+        else:
+            and_items += '({0}={1})'.format(attr, values)
+    and_items = '(&({0}))'.format(and_items)
+    return and_items
+
+
 def _find_available_idnumber(id_numbers, min, fill_gaps):
     if not id_numbers:
         return str(min)
@@ -624,6 +671,7 @@ def _get_oc_name_attrs(oc_name):
 def _get_user_object_classes(attrs):
     """Find a minimal list of objectClass attributes to support the given list of attribute names"""
     attrs = set(attrs)
+    attrs.add('objectClass')
     object_classes = set((USER_OBJECT_CLASS,))
     for attr in USER_ATTRS:
         try:
