@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from . import rfc4512
 from . import rules
 from . import utils
-from .exceptions import LDAPSchemaError
+from .exceptions import LDAPSchemaError, InvalidSyntaxError
 from .protoutils import parse_qdescrs
 from .utils import CaseIgnoreDict
 
@@ -170,6 +170,10 @@ class AttributeType(object):
         :return: A truthy value.
         :raises InvalidSyntaxError: if the value is invalid.
         """
+        if self.syntax_length > -1:
+            length = len(value)
+            if length > self.syntax_length:
+                raise InvalidSyntaxError('Length {0} greater than allowed {1}'.format(length, self.syntax_length))
         return self.syntax.validate(value)
 
     def index(self, value_list, assertion_value):
