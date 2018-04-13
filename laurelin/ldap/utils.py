@@ -1,3 +1,4 @@
+from . import exceptions
 import re
 
 try:
@@ -168,3 +169,13 @@ class CaseIgnoreDict(dict):
     def clear(self):
         dict.clear(self)
         self._keys.clear()
+
+
+def get_one_result(results):
+    n = len(results)
+    if n == 0:
+        raise exceptions.NoSearchResults()
+    elif n > 1:
+        raise exceptions.MultipleSearchResults()
+    else:
+        return results[0]

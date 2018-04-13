@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from . import utils
 from .attrsdict import AttrsDict
 from .attrvaluelist import AttrValueList
 from .constants import Scope
@@ -220,13 +221,7 @@ class LDAPObject(AttrsDict, Extensible):
         elif self.relative_search_scope == Scope.SUBTREE:
             filter = '({0})'.format(self._rdn_attr(rdn))
             res = list(self.search(filter=filter, attrs=attrs, limit=2, **kwds))
-            n = len(res)
-            if n == 0:
-                raise NoSearchResults()
-            elif n == 1:
-                return res[0]
-            else:
-                raise MultipleSearchResults()
+            return utils.get_one_result(res)
         else:
             raise ValueError('Unknown relative_search_scope')
 
