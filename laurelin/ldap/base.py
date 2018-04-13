@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 from . import controls
 from . import rfc4511
+from . import utils
 from .constants import Scope, DerefAliases, DELETE_ALL
 from .exceptions import *
 from .extensible import Extensible
@@ -599,13 +600,7 @@ class LDAP(Extensible):
         if self.sock.unbound:
             raise ConnectionUnbound()
         results = list(self.search(dn, Scope.BASE, attrs=attrs, limit=2, **kwds))
-        n = len(results)
-        if n == 0:
-            raise NoSearchResults()
-        elif n > 1:
-            raise MultipleSearchResults()
-        else:
-            return results[0]
+        return utils.get_one_result(results)
 
     def exists(self, dn):
         """Simply check if a DN exists.
