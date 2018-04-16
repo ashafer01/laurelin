@@ -23,9 +23,13 @@ POSIX Users and Groups
 
    .. autoattribute:: laurelin.extensions.posix.DEFAULT_FILL_GAPS
 
-   .. autofunction:: laurelin.extensions.posix.set_user_placement_func
+   .. autoclass:: laurelin.extensions.posix.UserPlacement
+      :members:
+      :undoc-members:
 
-   .. autofunction:: laurelin.extensions.posix.set_group_placement_func
+   .. autoclass:: laurelin.extensions.posix.GroupPlacement
+      :members:
+      :undoc-members:
 
 .. module:: laurelin.ldap
    :noindex:

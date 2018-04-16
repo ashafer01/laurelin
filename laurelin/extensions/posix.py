@@ -61,12 +61,12 @@ Configuration Reference
     Default ``True``. When generating uidNumber or gidNumber, fill gaps in the range. Set ``False`` to use the highest
     known id number incremented by default.
 
-:func:`.posix.set_user_placement_func`
+:func:`.posix.UserPlacement.select`
     Pass this a new function that accepts an :class:`LDAP` instance as well as all of the attribute keywords passed to
     :meth:`LDAP.add_user`. It should return a new parent DN string for the user object. The RDN will be automatically
     generated seperately.
 
-:func:`.posix.set_group_placement_func`
+:func:`.posix.GroupPlacement.select`
     Pass this a new function that accepts an :class:`LDAP` instance as well as all of the attribute keywords passed to
     :meth:`LDAP.add_group`. It should return a new parent DN string for the group object. The RDN will be
     automatically generated seperately.
@@ -74,10 +74,12 @@ Configuration Reference
 
 """
 from __future__ import absolute_import
-from laurelin.ldap import LDAP, LDAPObject, LDAPError
+from laurelin.ldap import LDAP, LDAPObject, LDAPError, NoSearchResults
 from laurelin.ldap.attributetype import AttributeType
 from laurelin.ldap.objectclass import ObjectClass, get_object_class
 from laurelin.ldap.utils import CaseIgnoreDict, get_one_result
+
+from datetime import datetime
 
 # needed?
 import laurelin.ldap.schema
@@ -86,27 +88,131 @@ import laurelin.ldap.schema
 USERS_BASE_TAG = 'posix_users_base'
 GROUPS_BASE_TAG = 'posix_groups_base'
 
+# settings
 
-def tag_flat_placement(tag):
+MIN_AUTO_UID_NUMBER = 1000
+MIN_AUTO_GID_NUMBER = 1000
+
+USER_RDN_ATTR = 'uid'
+GROUP_RDN_ATTR = 'cn'
+HOMEDIR_FORMAT = '/home/{uid}'
+DEFAULT_GIDNUMBER = 1000
+DEFAULT_FILL_GAPS = True
+
+
+# placement stuff
+
+
+def _tag_flat_placement(tag):
     """Create a placement function putting objects below the specified tag"""
     def flat_placement(ldap, **kwds):
-        """Place all objects directly below the user base"""
+        """Place all objects directly below the tagged base object"""
         return ldap.tag(tag).dn
     return flat_placement
 
 
-_user_placement_func = tag_flat_placement(USERS_BASE_TAG)
-_group_placement_func = tag_flat_placement(GROUPS_BASE_TAG)
+def _tag_year_placement(tag):
+    """Create a placement function for organizing users/groups by creation year"""
+    def year_placement(ldap, **kwds):
+        """Place new users/groups under an OU for the current year. Creates OU if necessary"""
+        year = datetime.utcnow().year
+        year_obj = _add_or_get_child_ou(ldap, tag, year)
+        return year_obj.dn
+    return year_placement
 
 
-def set_user_placement_func(func):
-    global _user_placement_func
-    _user_placement_func = func
+def _alpha_placement(tag, rdn_attr):
+    """Create a placement function for organizing users/groups by first character of RDN value"""
+    def alpha_placement(ldap, **kwds):
+        """Place new users/groups under an OU for the first characters of their RDN value. Creates OU if necessary"""
+        rdn_value = _get_kwd_attr(kwds, rdn_attr)
+        char = rdn_value[0].upper()
+        char_obj = _add_or_get_child_ou(ldap, tag, char)
+        return char_obj.dn
+    return alpha_placement
 
 
-def set_group_placement_func(func):
-    global _group_placement_func
-    _group_placement_func = func
+def _idnumber_range_placement(tag, idnumber_attr, range_size):
+    """Create a placement function for organizing users/groups by uid/gid number range"""
+    def idnumber_range_placement(ldap, **kwds):
+        """Place new users/groups under an OU based on ID number range. Creates OU if necessary."""
+        idnumber = int(_get_kwd_attr(kwds, idnumber_attr))
+        idnumber_range = idnumber - (idnumber % range_size)
+        range_ou = _add_or_get_child_ou(ldap, tag, idnumber_range)
+        return range_ou.dn
+    return idnumber_range_placement
+
+
+class PlacementDomain(object):
+    _selected = None
+
+    @classmethod
+    def select(cls, method):
+        cls._selected = method
+
+    @classmethod
+    def run(cls, ldap_conn, **kwds):
+        return cls._selected(ldap_conn, **kwds)
+
+
+class UserPlacement(PlacementDomain):
+    """These are pre-defined user placement functions. :meth:`UserPlacement.FLAT` is selected by default. Pass your
+    chosen function (it doesn't have to be one of these) to ``UserPlacement.select()`` to use it with
+    :meth:`LDAP.add_user`.
+
+    Example::
+
+        from laurelin.ldap import LDAP, Scope
+        posix = LDAP.activate_extension('laurelin.extensions.posix')
+        posix.UserPlacement.select(posix.UserPlacement.UID_100S)
+        with LDAP() as ldap:
+            ldap.base.obj('ou=people',
+                          tag=posix.USERS_BASE_TAG,
+                          rdn_attr='uid',
+                          relative_search_scope=Scope.SUBTREE)
+            ldap.add_user(uid='testuser1', uidNumber=4567)
+            ldap.add_user(uid='testuser2', uidNumber=5678)
+
+        # Produces the following tree structure:
+        # dc=example,dc=org
+        #   ou=people
+        #     ou=4500
+        #       uid=testuser1
+        #     ou=5600
+        #       uid=testuser2
+    """
+
+    FLAT = staticmethod(_tag_flat_placement(USERS_BASE_TAG))
+    YEAR = staticmethod(_tag_year_placement(USERS_BASE_TAG))
+    ALPHA = staticmethod(_alpha_placement(USERS_BASE_TAG, USER_RDN_ATTR))
+    UID_100S = staticmethod(_idnumber_range_placement(USERS_BASE_TAG, 'uidNumber', 100))
+    UID_1000S = staticmethod(_idnumber_range_placement(USERS_BASE_TAG, 'uidNumber', 1000))
+
+    @staticmethod
+    def PRIMARY_GROUP(ldap, **kwds):
+        """Place new users below the primary group object. Error if group does not exist.
+
+        Note that if using this placement function, you would need to have the same object tagged as user and group
+        base. The group base object would probably have a search scope of ``onelevel``, and the user base would have
+        ``subtree``.
+        """
+        group = ldap.find_group(gidNumber=_get_kwd_attr(kwds, 'gidNumber'))
+        return group.dn
+
+    _selected = FLAT
+
+
+class GroupPlacement(PlacementDomain):
+    """These are pre-defined group placement functions. :meth:`GroupPlacement.FLAT` is selected by default. Pass your
+    chosen function (it doesn't have to be one of these) to ``GroupPlacement.select()`` to use it with
+    :meth:`LDAP.add_group`."""
+    FLAT = staticmethod(_tag_flat_placement(GROUPS_BASE_TAG))
+    YEAR = staticmethod(_tag_year_placement(GROUPS_BASE_TAG))
+    ALPHA = staticmethod(_alpha_placement(GROUPS_BASE_TAG, GROUP_RDN_ATTR))
+    GID_100S = staticmethod(_idnumber_range_placement(GROUPS_BASE_TAG, 'gidNumber', 100))
+    GID_1000S = staticmethod(_idnumber_range_placement(GROUPS_BASE_TAG, 'gidNumber', 1000))
+
+    _selected = FLAT
 
 
 # RFC 2307 Schema elements for POSIX/shadow objects
@@ -237,17 +343,6 @@ USER_ATTRS.update(_posix_account.may)
 GROUP_ATTRS = set(_posix_group.must)
 GROUP_ATTRS.update(_posix_group.may)
 
-# settings
-
-MIN_AUTO_UID_NUMBER = 1000
-MIN_AUTO_GID_NUMBER = 1000
-
-USER_RDN_ATTR = 'uid'
-GROUP_RDN_ATTR = 'cn'
-HOMEDIR_FORMAT = '/home/{uid}'
-DEFAULT_GIDNUMBER = 1000
-DEFAULT_FILL_GAPS = True
-
 # LDAP extension methods
 
 _LDAP_methods = []
@@ -321,8 +416,8 @@ _LDAP_methods.append(get_group)
 
 
 def _place_user(self, **kwds):
-    parent_dn = _user_placement_func(self, **kwds)
-    return '{0}={1},{2}'.format(USER_RDN_ATTR, kwds[USER_RDN_ATTR], parent_dn)
+    parent_dn = UserPlacement.run(self, **kwds)
+    return '{0}={1},{2}'.format(USER_RDN_ATTR, _get_kwd_attr(kwds, USER_RDN_ATTR), parent_dn)
 
 
 _LDAP_methods.append(_place_user)
@@ -385,9 +480,9 @@ def add_user(self, **kwds):
         kwds['homeDirectory'] = [HOMEDIR_FORMAT.format(kwds)]
     if 'gidNumber' not in kwds:
         kwds['gidNumber'] = [str(DEFAULT_GIDNUMBER)]
-    if 'dn' in kwds:
+    try:
         dn = kwds.pop('dn')
-    else:
+    except KeyError:
         dn = self._place_user(**kwds)
     if 'objectClass' not in kwds:
         kwds['objectClass'] = _get_user_object_classes(list(kwds.keys()))
@@ -417,8 +512,8 @@ _LDAP_methods.append(update_user)
 
 
 def _place_group(self, **kwds):
-    parent_dn = _group_placement_func(self, **kwds)
-    return '{0}={1},{2}'.format(GROUP_RDN_ATTR, kwds[GROUP_RDN_ATTR], parent_dn)
+    parent_dn = GroupPlacement.run(self, **kwds)
+    return '{0}={1},{2}'.format(GROUP_RDN_ATTR, _get_kwd_attr(kwds, GROUP_RDN_ATTR), parent_dn)
 
 
 _LDAP_methods.append(_place_group)
@@ -454,9 +549,9 @@ def add_group(self, **kwds):
         kwds['gidNumber'] = [my_gidnumber]
     if 'objectClass' not in kwds:
         kwds['objectClass'] = [GROUP_OBJECT_CLASS]
-    if 'dn' in kwds:
+    try:
         dn = kwds.pop('dn')
-    else:
+    except KeyError:
         dn = self._place_group(**kwds)
     attrs_dict = _kwds_to_attrs_dict(kwds)
     return self.add(dn, attrs_dict)
@@ -631,6 +726,17 @@ def _kwds_to_filter(kwds):
     return and_items
 
 
+def _get_kwd_attr(kwds, attr):
+    values = kwds[attr]
+    if isinstance(values, list):
+        if len(values) == 1:
+            return values[0]
+        else:
+            raise TypeError('Too many values for {0}'.format(attr))
+    else:
+        return values
+
+
 def _find_available_idnumber(id_numbers, min, fill_gaps):
     if not id_numbers:
         return str(min)
@@ -705,6 +811,18 @@ def _get_user_object_classes(attrs):
     if attrs:
         raise LDAPPOSIXError('Could not find objectClass for attributes: ' + ','.join(attrs))
     return list(object_classes)
+
+
+def _add_or_get_child_ou(ldap, tag, ou):
+    rdn = 'ou={0}'.format(ou)
+    try:
+        obj = ldap.tag(tag).get_child(rdn)
+    except NoSearchResults:
+        obj = ldap.tag(tag).add_child(rdn, {
+            'objectClass': ['organizationalUnit'],
+            'ou': [ou],
+        })
+    return obj
 
 
 class LDAPPOSIXError(LDAPError):
