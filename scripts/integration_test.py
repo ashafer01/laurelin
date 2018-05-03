@@ -121,4 +121,4 @@ for info in test_servers:
             assert test_attr not in obj2
             obj2.delete()
     except Exception as e:
-        raise Exception('Functional test failed on {0}: {1}'.format(info['name'], str(e)))
+        raise Exception('Integration test failed on {0}: {1}'.format(info['name'], str(e)))
