@@ -704,8 +704,8 @@ class TestLDAP(unittest.TestCase):
 
         mock_sock.clear_sent()
 
-        challenge1 = 'foo'
-        challenge2 = 'bar'
+        challenge1 = b'foo'
+        challenge2 = b'bar'
 
         mock_sock.add_sasl_bind_in_progress(challenge1)
         mock_sock.add_sasl_bind_in_progress(challenge2)
@@ -721,7 +721,7 @@ class TestLDAP(unittest.TestCase):
         def get_sasl_cred(br):
             ac = br.getComponentByName('authentication')
             sasl = ac.getComponentByName('sasl')
-            return six.text_type(sasl.getComponentByName('credentials'))
+            return sasl.getComponentByName('credentials')
 
         mock_sock.read_sent()  # initial bind request
         lm = mock_sock.read_sent()  # first challenge response
