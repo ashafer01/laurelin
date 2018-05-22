@@ -47,11 +47,13 @@ Configuration Reference
 :attr:`.posix.DEFAULT_GIDNUMBER`
     Default ``1000``. The default gidNumber that will be automatically filled when missing from a new user creation.
 
-:attr:`.posix.USER_RDN_ATTR`
-    Default ``'uid'``. The default RDN attribute to use when creating new users.
+:attr:`.posix.DEFAULT_USER_RDN_ATTR`
+    Default ``'uid'``. The default RDN attribute to use when creating new users. If ``rdn_attr`` was specified on the
+    tagged base object, this will not be used.
 
-:attr:`.posix.GROUP_RDN_ATTR`
-    Default ``'cn'``. The default RDN attribute to use when creating new groups.
+:attr:`.posix.DEFAULT_GROUP_RDN_ATTR`
+    Default ``'cn'``. The default RDN attribute to use when creating new groups. If ``rdn_attr`` was specified on the
+    tagged base object, this will not be used.
 
 :attr:`.posix.HOMEDIR_FORMAT`
     Default ``'/home/{uid}'``. Gets string formatted with the attribute keywords before getting used as the default
@@ -93,9 +95,10 @@ GROUPS_BASE_TAG = 'posix_groups_base'
 MIN_AUTO_UID_NUMBER = 1000
 MIN_AUTO_GID_NUMBER = 1000
 
-USER_RDN_ATTR = 'uid'
-GROUP_RDN_ATTR = 'cn'
 HOMEDIR_FORMAT = '/home/{uid}'
+
+DEFAULT_USER_RDN_ATTR = 'uid'
+DEFAULT_GROUP_RDN_ATTR = 'cn'
 DEFAULT_GIDNUMBER = 1000
 DEFAULT_FILL_GAPS = True
 
@@ -121,10 +124,11 @@ def _tag_year_placement(tag):
     return year_placement
 
 
-def _alpha_placement(tag, rdn_attr):
+def _alpha_placement(tag, default_rdn_attr):
     """Create a placement function for organizing users/groups by first character of RDN value"""
     def alpha_placement(ldap, **kwds):
         """Place new users/groups under an OU for the first characters of their RDN value. Creates OU if necessary"""
+        rdn_attr = ldap._get_rdn_attr(tag, default_rdn_attr)
         rdn_value = _get_kwd_attr(kwds, rdn_attr)
         char = rdn_value[0].upper()
         char_obj = _add_or_get_child_ou(ldap, tag, char)
@@ -184,7 +188,7 @@ class UserPlacement(PlacementDomain):
 
     FLAT = staticmethod(_tag_flat_placement(USERS_BASE_TAG))
     YEAR = staticmethod(_tag_year_placement(USERS_BASE_TAG))
-    ALPHA = staticmethod(_alpha_placement(USERS_BASE_TAG, USER_RDN_ATTR))
+    ALPHA = staticmethod(_alpha_placement(USERS_BASE_TAG, DEFAULT_USER_RDN_ATTR))
     UID_100S = staticmethod(_idnumber_range_placement(USERS_BASE_TAG, 'uidNumber', 100))
     UID_1000S = staticmethod(_idnumber_range_placement(USERS_BASE_TAG, 'uidNumber', 1000))
 
@@ -208,7 +212,7 @@ class GroupPlacement(PlacementDomain):
     :meth:`LDAP.add_group`."""
     FLAT = staticmethod(_tag_flat_placement(GROUPS_BASE_TAG))
     YEAR = staticmethod(_tag_year_placement(GROUPS_BASE_TAG))
-    ALPHA = staticmethod(_alpha_placement(GROUPS_BASE_TAG, GROUP_RDN_ATTR))
+    ALPHA = staticmethod(_alpha_placement(GROUPS_BASE_TAG, DEFAULT_GROUP_RDN_ATTR))
     GID_100S = staticmethod(_idnumber_range_placement(GROUPS_BASE_TAG, 'gidNumber', 100))
     GID_1000S = staticmethod(_idnumber_range_placement(GROUPS_BASE_TAG, 'gidNumber', 1000))
 
@@ -415,9 +419,21 @@ def get_group(self, rdn, attrs=None):
 _LDAP_methods.append(get_group)
 
 
+def _get_rdn_attr(self, tag, default):
+    rdn_attr = self.tag(tag).rdn_attr
+    if rdn_attr:
+        return rdn_attr
+    else:
+        return default
+
+
+_LDAP_methods.append(_get_rdn_attr)
+
+
 def _place_user(self, **kwds):
     parent_dn = UserPlacement.run(self, **kwds)
-    return '{0}={1},{2}'.format(USER_RDN_ATTR, _get_kwd_attr(kwds, USER_RDN_ATTR), parent_dn)
+    rdn_attr = self._get_rdn_attr(USERS_BASE_TAG, DEFAULT_USER_RDN_ATTR)
+    return '{0}={1},{2}'.format(rdn_attr, _get_kwd_attr(kwds, rdn_attr), parent_dn)
 
 
 _LDAP_methods.append(_place_user)
@@ -513,7 +529,8 @@ _LDAP_methods.append(update_user)
 
 def _place_group(self, **kwds):
     parent_dn = GroupPlacement.run(self, **kwds)
-    return '{0}={1},{2}'.format(GROUP_RDN_ATTR, _get_kwd_attr(kwds, GROUP_RDN_ATTR), parent_dn)
+    rdn_attr = self._get_rdn_attr(GROUPS_BASE_TAG, DEFAULT_GROUP_RDN_ATTR)
+    return '{0}={1},{2}'.format(rdn_attr, _get_kwd_attr(kwds, rdn_attr), parent_dn)
 
 
 _LDAP_methods.append(_place_group)
