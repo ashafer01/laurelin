@@ -793,14 +793,21 @@ def _get_oc_name_attrs(oc_name):
 
 def _get_user_object_classes(attrs):
     """Find a minimal list of objectClass attributes to support the given list of attribute names"""
-    attrs = set(attrs)
-    attrs.add('objectClass')
+    attrs_set = set()
+    for attr in attrs:
+        attr = attr.lower()
+        attrs_set.add(attr)
+    attrs_set.add('objectclass')
+    attrs = attrs_set
     object_classes = set((USER_OBJECT_CLASS,))
     for attr in USER_ATTRS:
         try:
-            attrs.remove(attr)
+            attrs.remove(attr.lower())
         except KeyError:
             pass
+
+    if 'userpassword' in attrs:
+        object_classes.add('simpleSecurityObject')
 
     shadow_account = False
     for attr in _get_oc_attrs(_shadow_account):
@@ -817,7 +824,7 @@ def _get_user_object_classes(attrs):
     for i, oc_name in enumerate(inheritance_chain):
         for attr in _get_oc_name_attrs(oc_name):
             try:
-                attrs.remove(attr)
+                attrs.remove(attr.lower())
                 if i > max_index:
                     max_index = i
             except KeyError:
