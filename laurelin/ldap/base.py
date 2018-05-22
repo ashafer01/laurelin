@@ -492,7 +492,7 @@ class LDAP(Extensible):
             sasl = rfc4511.SaslCredentials()
             sasl.setComponentByName('mechanism', six.text_type(self.sock.sasl_mech))
             if challenge_response is not None:
-                sasl.setComponentByName('credentials', challenge_response)
+                sasl.setComponentByName('credentials', rfc4511.Credentials(challenge_response))
                 challenge_response = None
             ac.setComponentByName('sasl', sasl)
             br.setComponentByName('authentication', ac)
