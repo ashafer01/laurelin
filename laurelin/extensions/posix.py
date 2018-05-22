@@ -99,7 +99,7 @@ HOMEDIR_FORMAT = '/home/{uid}'
 
 DEFAULT_USER_RDN_ATTR = 'uid'
 DEFAULT_GROUP_RDN_ATTR = 'cn'
-DEFAULT_GIDNUMBER = 1000
+DEFAULT_GIDNUMBER = '1000'
 DEFAULT_FILL_GAPS = True
 
 
@@ -493,9 +493,9 @@ def add_user(self, **kwds):
     if 'cn' not in kwds:
         kwds['cn'] = kwds['uid']
     if 'homeDirectory' not in kwds:
-        kwds['homeDirectory'] = [HOMEDIR_FORMAT.format(kwds)]
+        kwds['homeDirectory'] = [HOMEDIR_FORMAT.format(**kwds)]
     if 'gidNumber' not in kwds:
-        kwds['gidNumber'] = [str(DEFAULT_GIDNUMBER)]
+        kwds['gidNumber'] = [DEFAULT_GIDNUMBER]
     try:
         dn = kwds.pop('dn')
     except KeyError:
@@ -799,15 +799,14 @@ def _get_user_object_classes(attrs):
         attrs_set.add(attr)
     attrs_set.add('objectclass')
     attrs = attrs_set
+
     object_classes = set((USER_OBJECT_CLASS,))
+
     for attr in USER_ATTRS:
         try:
             attrs.remove(attr.lower())
         except KeyError:
             pass
-
-    if 'userpassword' in attrs:
-        object_classes.add('simpleSecurityObject')
 
     shadow_account = False
     for attr in _get_oc_attrs(_shadow_account):
