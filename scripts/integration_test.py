@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import traceback
 from laurelin.ldap import LDAP, LDAPObject, config
 from laurelin.ldap.schema import SchemaValidator
 
@@ -123,7 +124,7 @@ for info in test_servers:
             assert test_attr not in obj2
             obj2.delete()
     except Exception as e:
-        line = 'Integration test failed on {0}: {1}'.format(info['name'], str(e))
+        line = 'Integration test failed on {0}: {1}'.format(info['name'], traceback.format_exc())
         print(line)
         fails.append(line)
 
