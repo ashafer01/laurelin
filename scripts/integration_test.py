@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import sys
 from laurelin.ldap import LDAP, LDAPObject, config
 from laurelin.ldap.schema import SchemaValidator
 
@@ -44,6 +45,7 @@ test_servers = [
 
 LDAP.enable_logging()
 LDAP.activate_extension('laurelin.extensions.descattrs')
+fails = []
 for info in test_servers:
     print('Testing {0}'.format(info['name']))
     try:
@@ -121,4 +123,15 @@ for info in test_servers:
             assert test_attr not in obj2
             obj2.delete()
     except Exception as e:
-        raise Exception('Functional test failed on {0}: {1}'.format(info['name'], str(e)))
+        line = 'Integration test failed on {0}: {1}'.format(info['name'], str(e))
+        print(line)
+        fails.append(line)
+
+for line in fails:
+    print(line)
+
+if fails:
+    print('{0}/{1} test servers failed'.format(len(fails), len(test_servers)))
+    sys.exit(1)
+else:
+    print('All test servers passed')
