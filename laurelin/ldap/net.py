@@ -333,23 +333,28 @@ class LDAPSocket(object):
                     if want_message_id == have_message_id:
                         yield response
                     elif have_message_id == 0:
+                        msg = 'Received unsolicited message (default message - should never be seen)'
                         try:
                             mid, xr, ctrls = unpack('extendedResp', response)
                             res_code = xr.getComponentByName('resultCode')
-                            res = six.text_type(res_code)
                             xr_oid = six.text_type(xr.getComponentByName('responseName'))
                             if xr_oid == LDAPSocket.OID_DISCONNECTION_NOTICE:
                                 mtype = 'Notice of Disconnection'
                             else:
                                 mtype = 'Unhandled ({0})'.format(xr_oid)
                             diag = xr.getComponentByName('diagnosticMessage')
-                            msg = 'Got unsolicited message: {0}: {1}: {2}'.format(mtype, res, diag)
+                            msg = 'Got unsolicited message: {0}: {1}: {2}'.format(mtype, res_code, diag)
                             if res_code == ResultCode('protocolError'):
                                 msg += (' (This may indicate an incompatability between laurelin-ldap and your server '
                                         'distribution)')
+                            elif res_code == ResultCode('strongerAuthRequired'):
+                                # this is a direct quote from RFC 4511 sec 4.4.1
+                                msg += (' (The server has detected that an established security association between the'
+                                        'client and server has unexpectedly failed or been compromised)')
                         except UnexpectedResponseType:
                             msg = 'Unhandled unsolicited message from server'
-                        raise LDAPUnsolicitedMessage(response, msg)
+                        finally:
+                            raise LDAPUnsolicitedMessage(response, msg)
                     else:
                         if have_message_id not in self._message_queues:
                             self._message_queues[have_message_id] = deque()
