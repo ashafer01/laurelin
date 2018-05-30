@@ -18,6 +18,7 @@ class TestSchema(unittest.TestCase):
 
         # reload built-in extensions defining new schema elements
         reload(import_module('laurelin.extensions.netgroups'))
+        import_module('laurelin.extensions.posix')
 
     def test_object_classes(self):
         """Ensure all defined object classes have defined attributes and superclasses"""
