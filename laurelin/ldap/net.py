@@ -1,6 +1,7 @@
 """Provides protocol-level interface for low-level sockets"""
 
 from __future__ import absolute_import
+import six
 import ssl
 import logging
 from glob import glob
@@ -12,9 +13,9 @@ from pyasn1.codec.ber.decoder import decode as ber_decode
 from pyasn1.error import SubstrateUnderrunError
 from puresasl.client import SASLClient
 
-from .rfc4511 import LDAPMessage
-from .exceptions import LDAPError, LDAPSASLError, LDAPConnectionError
-from .protoutils import pack
+from .rfc4511 import LDAPMessage, ResultCode
+from .exceptions import LDAPError, LDAPSASLError, LDAPConnectionError, LDAPUnsolicitedMessage, UnexpectedResponseType
+from .protoutils import pack, unpack
 
 _next_sock_id = 0
 logger = logging.getLogger(__name__)
@@ -40,6 +41,10 @@ class LDAPSocket(object):
     # For ldapi:/// try to connect to these socket files in order
     # Globs must match exactly one result
     LDAPI_SOCKET_PATHS = ['/var/run/ldapi', '/var/run/slapd/ldapi', '/var/run/slapd-*.socket']
+
+    # OIDs of unsolicited messages
+
+    OID_DISCONNECTION_NOTICE = '1.3.6.1.4.1.1466.20036'  # RFC 4511 sec 4.4.1 Notice of Disconnection
 
     def __init__(self, host_uri, connect_timeout=5, ssl_verify=True, ssl_ca_file=None, ssl_ca_path=None,
                  ssl_ca_data=None):
@@ -328,7 +333,23 @@ class LDAPSocket(object):
                     if want_message_id == have_message_id:
                         yield response
                     elif have_message_id == 0:
-                        raise LDAPError('Got message ID 0')
+                        try:
+                            mid, xr, ctrls = unpack('extendedResp', response)
+                            res_code = xr.getComponentByName('resultCode')
+                            res = six.text_type(res_code)
+                            xr_oid = six.text_type(xr.getComponentByName('responseName'))
+                            if xr_oid == LDAPSocket.OID_DISCONNECTION_NOTICE:
+                                mtype = 'Notice of Disconnection'
+                            else:
+                                mtype = 'Unhandled ({0})'.format(xr_oid)
+                            diag = xr.getComponentByName('diagnosticMessage')
+                            msg = 'Got unsolicited message: {0}: {1}: {2}'.format(mtype, res, diag)
+                            if res_code == ResultCode('protocolError'):
+                                msg += (' (This may indicate an incompatability between laurelin-ldap and your server '
+                                        'distribution)')
+                        except UnexpectedResponseType:
+                            msg = 'Unhandled unsolicited message from server'
+                        raise LDAPUnsolicitedMessage(response, msg)
                     else:
                         if have_message_id not in self._message_queues:
                             self._message_queues[have_message_id] = deque()

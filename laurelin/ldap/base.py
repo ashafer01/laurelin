@@ -172,7 +172,7 @@ class LDAP(Extensible):
     # OIDs
     OID_OBJ_CLASS_ATTR = '1.3.6.1.4.1.4203.1.5.2'  # RFC 4529 Requesting Attributes by Object Class
     OID_WHOAMI = '1.3.6.1.4.1.4203.1.11.3'  # RFC 4532 "Who am I?" Operation
-    OID_STARTTLS = '1.3.6.1.4.1.1466.20037'
+    OID_STARTTLS = '1.3.6.1.4.1.1466.20037'  # RFC 4511 StartTLS Operation
 
     ## logging and warning controls
 
