@@ -83,9 +83,6 @@ from laurelin.ldap.utils import CaseIgnoreDict, get_one_result
 
 from datetime import datetime
 
-# needed?
-import laurelin.ldap.schema
-
 
 USERS_BASE_TAG = 'posix_users_base'
 GROUPS_BASE_TAG = 'posix_groups_base'
