@@ -1,12 +1,20 @@
 Changelog
 =========
 
-Next
-----
+1.4.0
+-----
 
-Not yet released
+Released 2018.05.29
 
-* Added :meth:`.LDAP.disable_validation` which creates a context with any or all validators skipped
+* Validation updates:
+
+    * Added :meth:`.LDAP.disable_validation` which creates a context with any or all validators skipped
+    * Added an ``ldap_conn`` attribute to validator instances to allow validators to query the server
+    * Allowed passing a class as well as an instance with the ``validators`` constructor keyword
+
+* Greatly improved handling of unsolcitied messages (message ID 0)
+* Fix: enforce maximum length for attribute types
+* Fix: SASL auth issues with pure-sasl 0.5.1+
 
 1.3.1
 -----
