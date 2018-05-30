@@ -533,6 +533,20 @@ def _place_group(self, **kwds):
 _LDAP_methods.append(_place_group)
 
 
+def _get_gid_numbers(self):
+    gid_numbers = []
+    with self.tag(GROUPS_BASE_TAG).search(filter='(&(gidNumber=*)(objectClass={0}))'.format(GROUP_OBJECT_CLASS),
+                                          attrs=['gidNumber']) as search:
+        for group in search:
+            gid_number = int(group['gidNumber'][0])
+            if gid_number >= MIN_AUTO_GID_NUMBER:
+                gid_numbers.append(gid_number)
+    return gid_numbers
+
+
+_LDAP_methods.append(_get_gid_numbers)
+
+
 def add_group(self, **kwds):
     """add_group(**kwds)
 
@@ -556,8 +570,8 @@ def add_group(self, **kwds):
     kwds = CaseIgnoreDict(kwds)
     if 'cn' not in kwds:
         raise TypeError('Missing required keyword cn')
+    fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
     if 'gidNumber' not in kwds:
-        fill_gaps = kwds.pop('fill_gaps', DEFAULT_FILL_GAPS)
         all_gidnumbers = self._get_gid_numbers()
         my_gidnumber = _find_available_idnumber(all_gidnumbers, MIN_AUTO_GID_NUMBER, fill_gaps)
         kwds['gidNumber'] = [my_gidnumber]

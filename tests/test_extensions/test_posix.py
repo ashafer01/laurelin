@@ -96,3 +96,32 @@ class TestPosixExtension(unittest.TestCase):
         user = ldap.add_user(uid=test_uid, fill_gaps=False)
         self.assertEqual(user['uidNumber'][0], '1004',
                          'incorrect auto uidNumber selection with fill_gaps disabled')
+
+    def test_add_group(self):
+        mock_sock = MockSockRootDSE()
+        ldap = LDAP(mock_sock)
+
+        ldap.base.obj('ou=groups',
+                      tag=self.posix.GROUPS_BASE_TAG,
+                      rdn_attr='cn',
+                      relative_search_scope=Scope.ONE)
+
+        test_cn = 'testgroup'
+
+        mock_sock.add_search_res_entry('a=b,x=y', {'gidNumber': ['1000']})
+        mock_sock.add_search_res_entry('a=c,x=y', {'gidNumber': ['1003']})
+        mock_sock.add_search_res_done('x=y')
+        mock_sock.add_ldap_result(rfc4511.AddResponse, 'addResponse')
+
+        user = ldap.add_group(cn=test_cn, fill_gaps=True)
+        self.assertEqual(user['gidNumber'][0], '1001',
+                         'incorrect auto gidNumber selection with fill_gaps enabled')
+
+        mock_sock.add_search_res_entry('a=b,x=y', {'gidNumber': ['1001']})
+        mock_sock.add_search_res_entry('a=c,x=y', {'gidNumber': ['1003']})
+        mock_sock.add_search_res_done('x=y')
+        mock_sock.add_ldap_result(rfc4511.AddResponse, 'addResponse')
+
+        user = ldap.add_group(cn=test_cn, fill_gaps=False)
+        self.assertEqual(user['gidNumber'][0], '1004',
+                         'incorrect auto gidNumber selection with fill_gaps disabled')
