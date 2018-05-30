@@ -370,7 +370,7 @@ _LDAP_methods.append(find_user)
 def get_user(self, rdn, attrs=None):
     """get_user(rdn, attrs=None)
 
-    Find a user
+    Find a user based on its RDN
 
     :param str rdn: The username or an RDN
     :param attrs: List of attribute names to request. Defaults to all attributes.
@@ -397,10 +397,13 @@ def find_group(self, **kwds):
     return get_one_result(res)
 
 
+_LDAP_methods.append(find_group)
+
+
 def get_group(self, rdn, attrs=None):
     """get_group(rdn, attrs=GROUP_ATTRS)
 
-    Find a group
+    Find a group based on its RDN
 
     :param str rdn: The group name or an RDN
     :param attrs: List of attribute names to request. Defaults to all group attributes.
