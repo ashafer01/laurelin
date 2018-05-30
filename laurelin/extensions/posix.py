@@ -76,7 +76,7 @@ Configuration Reference
 
 """
 from __future__ import absolute_import
-from laurelin.ldap import LDAP, LDAPObject, LDAPError, NoSearchResults
+from laurelin.ldap import LDAP, LDAPObject, LDAPError, NoSearchResults, DELETE_ALL
 from laurelin.ldap.attributetype import AttributeType
 from laurelin.ldap.objectclass import ObjectClass, get_object_class
 from laurelin.ldap.utils import CaseIgnoreDict, get_one_result
@@ -736,7 +736,7 @@ def activate_extension():
 def _kwds_to_attrs_dict(kwds):
     for attr in kwds:
         val = kwds[attr]
-        if not isinstance(val, list):
+        if val is not DELETE_ALL and not isinstance(val, list):
             kwds[attr] = [val]
     return kwds
 
