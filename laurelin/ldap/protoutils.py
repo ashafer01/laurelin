@@ -19,10 +19,9 @@ RESULT_referral = rfc4511.ResultCode('referral')
 logger = logging.getLogger(__name__)
 
 
-def pack(mid, op, obj, controls=None):
+def pack(op, obj, controls=None):
     """Pack an object into an LDAPMessage envelope"""
     lm = rfc4511.LDAPMessage()
-    lm.setComponentByName('messageID', rfc4511.MessageID(mid))
     po = rfc4511.ProtocolOp()
     po.setComponentByName(op, obj)
     lm.setComponentByName('protocolOp', po)

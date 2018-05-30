@@ -13,9 +13,9 @@ from pyasn1.codec.ber.decoder import decode as ber_decode
 from pyasn1.error import SubstrateUnderrunError
 from puresasl.client import SASLClient
 
-from .rfc4511 import LDAPMessage, ResultCode
-from .exceptions import LDAPError, LDAPSASLError, LDAPConnectionError, LDAPUnsolicitedMessage, UnexpectedResponseType
-from .protoutils import pack, unpack
+from . import rfc4511
+from .exceptions import LDAPError, LDAPSASLError, LDAPConnectionError
+from .protoutils import pack
 
 _next_sock_id = 0
 logger = logging.getLogger(__name__)
@@ -263,30 +263,29 @@ class LDAPSocket(object):
         self._require_sasl_client()
         return self._sasl_client.process(challenge)
 
-    def _prep_message(self, op, obj, controls=None):
-        """Prepare a message for transmission"""
+    def _get_message_id(self):
+        """Get the next message ID"""
         mid = self._next_message_id
         self._next_message_id += 1
-        lm = pack(mid, op, obj, controls)
+        return mid
+
+    def _prep_message(self, lm):
+        """Prepare a packed :class:`.rfc4511.LDAPMessage` for transport"""
+        mid = self._get_message_id()
+        lm.setComponentByName('messageID', rfc4511.MessageID(mid))
         raw = ber_encode(lm)
         if self._has_sasl_client():
             raw = self._sasl_client.wrap(raw)
         return mid, raw
 
-    def send_message(self, op, obj, controls=None):
-        """Create and send an LDAPMessage given an operation name and a corresponding object.
+    def send_message(self, lm):
+        """Update the message ID of an already-packed :class:`.rfc4511.LDAPMessage` and send it over the socket
 
-        Operation names must be defined as component names in laurelin.ldap.rfc4511.ProtocolOp and
-        the object must be of the corresponding type.
-
-        :param str op: The protocol operation name
-        :param object obj: The associated protocol object (see :class:`.rfc4511.ProtocolOp` for mapping.
-        :param controls: Any request controls for the message
-        :type controls: rfc4511.Controls or None
-        :return: The message ID for this message
+        :param LDAPMessage lm: A packed :class:`.rfc4511.LDAPMessage`
+        :return: The new message ID
         :rtype: int
         """
-        mid, raw = self._prep_message(op, obj, controls)
+        mid, raw = self._prep_message(lm)
         self._sock.sendall(raw)
         return mid
 
@@ -328,7 +327,7 @@ class LDAPSocket(object):
                     newraw = self._sasl_client.unwrap(newraw)
                 raw += newraw
                 while len(raw) > 0:
-                    response, raw = ber_decode(raw, asn1Spec=LDAPMessage())
+                    response, raw = ber_decode(raw, asn1Spec=rfc4511.LDAPMessage())
                     have_message_id = response.getComponentByName('messageID')
                     if want_message_id == have_message_id:
                         yield response
@@ -344,10 +343,10 @@ class LDAPSocket(object):
                                 mtype = 'Unhandled ({0})'.format(xr_oid)
                             diag = xr.getComponentByName('diagnosticMessage')
                             msg = 'Got unsolicited message: {0}: {1}: {2}'.format(mtype, res_code, diag)
-                            if res_code == ResultCode('protocolError'):
+                            if res_code == rfc4511.ResultCode('protocolError'):
                                 msg += (' (This may indicate an incompatability between laurelin-ldap and your server '
                                         'distribution)')
-                            elif res_code == ResultCode('strongerAuthRequired'):
+                            elif res_code == rfc4511.ResultCode('strongerAuthRequired'):
                                 # this is a direct quote from RFC 4511 sec 4.4.1
                                 msg += (' (The server has detected that an established security association between the'
                                         'client and server has unexpectedly failed or been compromised)')

@@ -24,6 +24,11 @@ class MockLDAPSocket(LDAPSocket):
         raw = ber_encode(lm)
         self._outgoing_queue.append(raw)
 
+    def _pack_response(self, mid, op, obj, controls=None):
+        lm = protoutils.pack(op, obj, controls)
+        lm.setComponentByName('messageID', rfc4511.MessageID(mid))
+        return lm
+
     def add_search_res_entry(self, dn, attrs_dict, controls=None):
         """Create a searchResEntry LDAPMessage"""
         sre = rfc4511.SearchResultEntry()
@@ -43,14 +48,14 @@ class MockLDAPSocket(LDAPSocket):
 
         sre.setComponentByName('attributes', attrs, controls)
 
-        self.add_message(protoutils.pack(self._next_add_message_id, 'searchResEntry', sre))
+        self.add_message(self._pack_response(self._next_add_message_id, 'searchResEntry', sre))
 
     def add_search_res_ref(self, uris, controls=None):
         """Generate a searchResultRef LDAPMessage"""
         srr = rfc4511.SearchResultReference()
         for i, uri in enumerate(uris):
             srr.setComponentByPosition(i, uri)
-        self.add_message(protoutils.pack(self._next_add_message_id, 'searchResRef', srr, controls))
+        self.add_message(self._pack_response(self._next_add_message_id, 'searchResRef', srr, controls))
 
     def add_search_res_done(self, dn, result_code=protoutils.RESULT_success, controls=None, referral=None):
         """Create a searchResDone LDAPMessage"""
@@ -89,7 +94,7 @@ class MockLDAPSocket(LDAPSocket):
         res.setComponentByName('resultCode', result_code)
         res.setComponentByName('matchedDN', rfc4511.LDAPDN(dn))
         res.setComponentByName('diagnosticMessage', rfc4511.LDAPString(msg))
-        self.add_message(protoutils.pack(mid, op, res, controls))
+        self.add_message(self._pack_response(mid, op, res, controls))
 
     def add_root_dse(self):
         """Add a response to the mock socket for root DSE query"""
@@ -98,9 +103,9 @@ class MockLDAPSocket(LDAPSocket):
         }),
         self.add_search_res_done('')
 
-    def send_message(self, op, obj, controls=None):
+    def send_message(self, lm):
         """Pack and send a message"""
-        mid, raw = self._prep_message(op, obj, controls)
+        mid, raw = self._prep_message(lm)
         self._incoming_queue.append(raw)
         return mid
 
