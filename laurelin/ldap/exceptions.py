@@ -18,6 +18,17 @@ class LDAPUnicodeWarning(LDAPWarning, UnicodeWarning):
     pass
 
 
+class LDAPUnsolicitedMessage(Exception):
+    """Raised when a message with ID 0 is returned from the server
+
+    This may indicate an incompatability between laurelin and your server distribution and thus is outside the normal
+    exception inheritance chain.
+    """
+    def __init__(self, lm, exc_msg):
+        self.ldap_message = lm
+        Exception.__init__(self, exc_msg)
+
+
 class LDAPExtensionError(LDAPError):
     """Error occurred setting up an extension module"""
     pass
