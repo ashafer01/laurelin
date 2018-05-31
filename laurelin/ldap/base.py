@@ -503,8 +503,7 @@ class LDAP(Extensible):
             mid, res, res_ctrls = unpack('bindResponse', self.sock.recv_one(mid))
             status = res.getComponentByName('resultCode')
             if status == RESULT_saslBindInProgress:
-                challenge_response = self.sock.sasl_process_auth_challenge(six.text_type(
-                    res.getComponentByName('serverSaslCreds')))
+                challenge_response = self.sock.sasl_process_auth_challenge(res.getComponentByName('serverSaslCreds'))
                 continue
             elif status == RESULT_success:
                 logger.info('SASL bind successful')
