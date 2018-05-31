@@ -5,7 +5,7 @@ import six
 import ssl
 import logging
 from glob import glob
-from socket import create_connection, socket, AF_UNIX, error as SocketError
+from socket import create_connection, socket, error as SocketError
 from six.moves.urllib.parse import unquote
 from collections import deque
 from pyasn1.codec.ber.encoder import encode as ber_encode
@@ -16,6 +16,13 @@ from puresasl.client import SASLClient
 from .rfc4511 import LDAPMessage, ResultCode
 from .exceptions import LDAPError, LDAPSASLError, LDAPConnectionError, LDAPUnsolicitedMessage, UnexpectedResponseType
 from .protoutils import pack, unpack
+
+try:
+    from socket import AF_UNIX
+    _have_unix_socket = True
+except ImportError:
+    AF_UNIX = None
+    _have_unix_socket = False
 
 _next_sock_id = 0
 logger = logging.getLogger(__name__)
@@ -98,6 +105,9 @@ class LDAPSocket(object):
             self.start_tls(ssl_verify, ssl_ca_file, ssl_ca_path, ssl_ca_data)
             logger.info('Connected with TLS on #{0}'.format(self.ID))
         elif scheme == 'ldapi':
+            if not _have_unix_socket:
+                raise LDAPError('Unix sockets are not supported on your platform, please choose a protocol other'
+                                'than ldapi')
             self.sock_path = None
             self._sock = socket(AF_UNIX)
             self.host = 'localhost'
