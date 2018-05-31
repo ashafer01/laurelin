@@ -1,6 +1,14 @@
 Changelog
 =========
 
+1.4.1
+-----
+
+Released 2018.05.31
+
+* Fix: Checked for failed import of AF_UNIX to improve Windows support
+* Fix: Required latest pure-sasl
+
 1.4.0
 -----
 
