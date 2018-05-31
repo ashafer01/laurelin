@@ -3,3 +3,4 @@ pure-sasl>=0.5.0
 six
 py2casefold
 pyyaml
+parsimonious

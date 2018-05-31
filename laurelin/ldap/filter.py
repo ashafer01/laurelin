@@ -4,6 +4,7 @@ See RFC4515 String Representation of Search Filters
 """
 
 from __future__ import absolute_import
+from parsimonious.grammar import Grammar
 from .rfc4511 import (
     Filter,
     And,
@@ -186,3 +187,22 @@ def _parse_ava(chunk):
         ava.setComponentByName('attributeDesc', AttributeDescription(attr.strip()))
         ava.setComponentByName('assertionValue', AttributeValue(val))
         return 'equalityMatch', ava
+
+
+def parse_simple_filter(simple_filter_str):
+    """Laurelin defines its own, simpler format for filter strings. It uses the RFC 4515 standard format for the
+    various comparison expressions, but with SQL-style logic operations. (Fully standard RFC 4515 filters are fully
+    supported and used by default)
+    """
+    grammar = Grammar('''
+        filter      = and_terms ( OR and_terms )*
+        and_terms   = term ( AND term )*
+        term        = (NOT term) / rfc4515_ava / (LPAREN filter RPAREN)
+        OR          = " OR "
+        AND         = " AND "
+        NOT         = "NOT "
+        LPAREN      = "("
+        RPAREN      = ")"
+        rfc4515_ava = "AVA"
+    ''')
+    grammar.parse(simple_filter_str)
