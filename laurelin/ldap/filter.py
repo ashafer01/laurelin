@@ -131,7 +131,7 @@ _rfc4515_filter_grammar = Grammar(rfc4515_filter_grammar)
 
 
 def parse(filter_str):
-    """Parse an RFC 4515 filter string to an rfc4515.Filter"""
+    """Parse an RFC 4515 filter string to an rfc4511.Filter"""
 
     try:
         filter_node = _rfc4515_filter_grammar.parse(filter_str)

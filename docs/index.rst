@@ -13,6 +13,7 @@ source on `GitHub <https://github.com/ashafer01/laurelin>`_.
    :maxdepth: 4
 
    user_docs
+   simple_filters
    config_files
    built_in_extensions
    creating_extensions
