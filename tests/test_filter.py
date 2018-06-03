@@ -60,3 +60,18 @@ class TestFilter(unittest.TestCase):
         for f in self.good_filters:
             f_obj = filter.parse(f)
             self.assertEqual(f, filter.rfc4511_filter_to_rfc4515_string(f_obj))
+
+    def test_parse_simple_filter(self):
+        """Ensure parse_simple_filter() produces equivalent rfc4511.Filter to parse()"""
+        tests = [
+            ('(abc=foo)', '(abc=foo)'),
+            ('(&(abc=foo)(def=bar))', '(abc=foo) AND (def=bar)'),
+            ('(&(abc=foo)(def=bar)(ghi=jkl))', '(abc=foo) AND (def=bar) AND (ghi=jkl)'),
+            ('(|(abc=foo)(def=bar)(ghi=jkl))', '(abc=foo) OR (def=bar) OR (ghi=jkl)'),
+            ('(&(abc=foo)(|(def=bar)(ghi=jkl)))', '(abc=foo) AND ((def=bar) OR (ghi=jkl))'),
+            ('(&(abc=foo)(|(def=bar)(ghi=jkl))(xyz=abc))', '(abc=foo) AND ((def=bar) OR (ghi=jkl)) AND (xyz=abc)'),
+        ]
+        for standard, simple in tests:
+            f_obj = filter.parse_simple_filter(simple)
+            self.assertEqual(standard, filter.rfc4511_filter_to_rfc4515_string(f_obj),
+                             msg="Orig simple filter: {0}".format(simple))
