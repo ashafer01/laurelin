@@ -5,6 +5,7 @@ See RFC4515 String Representation of Search Filters
 
 from __future__ import absolute_import
 from parsimonious.grammar import Grammar
+from parsimonious.exceptions import ParseError
 from .rfc4511 import (
     Filter,
     And,
@@ -16,7 +17,6 @@ from .rfc4511 import (
     LessOrEqual,
     Present,
     ApproxMatch,
-    AttributeValue,
     AttributeDescription,
     Substrings,
     Substring,
@@ -31,7 +31,6 @@ from .rfc4511 import (
     Type,
 )
 from .exceptions import LDAPError
-from .utils import find_closing_paren
 
 escape_map = [
     ('(', '\\28'),
@@ -47,6 +46,78 @@ escape_map = [
     ('/', '\\2f')
 ]
 
+ava_grammar = '''
+      rfc4515_ava    = substring / simple / extensible
+      simple         = attr filtertype assertionvalue
+      filtertype     = approx / greaterorequal / lessorequal / equal
+      equal          = EQUALS
+      approx         = TILDE EQUALS
+      greaterorequal = RANGLE EQUALS
+      lessorequal    = LANGLE EQUALS
+      extensible     = ( ( attr dnattrs? matchingrule? COLON EQUALS assertionvalue )
+                       / ( dnattrs? matchingrule COLON EQUALS assertionvalue ) )
+      substring      = attr EQUALS initial? any final?
+      initial        = assertionvalue
+      any            = ASTERISK (assertionvalue ASTERISK)*
+      final          = assertionvalue
+      attr           = attributedescription
+
+      attributedescription = attributetype options
+      attributetype        = oid
+      options              = ( SEMI option )*
+      option               = keychar+
+
+      dnattrs        = COLON "dn"
+      matchingrule   = COLON oid
+
+      oid = descr / numericoid
+
+      numericoid = number ( DOT number )+
+      number     = DIGIT / ( LDIGIT DIGIT+ )
+      DIGIT      = ~r"[0-9]"
+      LDIGIT     = ~r"[1-9]"
+
+      descr       = keystring
+      keystring   = leadkeychar keychar*
+      leadkeychar = ALPHA
+      keychar     = ALPHA / DIGIT / HYPHEN
+      ALPHA       = ~r"[A-Za-z]"
+
+      assertionvalue = valueencoding
+      valueencoding  = (normal / escaped)*
+      normal         = ~r"[^\\0()*\\\\]"
+      escaped        = ESC HEX HEX
+      HEX            = DIGIT / ~r"[A-Fa-f]"
+
+      EQUALS   = "="
+      TILDE    = "~"
+      LANGLE   = "<"
+      RANGLE   = ">"
+      COLON    = ":"
+      ASTERISK = "*"
+      DOT      = "."
+      HYPHEN   = "-"
+      SEMI     = ";"
+      ESC      = "\\\\"
+'''
+
+rfc4515_filter_grammar = '''
+      filter         = LPAREN filtercomp RPAREN
+      filtercomp     = and / or / not / rfc4515_ava
+      and            = AMPERSAND filterlist
+      or             = VERTBAR filterlist
+      not            = EXCLAMATION filter
+      filterlist     = filter+
+''' + ava_grammar + '''
+      LPAREN      = "("
+      RPAREN      = ")"
+      AMPERSAND   = "&"
+      VERTBAR     = "|"
+      EXCLAMATION = "!"
+'''
+
+_rfc4515_filter_grammar = Grammar(rfc4515_filter_grammar)
+
 
 def escape(text):
     """Escape special characters"""
@@ -56,90 +127,112 @@ def escape(text):
 
 
 def parse(filter_str):
-    """Parse an RFC 4515 filter string to a protocol-level object"""
+    """Parse an RFC 4515 filter string to an rfc4515.Filter"""
 
-    fil = Filter()
     try:
-        chunk = filter_str[1:find_closing_paren(filter_str)]
-    except ValueError as e:
-        raise LDAPError('invalid filter - {0}'.format(str(e)))
-    if chunk[0] == '&':
-        fil.setComponentByName('and', _parse_set(chunk[1:], And))
-    elif chunk[0] == '|':
-        fil.setComponentByName('or', _parse_set(chunk[1:], Or))
-    elif chunk[0] == '!':
-        not_filter = Not()
-        not_filter.setComponentByName('innerNotFilter', parse(chunk[1:]))
-        fil.setComponentByName('not', not_filter)
-    else:
-        fil.setComponentByName(*_parse_ava(chunk))
+        filter_node = _rfc4515_filter_grammar.parse(filter_str)
+        return _handle_filter(filter_node)
+    except ParseError as e:
+        raise LDAPError(str(e))
+
+
+def _handle_filter(filter_node):
+    fil = Filter()
+    filtercomp = filter_node.children[1]
+    for child in filtercomp.children:
+        if child.expr_name == 'and':
+            filterlist = child.children[1]
+            and_set = And()
+            for i, node in enumerate(filterlist.children):
+                and_set.setComponentByPosition(i, _handle_filter(node))
+            fil.setComponentByName('and', and_set)
+        elif child.expr_name == 'or':
+            filterlist = child.children[1]
+            or_set = Or()
+            for i, node in enumerate(filterlist.children):
+                or_set.setComponentByPosition(i, _handle_filter(node))
+            fil.setComponentByName('or', or_set)
+        elif child.expr_name == 'not':
+            node = child.children[1]
+            not_filter = Not()
+            not_filter.setComponentByName('innerNotFilter', _handle_filter(node))
+            fil.setComponentByName('not', not_filter)
+        elif child.expr_name == 'rfc4515_ava':
+            _handle_rfc4515_ava(fil, child)
+        else:
+            raise LDAPError('Unhandled condition while parsing filter')
     return fil
 
 
-def _parse_set(filter_str, cls):
-    fset = cls()
-    i = 0
-    while len(filter_str) > 0:
-        end = find_closing_paren(filter_str) + 1
-        fset.setComponentByPosition(i, parse(filter_str[0:end]))
-        filter_str = filter_str[end:]
-        i += 1
-    return fset
-
-
-def _parse_ava(chunk):
-    try:
-        attr, val = chunk.split('=', 1)
-    except ValueError:
-        raise LDAPError('Invalid filter - missing =')
-    if attr[-1] == '>':
-        ava = GreaterOrEqual()
-        ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1].strip()))
-        ava.setComponentByName('assertionValue', AssertionValue(val))
-        return 'greaterOrEqual', ava
-    elif attr[-1] == '<':
-        ava = LessOrEqual()
-        ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1].strip()))
-        ava.setComponentByName('assertionValue', AssertionValue(val))
-        return 'lessOrEqual', ava
-    elif attr[-1] == '~':
-        ava = ApproxMatch()
-        ava.setComponentByName('attributeDesc', AttributeDescription(attr[0:-1].strip()))
-        ava.setComponentByName('assertionValue', AssertionValue(val))
-        return 'approxMatch', ava
-    elif attr[-1] == ':':
-        # 1
-        # attr:=value
-        # 2
-        # attr:dn:=value
-        # attr:rule:=value
-        # :rule:=value
-        # 3
-        # attr:dn:rule:=value
-        # :dn:rule:=value
-
-        params = attr[0:-1].split(':')
-        n = len(params)
-
-        dnattrs = False
-        rule = None
-
-        if n == 1:
-            attr = params[0]
-        elif n == 2:
-            attr = params[0]
-            if params[1] == 'dn':
-                dnattrs = True
-            else:
-                rule = params[1]
-        elif n == 3:
-            if params[1] != 'dn':
-                raise LDAPError('invalid extensible filter')
-            dnattrs = True
-            attr = params[0]
-            rule = params[2]
+def _handle_rfc4515_ava(fil, ava_node):
+    ava_type = ava_node.children[0]
+    if ava_type.expr_name == 'simple':
+        attr_type = ava_type.children[0].text
+        filtertype = ava_type.children[1].children[0].expr_name
+        attr_value = ava_type.children[2].text
+        if filtertype == "EQUALS":
+            component = 'equalityMatch'
+            ava = EqualityMatch()
+        elif filtertype == "approx":
+            component = 'approxMatch'
+            ava = ApproxMatch()
+        elif filtertype == "greaterorequal":
+            component = 'greaterOrEqual'
+            ava = GreaterOrEqual()
+        elif filtertype == "lessorequal":
+            component = 'lessOrEqual'
+            ava = LessOrEqual()
         else:
-            raise LDAPError('invalid extensible filter')
+            raise LDAPError('Unhandled condition while parsing filter')
+        ava.setComponentByName('attributeDesc', AttributeDescription(attr_type))
+        ava.setComponentByName('assertionValue', AssertionValue(attr_value))
+        fil.setComponentByName(component, ava)
+    elif ava_type.expr_name == 'substring':
+        attr_type = ava_type.children[0].text
+
+        # detect the special case that this should be rfc4511.Present
+        if ava_type.children[2].text == '' and ava_type.children[3].text == '*' and ava_type.children[4].text == '':
+            fil.setComponentByName('present', Present(attr_type))
+
+        # standard substring
+        else:
+            subf = SubstringFilter()
+            subf.setComponentByName('type', AttributeDescription(attr_type))
+            subs = Substrings()
+            i = 0
+            if ava_type.children[2].text != '':
+                c = Substring()
+                c.setComponentByName('initial', Initial(ava_type.children[2].text))
+                subs.setComponentByPosition(i, c)
+                i += 1
+            if ava_type.children[3].text != '*':
+                for any_sub in ava_type.children[3].children[1:]:
+                    c = Substring()
+                    c.setComponentByName('any', Any(any_sub.children[0].text))
+                    subs.setComponentByPosition(i, c)
+                    i += 1
+            if ava_type.children[4].text != '':
+                c = Substring()
+                c.setComponentByName('final', Final(ava_type.children[4].text))
+                subs.setComponentByPosition(i, c)
+            subf.setComponentByName('substrings', subs)
+            fil.setComponentByName('substrings', subf)
+    elif ava_type.expr_name == 'extensible':
+        ext_filter = ava_type.children[0]
+
+        num_children = len(ext_filter.children)
+        if num_children == 6:
+            attr = ext_filter.children[0].text
+            dnattrs = (ext_filter.children[1].text == ':dn')
+            rule = ext_filter.children[2].text[1:]
+            val = ext_filter.children[5].text
+        elif num_children == 5:
+            attr = None
+            dnattrs = (ext_filter.children[0].text == ':dn')
+            rule = ext_filter.children[1].text[1:]
+            val = ext_filter.children[4].text
+        else:
+            raise LDAPError('Unhandled condition while parsing filter')
 
         xm = ExtensibleMatch()
         xm.setComponentByName('matchValue', MatchValue(val))
@@ -148,45 +241,9 @@ def _parse_ava(chunk):
             xm.setComponentByName('type', Type(attr))
         if rule:
             xm.setComponentByName('matchingRule', MatchingRule(rule))
-        return 'extensibleMatch', xm
-    elif val.strip() == '*':
-        return 'present', Present(attr)
-    elif '*' in val:
-        subf = SubstringFilter()
-        subf.setComponentByName('type', AttributeDescription(attr.strip()))
-        subs = Substrings()
-        sublist = val.split('*')
-        p = 0
-        i = 0
-        if sublist[0] != '':
-            # do initial substring
-            c = Substring()
-            c.setComponentByName('initial', Initial(sublist[0]))
-            subs.setComponentByPosition(p, c)
-            i += 1
-            p += 1
-        else:
-            i += 1
-        # do middle substrings
-        while i < len(sublist)-1:
-            if sublist[i] != '':
-                c = Substring()
-                c.setComponentByName('any', Any(sublist[i]))
-                subs.setComponentByPosition(p, c)
-                p += 1
-            i += 1
-        if sublist[i] != '':
-            # do final substring
-            c = Substring()
-            c.setComponentByName('final', Final(sublist[i]))
-            subs.setComponentByPosition(p, c)
-        subf.setComponentByName('substrings', subs)
-        return 'substrings', subf
+        fil.setComponentByName('extensibleMatch', xm)
     else:
-        ava = EqualityMatch()
-        ava.setComponentByName('attributeDesc', AttributeDescription(attr.strip()))
-        ava.setComponentByName('assertionValue', AttributeValue(val))
-        return 'equalityMatch', ava
+        raise LDAPError('Unhandled condition while parsing filter')
 
 
 def parse_simple_filter(simple_filter_str):

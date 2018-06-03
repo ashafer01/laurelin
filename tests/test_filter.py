@@ -23,7 +23,7 @@ class TestFilter(unittest.TestCase):
             '(foo=abc*def)',
             '(foo=*abc*def*)',
             '(foo=abc*def*)',
-            '(foo=*abc*def)',
+            '(foo=*abc*def*ghj*)',
             '(&(foo=bar))',
             '(&(foo=bar)(foo>=1)(foo:1.2.3.4:=bar))',
             '(|(foo=bar))',
