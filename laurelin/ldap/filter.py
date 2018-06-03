@@ -46,6 +46,14 @@ escape_map = [
     ('/', '\\2f')
 ]
 
+
+def escape(text):
+    """Escape special characters"""
+    for rep in escape_map:
+        text = text.replace(*rep)
+    return text
+
+
 ava_grammar = '''
       rfc4515_ava    = substring / simple / extensible
       simple         = attr filtertype assertionvalue
@@ -117,13 +125,6 @@ rfc4515_filter_grammar = '''
 '''
 
 _rfc4515_filter_grammar = Grammar(rfc4515_filter_grammar)
-
-
-def escape(text):
-    """Escape special characters"""
-    for rep in escape_map:
-        text = text.replace(*rep)
-    return text
 
 
 def parse(filter_str):
@@ -246,6 +247,25 @@ def _handle_rfc4515_ava(fil, ava_node):
         raise LDAPError('Unhandled condition while parsing filter')
 
 
+laurelin_filter_grammar = '''
+    filter      = component or_exp*
+    component   = term and_exp*
+    or_exp      = SPACE OR SPACE component
+    and_exp     = SPACE AND SPACE term
+    term        = not_exp / paren_term / ava
+    not_exp     = NOT SPACE term
+    ava         = "(" rfc4515_ava ")"
+    paren_term  = "(" SPACE filter SPACE ")"
+''' + ava_grammar + '''
+    SPACE       = ~"[ \t]*"
+    OR          = "OR"
+    AND         = "AND"
+    NOT         = "NOT"
+'''
+
+_laurelin_filter_grammar = Grammar(laurelin_filter_grammar)
+
+
 def parse_simple_filter(simple_filter_str):
     """Laurelin defines its own, simpler format for filter strings. It uses the
     RFC 4515 standard format for the various comparison expressions, but with
@@ -253,19 +273,67 @@ def parse_simple_filter(simple_filter_str):
     supported and used by default)
     """
 
-    grammar = Grammar('''
-            filter      = component or_exp*
-            component   = term and_exp*
-            or_exp      = SPACE OR SPACE component
-            and_exp     = SPACE AND SPACE term
-            term        = (NOT SPACE term) / paren_term / rfc4515_ava
-            paren_term  = "(" SPACE filter SPACE ")"
+    try:
+        filter_node = _laurelin_filter_grammar.parse(simple_filter_str)
+        return _handle_simple_filter(filter_node)
+    except ParseError as e:
+        raise LDAPError(str(e))
 
-            SPACE       = ~"[ \t]*"
-            OR          = "OR"
-            AND         = "AND"
-            NOT         = "NOT"
-            rfc4515_ava = "AVA"
-            ''')
 
-    grammar.parse(simple_filter_str)
+def _handle_simple_filter(filter_node):
+    first_component = _handle_component(filter_node.children[0])
+
+    if filter_node.children[1].text != '':
+        # got an OR
+        fil = Filter()
+        or_set = Or()
+        i = 0
+        or_set.setComponentByPosition(i, first_component)
+        i += 1
+        or_exps = filter_node.children[1].children
+        for or_exp in or_exps:
+            or_component = or_exp.children[3]
+            or_set.setComponentByPosition(i, _handle_component(or_component))
+            i += 1
+        fil.setComponentByName('or', or_set)
+    else:
+        # got a single component
+        fil = first_component
+    return fil
+
+
+def _handle_component(component_node):
+    term_node = component_node.children[0]
+    first_term = _handle_term(term_node)
+    if component_node.children[1].text != '':
+        # got AND terms
+        fil = Filter()
+        and_set = And()
+        i = 0
+        and_set.setComponentByPosition(i, first_term)
+        i += 1
+        for and_exp in component_node.children[1].children:
+            and_set.setComponentByPosition(i, _handle_term(and_exp.children[3]))
+            i += 1
+        fil.setComponentByName('and', and_set)
+    else:
+        # got a single term
+        fil = first_term
+    return fil
+
+
+def _handle_term(term_node):
+    term_type = term_node.children[0]
+    if term_type.expr_name == 'not_exp':
+        fil = Filter()
+        not_filter = Not()
+        not_filter.setComponentByName('innerNotFilter', _handle_term(term_type.children[2]))
+        fil.setComponentByName('not', not_filter)
+    elif term_type.expr_name == 'paren_term':
+        fil = _handle_simple_filter(term_type.children[2])
+    elif term_type.expr_name == 'ava':
+        fil = Filter()
+        _handle_rfc4515_ava(fil, term_type.children[1])
+    else:
+        raise LDAPError('Unhandled condition while parsing filter')
+    return fil
