@@ -253,7 +253,7 @@ def parse_simple_filter(simple_filter_str):
     supported and used by default)
     """
 
-    grammar = par.Grammar('''
+    grammar = Grammar('''
             filter      = component or_exp*
             component   = term and_exp*
             or_exp      = SPACE OR SPACE component
