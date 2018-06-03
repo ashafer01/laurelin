@@ -247,19 +247,25 @@ def _handle_rfc4515_ava(fil, ava_node):
 
 
 def parse_simple_filter(simple_filter_str):
-    """Laurelin defines its own, simpler format for filter strings. It uses the RFC 4515 standard format for the
-    various comparison expressions, but with SQL-style logic operations. (Fully standard RFC 4515 filters are fully
+    """Laurelin defines its own, simpler format for filter strings. It uses the
+    RFC 4515 standard format for the various comparison expressions, but with
+    SQL-style logic operations. (Fully standard RFC 4515 filters are fully
     supported and used by default)
     """
+
     grammar = Grammar('''
-        filter      = and_terms ( OR and_terms )*
-        and_terms   = term ( AND term )*
-        term        = (NOT term) / rfc4515_ava / (LPAREN filter RPAREN)
-        OR          = " OR "
-        AND         = " AND "
-        NOT         = "NOT "
-        LPAREN      = "("
-        RPAREN      = ")"
-        rfc4515_ava = "AVA"
-    ''')
+            filter      = component or_exp*
+            component   = term and_exp*
+            or_exp      = SPACE OR SPACE component
+            and_exp     = SPACE AND SPACE term
+            term        = (NOT SPACE term) / paren_term / rfc4515_ava
+            paren_term  = "(" SPACE filter SPACE ")"
+
+            SPACE       = ~"[ \t]*"
+            OR          = "OR"
+            AND         = "AND"
+            NOT         = "NOT"
+            rfc4515_ava = "AVA"
+            ''')
+
     grammar.parse(simple_filter_str)
