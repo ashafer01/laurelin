@@ -32,6 +32,9 @@ from .rfc4511 import (
 )
 from .exceptions import LDAPError
 
+import six
+from six.moves import range
+
 escape_map = [
     ('(', '\\28'),
     (')', '\\29'),
@@ -207,7 +210,7 @@ def _handle_rfc4515_ava(fil, ava_node):
                 subs.setComponentByPosition(i, c)
                 i += 1
             if ava_type.children[3].text != '*':
-                for any_sub in ava_type.children[3].children[1:]:
+                for any_sub in ava_type.children[3].children[1].children:
                     c = Substring()
                     c.setComponentByName('any', Any(any_sub.children[0].text))
                     subs.setComponentByPosition(i, c)
@@ -337,3 +340,89 @@ def _handle_term(term_node):
     else:
         raise LDAPError('Unhandled condition while parsing filter')
     return fil
+
+
+def rfc4511_filter_to_rfc4515_string(fil):
+    """Reverse :func:`parse`, mainly used for testing
+
+    :param Filter fil: An rfc4511.Filter object
+    :return: An RFC 4515 compatible filter string
+    """
+    filter_type = fil.getName()
+    if filter_type == 'and':
+        and_obj = fil.getComponent()
+        ret = '(&{0})'.format(_reverse_filterset(and_obj))
+    elif filter_type == 'or':
+        or_obj = fil.getComponent()
+        ret = '(|{0})'.format(_reverse_filterset(or_obj))
+    elif filter_type == 'not':
+        not_obj = fil.getComponent()
+        not_filter = not_obj.getComponentByName('innerNotFilter')
+        ret = '(!{0})'.format(rfc4511_filter_to_rfc4515_string(not_filter))
+    elif filter_type == 'equalityMatch':
+        ava = fil.getComponent()
+        ret = '({0}={1})'.format(six.text_type(ava.getComponentByName('attributeDesc')),
+                                 six.text_type(ava.getComponentByName('assertionValue')))
+    elif filter_type == 'substrings':
+        subs_obj = fil.getComponent()
+        attr_type = six.text_type(subs_obj.getComponentByName('type'))
+        subs = subs_obj.getComponentByName('substrings')
+        n = len(subs)
+        sub_name = ''
+        sub_strs = []
+        first_type = subs.getComponentByPosition(0).getName()
+        if first_type != 'initial':
+            sub_strs.append('')
+        for i in range(n):
+            sub_obj = subs.getComponentByPosition(i)
+            sub_name = sub_obj.getName()
+            sub_str = six.text_type(sub_obj.getComponent())
+            sub_strs.append(sub_str)
+        if sub_name != 'final' and sub_strs[-1] != '':
+            sub_strs.append('')
+        ret = '({0}={1})'.format(attr_type, '*'.join(sub_strs))
+    elif filter_type == 'greaterOrEqual':
+        ava = fil.getComponent()
+        ret = '({0}>={1})'.format(six.text_type(ava.getComponentByName('attributeDesc')),
+                                  six.text_type(ava.getComponentByName('assertionValue')))
+    elif filter_type == 'lessOrEqual':
+        ava = fil.getComponent()
+        ret = '({0}<={1})'.format(six.text_type(ava.getComponentByName('attributeDesc')),
+                                  six.text_type(ava.getComponentByName('assertionValue')))
+    elif filter_type == 'present':
+        present_obj = fil.getComponent()
+        attr_type = six.text_type(present_obj)
+        ret = '({0}=*)'.format(attr_type)
+    elif filter_type == 'approxMatch':
+        ava = fil.getComponent()
+        ret = '({0}~={1})'.format(six.text_type(ava.getComponentByName('attributeDesc')),
+                                  six.text_type(ava.getComponentByName('assertionValue')))
+    elif filter_type == 'extensibleMatch':
+        xm_obj = fil.getComponent()
+
+        rule = ''
+        rule_obj = xm_obj.getComponentByName('matchingRule')
+        if rule_obj.isValue:
+            rule = ':' + six.text_type(rule_obj)
+
+        attr = ''
+        attr_obj = xm_obj.getComponentByName('type')
+        if attr_obj.isValue:
+            attr = six.text_type(attr_obj)
+
+        dn_attrs = ':dn' if bool(xm_obj.getComponentByName('dnAttributes')) else ''
+
+        value = six.text_type(xm_obj.getComponentByName('matchValue'))
+
+        ret = '({0}{1}{2}:={3})'.format(attr, dn_attrs, rule, value)
+    else:
+        raise LDAPError('Unhandled condition while constructing filter string')
+    return ret
+
+
+def _reverse_filterset(filterset):
+    n = len(filterset)
+    ret = ''
+    for i in range(n):
+        ret += rfc4511_filter_to_rfc4515_string(filterset.getComponentByPosition(i))
+    return ret
