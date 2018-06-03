@@ -70,6 +70,8 @@ class TestFilter(unittest.TestCase):
             ('(|(abc=foo)(def=bar)(ghi=jkl))', '(abc=foo) OR (def=bar) OR (ghi=jkl)'),
             ('(&(abc=foo)(|(def=bar)(ghi=jkl)))', '(abc=foo) AND ((def=bar) OR (ghi=jkl))'),
             ('(&(abc=foo)(|(def=bar)(ghi=jkl))(xyz=abc))', '(abc=foo) AND ((def=bar) OR (ghi=jkl)) AND (xyz=abc)'),
+            ('(|(abc=foo)(&(def=bar)(ghi=jkl)))', '(abc=foo) OR (def=bar) AND (ghi=jkl)'),
+            ('(|(abc=foo)(&(def=bar)(ghi=jkl)))', '(abc=foo) OR ((def=bar) AND (ghi=jkl))'),
         ]
         for standard, simple in tests:
             f_obj = filter.parse_simple_filter(simple)
