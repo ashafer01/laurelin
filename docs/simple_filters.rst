@@ -54,11 +54,11 @@ only simple comparisons within SQL-style logic, and the default ``FilterSyntax.U
     with LDAP() as ldap:
         search = ldap.search('o=foo', filter='(abc=foo) AND (def=bar)', filter_syntax=FilterSyntax.SIMPLE)
 
-2. Pass ``default_filter_syntax=`` to the :class:`.LDAP` constructor::
+2. Pass ``filter_syntax=`` to the :class:`.LDAP` constructor::
 
     from laurelin.ldap import LDAP, FilterSyntax
 
-    with LDAP(default_filter_syntax=FilterSyntax.SIMPLE) as ldap:
+    with LDAP(filter_syntax=FilterSyntax.SIMPLE) as ldap:
         search1 = ldap.search('o=foo', filter='(abc=foo) AND (def=bar)')
         search2 = ldap.search('o=bar', filter='(xyz=foo) OR (abc=bar)')
 

@@ -122,10 +122,10 @@ class LDAP(Extensible):
     :param bool ignore_empty_list: Default False. Set to True to ignore empty value lists passed to
                                    :meth:`.LDAP.modify`, :meth:`.LDAP.replace_attrs`, or :meth:`.LDAP.delete_attrs` or
                                    their LDAPObject counterparts. This will be default True in a future release.
-    :param FilterSyntax default_filter_syntax: The default search filter syntax selection. Must be one of the
-                                               :class:`.FilterSyntax` constants. Can be overridden on a per-search basis
-                                               by setting the ``filter_syntax`` keyword on :meth:`LDAP.search`. Defaults
-                                               to ``FilterSyntax.STANDARD`` for RFC4515-compliant filter string syntax.
+    :param FilterSyntax filter_syntax: The default search filter syntax selection. Must be one of the
+                                       :class:`.FilterSyntax` constants. Can be overridden on a per-search basis
+                                       by setting the ``filter_syntax`` keyword on :meth:`LDAP.search`. Defaults
+                                       to ``FilterSyntax.STANDARD`` for RFC4515-compliant filter string syntax.
 
     The class can be used as a context manager, which will automatically unbind and close the connection when the
     context manager exits.
@@ -235,7 +235,7 @@ class LDAP(Extensible):
                  deref_aliases=None, strict_modify=None, ssl_verify=None, ssl_ca_file=None, ssl_ca_path=None,
                  ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
                  default_criticality=None, follow_referrals=None, validators=None, warn_empty_list=None,
-                 error_empty_list=None, ignore_empty_list=None, default_filter_syntax=None):
+                 error_empty_list=None, ignore_empty_list=None, filter_syntax=None):
 
         # setup
         if server is None:
@@ -278,8 +278,8 @@ class LDAP(Extensible):
             error_empty_list = LDAP.DEFAULT_ERROR_EMPTY_LIST
         if ignore_empty_list is None:
             ignore_empty_list = LDAP.DEFAULT_IGNORE_EMPTY_LIST
-        if default_filter_syntax is None:
-            default_filter_syntax = LDAP.DEFAULT_FILTER_SYNTAX
+        if filter_syntax is None:
+            filter_syntax = LDAP.DEFAULT_FILTER_SYNTAX
 
         self.default_search_timeout = search_timeout
         self.default_deref_aliases = deref_aliases
@@ -287,7 +287,7 @@ class LDAP(Extensible):
         self.default_follow_referrals = follow_referrals
         self.default_sasl_mech = default_sasl_mech
         self.default_criticality = default_criticality
-        self.default_filter_syntax = default_filter_syntax
+        self.default_filter_syntax = filter_syntax
 
         self.strict_modify = strict_modify
         self.sasl_fatal_downgrade_check = sasl_fatal_downgrade_check

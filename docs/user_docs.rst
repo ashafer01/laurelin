@@ -353,7 +353,7 @@ Global Default                                   :class:`.LDAP` instance attribu
 :attr:`.LDAP.DEFAULT_WARN_EMPTY_LIST`            ``warn_empty_list``               ``warn_empty_list``
 :attr:`.LDAP.DEFAULT_ERROR_EMPTY_LIST`           ``error_empty_list``              ``error_empty_list``
 :attr:`.LDAP.DEFAULT_IGNORE_EMPTY_LIST`          ``ignore_empty_list``             ``ignore_empty_list``
-:attr:`.LDAP.DEFAULT_FILTER_SYNTAX`              ``default_filter_syntax``         ``default_filter_syntax``
+:attr:`.LDAP.DEFAULT_FILTER_SYNTAX`              ``default_filter_syntax``         ``filter_syntax``
 ================================================ ================================= ==================================
 
 The :class:`.LDAP` instance attributes beginning with ``default_`` are used as the defaults for corresponding arguments
