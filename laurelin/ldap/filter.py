@@ -90,12 +90,12 @@ ava_grammar = '''
 '''
 
 rfc4515_filter_grammar = '''
-      filter         = LPAREN filtercomp RPAREN
-      filtercomp     = and / or / not / rfc4515_ava
-      and            = AMPERSAND filterlist
-      or             = VERTBAR filterlist
-      not            = EXCLAMATION filter
-      filterlist     = filter+
+      standard_filter = LPAREN filtercomp RPAREN
+      filtercomp      = and / or / not / rfc4515_ava
+      and             = AMPERSAND filterlist
+      or              = VERTBAR filterlist
+      not             = EXCLAMATION standard_filter
+      filterlist      = standard_filter+
 ''' + ava_grammar + '''
       LPAREN      = "("
       RPAREN      = ")"
@@ -107,7 +107,7 @@ rfc4515_filter_grammar = '''
 _rfc4515_filter_grammar = Grammar(rfc4515_filter_grammar)
 
 
-def parse(filter_str):
+def parse_standard_filter(filter_str):
     """Parse an RFC 4515 filter string to an rfc4511.Filter"""
 
     try:
@@ -227,21 +227,24 @@ def _handle_rfc4515_ava(fil, ava_node):
         raise LDAPError('Unhandled condition while parsing filter')
 
 
-laurelin_filter_grammar = '''
+laurelin_logic_grammar = '''
     filter      = component or_exp*
     component   = term and_exp*
     or_exp      = SPACE OR SPACE component
     and_exp     = SPACE AND SPACE term
-    term        = not_exp / paren_term / ava
     not_exp     = NOT SPACE term
-    ava         = "(" rfc4515_ava ")"
     paren_term  = "(" SPACE filter SPACE ")"
-''' + ava_grammar + '''
     SPACE       = ~"[ \t]*"
     OR          = "OR"
     AND         = "AND"
     NOT         = "NOT"
 '''
+
+
+laurelin_filter_grammar = laurelin_logic_grammar + '''
+    term        = not_exp / paren_term / ava
+    ava         = "(" rfc4515_ava ")"
+''' + ava_grammar
 
 _laurelin_filter_grammar = Grammar(laurelin_filter_grammar)
 
@@ -311,12 +314,38 @@ def _handle_term(term_node):
         fil.setComponentByName('not', not_filter)
     elif term_type.expr_name == 'paren_term':
         fil = _handle_simple_filter(term_type.children[2])
+
+    # support both simple and unified grammar
     elif term_type.expr_name == 'ava':
         fil = rfc4511.Filter()
         _handle_rfc4515_ava(fil, term_type.children[1])
+    elif term_type.expr_name == 'standard_filter':
+        fil = _handle_filter(term_type)
+
     else:
         raise LDAPError('Unhandled condition while parsing filter')
     return fil
+
+
+unified_filter_grammar = laurelin_logic_grammar + '''
+    term        = not_exp / paren_term / standard_filter
+''' + rfc4515_filter_grammar
+
+_unified_filter_grammar = Grammar(unified_filter_grammar)
+
+
+def parse(filter_str):
+    """Laurelin defines its own, simpler format for filter strings. It uses the
+    RFC 4515 standard format for the various comparison expressions, but with
+    SQL-style logic operations. (Fully standard RFC 4515 filters are fully
+    supported and used by default)
+    """
+
+    try:
+        filter_node = _unified_filter_grammar.parse(filter_str)
+        return _handle_simple_filter(filter_node)
+    except ParseError as e:
+        raise LDAPError(str(e))
 
 
 def rfc4511_filter_to_rfc4515_string(fil):

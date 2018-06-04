@@ -43,26 +43,26 @@ class TestFilter(unittest.TestCase):
         '(::::::=foo)',
     ]
 
-    def test_parse(self):
+    def test_parse_standard_filter(self):
         """Exercise filter parsing"""
         for f in self.good_filters:
             try:
-                filter.parse(f)
+                filter.parse_standard_filter(f)
             except Exception as e:
                 self.fail('Failed on good filter - {0} - {1}: {2}'.format(f, e.__class__.__name__, str(e)))
 
         for f in self.bad_filters:
             with self.assertRaises(LDAPError):
-                filter.parse(f)
+                filter.parse_standard_filter(f)
 
     def test_rfc4511_filter_to_rfc4515_string(self):
         """Exercise reverse parsing function"""
         for f in self.good_filters:
-            f_obj = filter.parse(f)
+            f_obj = filter.parse_standard_filter(f)
             self.assertEqual(f, filter.rfc4511_filter_to_rfc4515_string(f_obj))
 
-    def test_parse_simple_filter(self):
-        """Ensure parse_simple_filter() produces equivalent rfc4511.Filter to parse()"""
+    def test_parse_unified_filter(self):
+        """Ensure parse_unified_filter() produces equivalent rfc4511.Filter to parse()"""
         tests = [
             ('(abc=foo)', '(abc=foo)'),
             ('(&(abc=foo)(def=bar))', '(abc=foo) AND (def=bar)'),
@@ -77,8 +77,9 @@ class TestFilter(unittest.TestCase):
             ('(foo=abc AND def)', '(foo=abc AND def)'),
             ('(&(foo=abc AND def)(bar=xyz AND abc))', '(foo=abc AND def) AND (bar=xyz AND abc)'),
             ('(&(foo=abc OR def)(bar=xyz OR abc))', '(foo=abc OR def) AND (bar=xyz OR abc)'),
+            ('(&(&(foo=abc)(bar=def))(foo=ghi)(bar=jkl))', '(&(foo=abc)(bar=def)) AND (foo=ghi) AND (bar=jkl)'),
         ]
         for standard, simple in tests:
-            f_obj = filter.parse_simple_filter(simple)
+            f_obj = filter.parse(simple)
             self.assertEqual(standard, filter.rfc4511_filter_to_rfc4515_string(f_obj),
                              msg="Orig simple filter: {0}".format(simple))

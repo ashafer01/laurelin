@@ -7,7 +7,7 @@ from . import utils
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .exceptions import *
 from .extensible import Extensible
-from .filter import parse as parse_standard_filter, parse_simple_filter
+from .filter import parse as parse_unified_filter, parse_standard_filter, parse_simple_filter
 from .ldapobject import LDAPObject
 from .modify import (
     Mod,
@@ -166,7 +166,7 @@ class LDAP(Extensible):
     DEFAULT_WARN_EMPTY_LIST = False
     DEFAULT_ERROR_EMPTY_LIST = False
     DEFAULT_IGNORE_EMPTY_LIST = False
-    DEFAULT_FILTER_SYNTAX = FilterSyntax.STANDARD
+    DEFAULT_FILTER_SYNTAX = FilterSyntax.UNIFIED
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -703,7 +703,9 @@ class LDAP(Extensible):
         req.setComponentByName('sizeLimit', rfc4511.Integer0ToMax(limit))
         req.setComponentByName('timeLimit', rfc4511.Integer0ToMax(search_timeout))
         req.setComponentByName('typesOnly', rfc4511.TypesOnly(attrs_only))
-        if filter_syntax is FilterSyntax.STANDARD:
+        if filter_syntax is FilterSyntax.UNIFIED:
+            rfc4511_filter = parse_unified_filter(filter)
+        elif filter_syntax is FilterSyntax.STANDARD:
             rfc4511_filter = parse_standard_filter(filter)
         elif filter_syntax is FilterSyntax.SIMPLE:
             rfc4511_filter = parse_simple_filter(filter)

@@ -38,17 +38,23 @@ Standard                                       Simple
 ``(&(abc=foo)(|(def=bar)(ghi=jkl))(xyz=abc))`` ``(abc=foo) AND ((def=bar) OR (ghi=jkl)) AND (xyz=abc)``
 ============================================== ========================================================
 
-By default, Laurelin will interpret your filters as **standard** filters. In order to use simple filters, you must do
-one of the following:
+By default, Laurelin will interpret your filters with the **unified** filter syntax, meaning you can embed a full
+RFC 4515-compliant filter anywhere you see a simple comparison in the above examples. This includes as the only element
+in the filter, making this fully backwards compatible with RFC 4515 standard filters.
 
-1. Pass ``filter_syntax=FilterSytnax.SIMPLE`` to :meth:`.LDAP.search`::
+If you wish to restrict the syntax in either direction, you can do one of the following:
+
+Currently available syntaxes are ``FilterSyntax.STANDARD`` to limit to RFC 4515, ``FilterSyntax.SIMPLE`` to limit to
+only simle comparisons within SQL-style logic, and the default ``FilterSyntax.UNIFIED``.
+
+1. Pass ``filter_syntax=`` to :meth:`.LDAP.search`::
 
     from laurelin.ldap import LDAP, FilterSyntax
 
     with LDAP() as ldap:
         search = ldap.search('o=foo', filter='(abc=foo) AND (def=bar)', filter_syntax=FilterSyntax.SIMPLE)
 
-2. Pass ``default_filter_syntax=FilterSyntax.SIMPLE`` to the :class:`.LDAP` constructor::
+2. Pass ``default_filter_syntax=`` to the :class:`.LDAP` constructor::
 
     from laurelin.ldap import LDAP, FilterSyntax
 
@@ -56,18 +62,17 @@ one of the following:
         search1 = ldap.search('o=foo', filter='(abc=foo) AND (def=bar)')
         search2 = ldap.search('o=bar', filter='(xyz=foo) OR (abc=bar)')
 
-3. Set the global default ``LDAP.DEFAULT_FILTER_SYNTAX = FilterSyntax.SIMPLE`` before instantiating any :class:`.LDAP`
-instances::
+3. Set the global default ``LDAP.DEFAULT_FILTER_SYNTAX before instantiating any :class:`.LDAP` instances::
 
     from laurelin.ldap import LDAP, FilterSyntax
 
-    LDAP.DEFAULT_FILTER_SYNTAX = FilterSyntax.SIMPLE
+    LDAP.DEFAULT_FILTER_SYNTAX = FilterSyntax.STANDARD
 
     with LDAP() as ldap:
-        search = ldap.search('o=foo', filter='(abc=foo) AND (def=bar)')
+        search = ldap.search('o=foo', filter='(&(abc=foo)(def=bar))')
 
     with LDAP('ldap://localhost:10389') as ldap:
-        search = ldap.search('o=bar', filter='(xyz=foo) OR (abc=bar)')
+        search = ldap.search('o=bar', filter='(|(xyz=foo)(abc=bar))')
 
 4. Do either of the two above using :doc:`config_files`.
 

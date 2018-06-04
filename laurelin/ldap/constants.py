@@ -8,6 +8,7 @@ from .rfc4511 import (
 
 _const_filter_syntax_standard = '__rfc4515_standard_filter_syntax__'
 _const_filter_syntax_simple = '__laurelin_simplified_filter_syntax__'
+_const_filter_syntax_unified = '__laurelin_unified_filter_syntax__'
 
 
 class _FilterSyntaxSelection(object):
@@ -19,6 +20,8 @@ class _FilterSyntaxSelection(object):
             return 'FilterSyntax.SIMPLE'
         elif self.const == _const_filter_syntax_standard:
             return 'FilterSyntax.STANDARD'
+        elif self.const == _const_filter_syntax_unified:
+            return 'FilterSyntax.UNIFIED'
         else:
             return repr(self.const)
 
@@ -27,6 +30,7 @@ class FilterSyntax:
     """Filter syntax selection constants. Used to determine which filter syntax to use when parsing a search filter."""
     STANDARD = _FilterSyntaxSelection(_const_filter_syntax_standard)
     SIMPLE = _FilterSyntaxSelection(_const_filter_syntax_simple)
+    UNIFIED = _FilterSyntaxSelection(_const_filter_syntax_unified)
 
     @staticmethod
     def string(str):
