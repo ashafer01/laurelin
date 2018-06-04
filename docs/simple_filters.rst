@@ -45,7 +45,7 @@ in the filter, making this fully backwards compatible with RFC 4515 standard fil
 If you wish to restrict the syntax in either direction, you can do one of the following:
 
 Currently available syntaxes are ``FilterSyntax.STANDARD`` to limit to RFC 4515, ``FilterSyntax.SIMPLE`` to limit to
-only simle comparisons within SQL-style logic, and the default ``FilterSyntax.UNIFIED``.
+only simple comparisons within SQL-style logic, and the default ``FilterSyntax.UNIFIED``.
 
 1. Pass ``filter_syntax=`` to :meth:`.LDAP.search`::
 
@@ -62,7 +62,7 @@ only simle comparisons within SQL-style logic, and the default ``FilterSyntax.UN
         search1 = ldap.search('o=foo', filter='(abc=foo) AND (def=bar)')
         search2 = ldap.search('o=bar', filter='(xyz=foo) OR (abc=bar)')
 
-3. Set the global default ``LDAP.DEFAULT_FILTER_SYNTAX before instantiating any :class:`.LDAP` instances::
+3. Set the global default ``LDAP.DEFAULT_FILTER_SYNTAX`` before instantiating any :class:`.LDAP` instances::
 
     from laurelin.ldap import LDAP, FilterSyntax
 
