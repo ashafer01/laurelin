@@ -30,6 +30,7 @@ class FilterSyntax:
 
     @staticmethod
     def string(str):
+        """Convert filter syntax string to constant"""
         str = str.upper()
         return getattr(FilterSyntax, str)
 
