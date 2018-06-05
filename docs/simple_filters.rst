@@ -42,12 +42,12 @@ By default, Laurelin will interpret your filters with the **unified** filter syn
 RFC 4515-compliant filter anywhere you see a simple comparison in the above examples. This includes as the only element
 in the filter, making this fully backwards compatible with RFC 4515 standard filters.
 
-If you wish to restrict the syntax in either direction, you can do one of the following:
-
 Currently available syntaxes are ``FilterSyntax.STANDARD`` to limit to RFC 4515, ``FilterSyntax.SIMPLE`` to limit to
 only simple comparisons within SQL-style logic, and the default ``FilterSyntax.UNIFIED``.
 
-1. Pass ``filter_syntax=`` to :meth:`.LDAP.search`::
+If you wish to restrict the syntax, you can do one of the following:
+
+1. Pass ``filter_syntax=`` to :meth:`.LDAP.search` or any other ``search`` method::
 
     from laurelin.ldap import LDAP, FilterSyntax
 
