@@ -62,7 +62,7 @@ class TestFilter(unittest.TestCase):
             self.assertEqual(f, filter.rfc4511_filter_to_rfc4515_string(f_obj))
 
     def test_parse_unified_filter(self):
-        """Ensure parse_unified_filter() produces equivalent rfc4511.Filter to parse()"""
+        """Ensure parse() produces equivalent rfc4511.Filter to parse_standard_filter()"""
         tests = [
             ('(abc=foo)', '(abc=foo)'),
             ('(&(abc=foo)(def=bar))', '(abc=foo) AND (def=bar)'),
@@ -86,3 +86,14 @@ class TestFilter(unittest.TestCase):
             f_obj = filter.parse(simple)
             self.assertEqual(standard, filter.rfc4511_filter_to_rfc4515_string(f_obj),
                              msg="Orig simple filter: {0}".format(simple))
+
+    def test_parse_simple_filter(self):
+        """Ensure parse_simple_filter only supports simple filters"""
+        unified = '(&(foo=abc)(bar=def)) OR (&(foo=def)(bar=abc))'
+        standard = '(&(foo=abc)(bar=def))'
+        simple = '(foo=abc) AND (bar=def)'
+        with self.assertRaises(LDAPError):
+            filter.parse_simple_filter(unified)
+        with self.assertRaises(LDAPError):
+            filter.parse_simple_filter(standard)
+        filter.parse_simple_filter(simple)

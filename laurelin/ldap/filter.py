@@ -112,12 +112,12 @@ def parse_standard_filter(filter_str):
 
     try:
         filter_node = _rfc4515_filter_grammar.parse(filter_str)
-        return _handle_filter(filter_node)
+        return _handle_standard_filter(filter_node)
     except ParseError as e:
         raise LDAPError(str(e))
 
 
-def _handle_filter(filter_node):
+def _handle_standard_filter(filter_node):
     fil = rfc4511.Filter()
     filtercomp = filter_node.children[1]
     for child in filtercomp.children:
@@ -125,18 +125,18 @@ def _handle_filter(filter_node):
             filterlist = child.children[1]
             and_set = rfc4511.And()
             for i, node in enumerate(filterlist.children):
-                and_set.setComponentByPosition(i, _handle_filter(node))
+                and_set.setComponentByPosition(i, _handle_standard_filter(node))
             fil.setComponentByName('and', and_set)
         elif child.expr_name == 'or':
             filterlist = child.children[1]
             or_set = rfc4511.Or()
             for i, node in enumerate(filterlist.children):
-                or_set.setComponentByPosition(i, _handle_filter(node))
+                or_set.setComponentByPosition(i, _handle_standard_filter(node))
             fil.setComponentByName('or', or_set)
         elif child.expr_name == 'not':
             node = child.children[1]
             not_filter = rfc4511.Not()
-            not_filter.setComponentByName('innerNotFilter', _handle_filter(node))
+            not_filter.setComponentByName('innerNotFilter', _handle_standard_filter(node))
             fil.setComponentByName('not', not_filter)
         elif child.expr_name == 'rfc4515_ava':
             _handle_rfc4515_ava(fil, child)
@@ -240,7 +240,6 @@ laurelin_logic_grammar = '''
     NOT         = "NOT"
 '''
 
-
 laurelin_filter_grammar = laurelin_logic_grammar + '''
     term        = not_exp / paren_term / ava
     ava         = "(" rfc4515_ava ")"
@@ -320,7 +319,7 @@ def _handle_term(term_node):
         fil = rfc4511.Filter()
         _handle_rfc4515_ava(fil, term_type.children[1])
     elif term_type.expr_name == 'standard_filter':
-        fil = _handle_filter(term_type)
+        fil = _handle_standard_filter(term_type)
 
     else:
         raise LDAPError('Unhandled condition while parsing filter')
@@ -335,10 +334,8 @@ _unified_filter_grammar = Grammar(unified_filter_grammar)
 
 
 def parse(filter_str):
-    """Laurelin defines its own, simpler format for filter strings. It uses the
-    RFC 4515 standard format for the various comparison expressions, but with
-    SQL-style logic operations. (Fully standard RFC 4515 filters are fully
-    supported and used by default)
+    """Parse unified filter syntax. Fully compatible with standard filters, laurelin simple filters, and any
+    intermingling of the two.
     """
 
     try:
@@ -349,7 +346,7 @@ def parse(filter_str):
 
 
 def rfc4511_filter_to_rfc4515_string(fil):
-    """Reverse :func:`parse`, mainly used for testing
+    """Reverse :func:`parse_standard_filter`, mainly used for testing
 
     :param Filter fil: An rfc4511.Filter object
     :return: An RFC 4515 compatible filter string
