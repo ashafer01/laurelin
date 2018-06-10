@@ -57,6 +57,17 @@ class TestFilter(unittest.TestCase):
         ('(foo=abc AND def)', '(foo=abc AND def)'),
         ('(&(foo=abc AND def)(bar=xyz AND abc))', '(foo=abc AND def) AND (bar=xyz AND abc)'),
         ('(&(foo=abc OR def)(bar=xyz OR abc))', '(foo=abc OR def) AND (bar=xyz OR abc)'),
+        ('(!(!(foo=abc)))', 'NOT NOT (foo=abc)'),
+        ('(!(&(foo=abc)(bar=def)))', 'NOT ((foo=abc) AND (bar=def))'),
+        ('(!(|(foo=abc)(bar=def)))', 'NOT ((foo=abc) OR (bar=def))'),
+    ]
+
+    bad_simple_filters = [
+        'foo=bar',
+        'AND (foo=bar)',
+        '(foo=bar) OR',
+        '(foo=bar) AND OR (foo=abc)',
+        '(foo=bar) NOT AND (foo=abc)',
     ]
 
     def test_parse_standard_filter(self):
@@ -104,11 +115,19 @@ class TestFilter(unittest.TestCase):
             self.assertEqual(standard, filter.rfc4511_filter_to_rfc4515_string(f_obj),
                              msg="Orig unified filter: {0}".format(unified))
 
+        for standard in self.bad_filters:
+            with self.assertRaises(LDAPError):
+                filter.parse(standard)
+
     def test_parse_simple_filter(self):
         for standard, simple in self.good_standard_and_simple_filters:
-            f_obj = filter.parse(simple)
+            f_obj = filter.parse_simple_filter(simple)
             self.assertEqual(standard, filter.rfc4511_filter_to_rfc4515_string(f_obj),
                              msg="Simple test filter did not produce consistent results!")
+
+        for simple in self.bad_simple_filters:
+            with self.assertRaises(LDAPError):
+                filter.parse_simple_filter(simple)
 
     def test_parse_simple_filter_simple_only(self):
         """Ensure parse_simple_filter() only supports simple filters"""
