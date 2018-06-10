@@ -360,7 +360,7 @@ class LDAPSocket(object):
                             elif res_code == ResultCode('strongerAuthRequired'):
                                 # this is a direct quote from RFC 4511 sec 4.4.1
                                 msg += (' (The server has detected that an established security association between the'
-                                        'client and server has unexpectedly failed or been compromised)')
+                                        ' client and server has unexpectedly failed or been compromised)')
                         except UnexpectedResponseType:
                             msg = 'Unhandled unsolicited message from server'
                         finally:
