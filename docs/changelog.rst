@@ -1,6 +1,16 @@
 Changelog
 =========
 
+1.5.0
+-----
+
+Released 2018.06.09
+
+* Added new simple filter syntax
+* Switched default filter syntax to UNIFIED which should be backwards compatible with standard RFC 4515 filters
+
+Special thanks to @jpypi for authoring the new grammar
+
 1.4.1
 -----
 
