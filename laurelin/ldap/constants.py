@@ -6,6 +6,38 @@ from .rfc4511 import (
     DerefAliases as _DerefAliases,
 )
 
+_const_filter_syntax_standard = '__rfc4515_standard_filter_syntax__'
+_const_filter_syntax_simple = '__laurelin_simplified_filter_syntax__'
+_const_filter_syntax_unified = '__laurelin_unified_filter_syntax__'
+
+
+class _FilterSyntaxSelection(object):
+    def __init__(self, const):
+        self.const = const
+
+    def __repr__(self):
+        if self.const == _const_filter_syntax_simple:
+            return 'FilterSyntax.SIMPLE'
+        elif self.const == _const_filter_syntax_standard:
+            return 'FilterSyntax.STANDARD'
+        elif self.const == _const_filter_syntax_unified:
+            return 'FilterSyntax.UNIFIED'
+        else:
+            return repr(self.const)
+
+
+class FilterSyntax:
+    """Filter syntax selection constants. Used to determine which filter syntax to use when parsing a search filter."""
+    STANDARD = _FilterSyntaxSelection(_const_filter_syntax_standard)
+    SIMPLE = _FilterSyntaxSelection(_const_filter_syntax_simple)
+    UNIFIED = _FilterSyntaxSelection(_const_filter_syntax_unified)
+
+    @staticmethod
+    def string(str):
+        """Convert filter syntax string to constant"""
+        str = str.upper()
+        return getattr(FilterSyntax, str)
+
 
 class _DeleteAllAttrs(object):
     """Sentinel object used to delete all attributes in replace or delete"""

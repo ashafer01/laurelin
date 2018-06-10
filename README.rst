@@ -21,6 +21,7 @@ Features Overview
 
 * Fully compliant with RFC 4510 and its children, as well as several other related standards.
 * Tested against CPython 2.7, 3.4, 3.5, 3.6, PyPy, and PyPy3.
+* Simplified filter syntax (optional, standard filter syntax is fully supported and used by default)
 * Pythonic attributes input and presentation. It's just a dictionary.
 * Exceedingly easy relative searching. All objects have a suite of search methods which will automatically pass the
   object's DN as the search base. In many cases, you wont have to pass *any* arguments to search methods.
