@@ -4,10 +4,10 @@ from __future__ import absolute_import
 from . import controls
 from . import rfc4511
 from . import utils
-from .constants import Scope, DerefAliases, DELETE_ALL
+from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .exceptions import *
 from .extensible import Extensible
-from .filter import parse as parse_filter
+from .filter import parse as parse_unified_filter, parse_standard_filter, parse_simple_filter
 from .ldapobject import LDAPObject
 from .modify import (
     Mod,
@@ -122,6 +122,10 @@ class LDAP(Extensible):
     :param bool ignore_empty_list: Default False. Set to True to ignore empty value lists passed to
                                    :meth:`.LDAP.modify`, :meth:`.LDAP.replace_attrs`, or :meth:`.LDAP.delete_attrs` or
                                    their LDAPObject counterparts. This will be default True in a future release.
+    :param FilterSyntax filter_syntax: The default search filter syntax selection. Must be one of the
+                                       :class:`.FilterSyntax` constants. Can be overridden on a per-search basis
+                                       by setting the ``filter_syntax`` keyword on :meth:`LDAP.search`. Defaults
+                                       to ``FilterSyntax.STANDARD`` for RFC4515-compliant filter string syntax.
 
     The class can be used as a context manager, which will automatically unbind and close the connection when the
     context manager exits.
@@ -162,6 +166,7 @@ class LDAP(Extensible):
     DEFAULT_WARN_EMPTY_LIST = False
     DEFAULT_ERROR_EMPTY_LIST = False
     DEFAULT_IGNORE_EMPTY_LIST = False
+    DEFAULT_FILTER_SYNTAX = FilterSyntax.UNIFIED
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -230,7 +235,7 @@ class LDAP(Extensible):
                  deref_aliases=None, strict_modify=None, ssl_verify=None, ssl_ca_file=None, ssl_ca_path=None,
                  ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
                  default_criticality=None, follow_referrals=None, validators=None, warn_empty_list=None,
-                 error_empty_list=None, ignore_empty_list=None):
+                 error_empty_list=None, ignore_empty_list=None, filter_syntax=None):
 
         # setup
         if server is None:
@@ -273,6 +278,8 @@ class LDAP(Extensible):
             error_empty_list = LDAP.DEFAULT_ERROR_EMPTY_LIST
         if ignore_empty_list is None:
             ignore_empty_list = LDAP.DEFAULT_IGNORE_EMPTY_LIST
+        if filter_syntax is None:
+            filter_syntax = LDAP.DEFAULT_FILTER_SYNTAX
 
         self.default_search_timeout = search_timeout
         self.default_deref_aliases = deref_aliases
@@ -280,6 +287,7 @@ class LDAP(Extensible):
         self.default_follow_referrals = follow_referrals
         self.default_sasl_mech = default_sasl_mech
         self.default_criticality = default_criticality
+        self.default_filter_syntax = filter_syntax
 
         self.strict_modify = strict_modify
         self.sasl_fatal_downgrade_check = sasl_fatal_downgrade_check
@@ -619,7 +627,8 @@ class LDAP(Extensible):
             return True
 
     def search(self, base_dn, scope=Scope.SUBTREE, filter=None, attrs=None, search_timeout=None, limit=0,
-               deref_aliases=None, attrs_only=False, fetch_result_refs=None, follow_referrals=None, **kwds):
+               deref_aliases=None, attrs_only=False, fetch_result_refs=None, follow_referrals=None,
+               filter_syntax=None, **kwds):
         """Sends search and return an iterator over results.
 
         :param str base_dn: The DN of the base object of the search
@@ -649,6 +658,10 @@ class LDAP(Extensible):
                                       per connection by passing the `follow_referrals` keyword to the :class:`LDAP`
                                       constructor, or set the global default by defining
                                       :attr:`LDAP.DEFAULT_FOLLOW_REFERRALS`.
+        :param FilterSyntax filter_syntax: Select which filter syntax to use to parse the ``filter``. The default can be
+                                           set per connection by passing the ``default_filter_syntax`` keyword to the
+                                           :class:`LDAP` constructor, or set the global default by defining
+                                           :attr:`LDAP.DEFAULT_FILTER_SYNTAX`.
         :return: An iterator over the results of the search. May yield :class:`LDAPObject` or possibly
                  :class:`SearchReferenceHandle` if ``fetch_result_refs`` is False.
 
@@ -672,6 +685,7 @@ class LDAP(Extensible):
 
         if filter is None:
             filter = LDAP.DEFAULT_FILTER
+            filter_syntax = FilterSyntax.STANDARD
         if search_timeout is None:
             search_timeout = self.default_search_timeout
         if deref_aliases is None:
@@ -680,6 +694,8 @@ class LDAP(Extensible):
             fetch_result_refs = self.default_fetch_result_refs
         if follow_referrals is None:
             follow_referrals = self.default_follow_referrals
+        if filter_syntax is None:
+            filter_syntax = self.default_filter_syntax
         req = rfc4511.SearchRequest()
         req.setComponentByName('baseObject', rfc4511.LDAPDN(base_dn))
         req.setComponentByName('scope', scope)
@@ -687,7 +703,15 @@ class LDAP(Extensible):
         req.setComponentByName('sizeLimit', rfc4511.Integer0ToMax(limit))
         req.setComponentByName('timeLimit', rfc4511.Integer0ToMax(search_timeout))
         req.setComponentByName('typesOnly', rfc4511.TypesOnly(attrs_only))
-        req.setComponentByName('filter', parse_filter(filter))
+        if filter_syntax is FilterSyntax.UNIFIED:
+            rfc4511_filter = parse_unified_filter(filter)
+        elif filter_syntax is FilterSyntax.STANDARD:
+            rfc4511_filter = parse_standard_filter(filter)
+        elif filter_syntax is FilterSyntax.SIMPLE:
+            rfc4511_filter = parse_simple_filter(filter)
+        else:
+            raise LDAPError('Invalid filter_syntax')
+        req.setComponentByName('filter', rfc4511_filter)
 
         _attrs = rfc4511.AttributeSelection()
         i = 0

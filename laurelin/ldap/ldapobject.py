@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from . import utils
 from .attrsdict import AttrsDict
 from .attrvaluelist import AttrValueList
-from .constants import Scope
+from .constants import Scope, FilterSyntax
 from .exceptions import (
     LDAPError,
     Abandon,
@@ -220,7 +220,7 @@ class LDAPObject(AttrsDict, Extensible):
             return self.get_child(rdn, attrs, **kwds)
         elif self.relative_search_scope == Scope.SUBTREE:
             filter = '({0})'.format(self._rdn_attr(rdn))
-            res = list(self.search(filter=filter, attrs=attrs, limit=2, **kwds))
+            res = list(self.search(filter=filter, filter_syntax=FilterSyntax.STANDARD, attrs=attrs, limit=2, **kwds))
             return utils.get_one_result(res)
         else:
             raise ValueError('Unknown relative_search_scope')

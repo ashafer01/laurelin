@@ -10,6 +10,7 @@ Features Overview
 * Fully compliant with RFC 4510 and its children.
 * Pure Python codebase, meaning that it can be used with Python implementations other than CPython.
 * Tested against CPython 2.7, 3.3, 3.4, 3.5, 3.6, PyPy, and PyPy3.
+* Simplified filter syntax (optional, standard filter syntax is fully supported and used by default)
 * Pythonic attributes input and presentation. It's just a dictionary.
 * Exceedingly easy relative searching. All objects have a suite of search methods which will automatically pass the
   object's DN as the search base. In many cases, you wont have to pass *any* arguments to search methods.
@@ -352,6 +353,7 @@ Global Default                                   :class:`.LDAP` instance attribu
 :attr:`.LDAP.DEFAULT_WARN_EMPTY_LIST`            ``warn_empty_list``               ``warn_empty_list``
 :attr:`.LDAP.DEFAULT_ERROR_EMPTY_LIST`           ``error_empty_list``              ``error_empty_list``
 :attr:`.LDAP.DEFAULT_IGNORE_EMPTY_LIST`          ``ignore_empty_list``             ``ignore_empty_list``
+:attr:`.LDAP.DEFAULT_FILTER_SYNTAX`              ``default_filter_syntax``         ``filter_syntax``
 ================================================ ================================= ==================================
 
 The :class:`.LDAP` instance attributes beginning with ``default_`` are used as the defaults for corresponding arguments
