@@ -1,6 +1,24 @@
 Changelog
 =========
 
+1.5.0
+-----
+
+Released 2018.06.09
+
+* Added new simple filter syntax
+* Switched default filter syntax to UNIFIED which should be backwards compatible with standard RFC 4515 filters
+
+Special thanks to @jpypi for authoring the new grammar
+
+1.4.1
+-----
+
+Released 2018.05.31
+
+* Fix: Checked for failed import of AF_UNIX to improve Windows support
+* Fix: Required latest pure-sasl
+
 1.4.0
 -----
 
