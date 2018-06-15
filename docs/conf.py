@@ -24,6 +24,12 @@ from sphinx.ext.autodoc import FunctionDocumenter
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
 
+from laurelin.ldap import attributetype, objectclass, rules
+
+attributetype._skip_registration = True
+objectclass._skip_registration = True
+rules._skip_registration = True
+
 
 # -- General configuration ------------------------------------------------
 

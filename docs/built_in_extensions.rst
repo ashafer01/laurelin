@@ -15,9 +15,9 @@ POSIX Users and Groups
 
    .. autoattribute:: laurelin.extensions.posix.DEFAULT_GIDNUMBER
 
-   .. autoattribute:: laurelin.extensions.posix.USER_RDN_ATTR
+   .. autoattribute:: laurelin.extensions.posix.DEFAULT_USER_RDN_ATTR
 
-   .. autoattribute:: laurelin.extensions.posix.GROUP_RDN_ATTR
+   .. autoattribute:: laurelin.extensions.posix.DEFAULT_GROUP_RDN_ATTR
 
    .. autoattribute:: laurelin.extensions.posix.HOMEDIR_FORMAT
 

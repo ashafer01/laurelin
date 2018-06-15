@@ -6,6 +6,8 @@ from .utils import CaseIgnoreDict
 import re
 import six
 
+_skip_registration = False
+
 
 ## Syntax Rules
 
@@ -25,7 +27,7 @@ class MetaSyntaxRule(type):
     def __new__(meta, name, bases, dct):
         oid = dct.get('OID')
         cls = type.__new__(meta, name, bases, dct)
-        if oid:
+        if oid and not _skip_registration:
             if oid in _oid_syntax_rules:
                 cur_class = _oid_syntax_rules[oid].__name__
                 raise LDAPSchemaError('Duplicate OID {0} in syntax rule declaration (original class {1}, '
@@ -119,14 +121,15 @@ class MetaMatchingRule(type):
             names = (names,)
             dct['NAME'] = names
         cls = type.__new__(meta, clsname, bases, dct)
-        if oid:
-            if oid in _oid_matching_rules:
-                raise LDAPSchemaError('Duplicate OID {0} in matching rule declaration'.format(oid))
-            _oid_matching_rules[oid] = cls
-        for name in names:
-            if name in _name_matching_rules:
-                raise LDAPSchemaError('Duplicate name {0} in matching rule declaration'.format(name))
-            _name_matching_rules[name] = cls
+        if not _skip_registration:
+            if oid:
+                if oid in _oid_matching_rules:
+                    raise LDAPSchemaError('Duplicate OID {0} in matching rule declaration'.format(oid))
+                _oid_matching_rules[oid] = cls
+            for name in names:
+                if name in _name_matching_rules:
+                    raise LDAPSchemaError('Duplicate name {0} in matching rule declaration'.format(name))
+                _name_matching_rules[name] = cls
         return cls
 
 

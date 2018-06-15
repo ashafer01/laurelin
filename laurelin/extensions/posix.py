@@ -29,7 +29,9 @@ both users and groups, ``uidNumber``, ``gidNumber``, ``cn``, ``homeDirectory``, 
 For both users and groups, the DN will be automatically constructed (if not specified with the ``dn`` keyword) by using
 a *placement function*. There is both a user and group placement function. It takes in the attribute keywords passed to
 the add function, and returns a new **parent** DN. The RDN is generated using the configured default RDN attribute. See
-the reference below for how to specify placement functions.
+the reference below for how to specify placement functions. (Note: the placement function concept may be altered or
+removed in a future major release. I suggest using the `compatible release operator
+<https://www.python.org/dev/peps/pep-0440/#compatible-release>`_ to declare your laurelin-ldap dependency).
 
 By default any gaps will be filled in your uid/gid number range. You can turn this feature off, and automatically
 increment the highest number by passing ``fill_gaps=False``. You can also set the module level attribute
