@@ -43,6 +43,10 @@ POSIX Users and Groups
 
    .. autofunction:: laurelin.extensions.posix.get_group
 
+   .. autofunction:: laurelin.extensions.posix.find_user
+
+   .. autofunction:: laurelin.extensions.posix.find_group
+
    .. autofunction:: laurelin.extensions.posix.add_user
 
    .. autofunction:: laurelin.extensions.posix.update_user

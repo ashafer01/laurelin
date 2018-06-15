@@ -74,11 +74,9 @@ Configuration Reference
     Pass this a new function that accepts an :class:`LDAP` instance as well as all of the attribute keywords passed to
     :meth:`LDAP.add_group`. It should return a new parent DN string for the group object. The RDN will be
     automatically generated seperately.
-
-
 """
 from __future__ import absolute_import
-from laurelin.ldap import LDAP, LDAPObject, LDAPError, NoSearchResults, DELETE_ALL
+from laurelin.ldap import LDAP, LDAPObject, LDAPError, NoSearchResults, DELETE_ALL, FilterSyntax
 from laurelin.ldap.attributetype import AttributeType
 from laurelin.ldap.objectclass import ObjectClass, get_object_class
 from laurelin.ldap.utils import CaseIgnoreDict, get_one_result
@@ -362,7 +360,8 @@ def find_user(self, **kwds):
     """
     attrs = kwds.pop('attrs', None)
     filter = _kwds_to_filter(kwds)
-    res = list(self.tag(USERS_BASE_TAG).search(filter=filter, attrs=attrs, limit=2))
+    res = list(self.tag(USERS_BASE_TAG).search(filter=filter, filter_syntax=FilterSyntax.STANDARD, attrs=attrs,
+                                               limit=2))
     return get_one_result(res)
 
 
@@ -395,7 +394,8 @@ def find_group(self, **kwds):
     """
     attrs = kwds.pop('attrs', None)
     filter = _kwds_to_filter(kwds)
-    res = list(self.tag(GROUPS_BASE_TAG).search(filter=filter, attrs=attrs, limit=2))
+    res = list(self.tag(GROUPS_BASE_TAG).search(filter=filter, filter_syntax=FilterSyntax.STANDARD, attrs=attrs,
+                                                limit=2))
     return get_one_result(res)
 
 
@@ -443,7 +443,7 @@ _LDAP_methods.append(_place_user)
 
 def _get_uid_numbers(self):
     uid_numbers = []
-    with self.tag(USERS_BASE_TAG).search(filter='(uidNumber=*)', attrs=['uidNumber']) as search:
+    with self.tag(USERS_BASE_TAG).search(filter='(uidNumber=*)', filter_syntax=FilterSyntax.STANDARD, attrs=['uidNumber']) as search:
         for user in search:
             uid_number = int(user['uidNumber'][0])
             if uid_number >= MIN_AUTO_UID_NUMBER:
@@ -519,11 +519,21 @@ def update_user(self, dn, **kwds):
 
     Pass attribute keywords with new values. Single-value attributes DO NOT need to be wrapped in a list.
 
+    If a new objectClass is not passed and strict modify is disabled (the default), then this method will ensure that
+    you have sufficient objectClass coverage for any new attributes you are adding. Conversely, if strict modify has
+    been enabled (and a new objectClass was not passed), no attempt will be made to update the objectClass, and you may
+    get a server error if you add an attribute for an objectClass not currently set on the object.
+
     :param str dn: The DN of the user to update
     :return: None
     """
-    # TODO update objectClass - need to know current attrs to combine with new
-    self.replace_attrs(dn, _kwds_to_attrs_dict(kwds))
+    kwds = CaseIgnoreDict(kwds)
+    current = None
+    if 'objectClass' not in kwds and not self.strict_modify:
+        current = self.get(dn)
+        current_oc = set(current['objectClass'])
+        kwds['objectClass'] = _update_user_object_classes(current_oc, kwds.keys())
+    self.replace_attrs(dn, _kwds_to_attrs_dict(kwds), current=current)
 
 
 _LDAP_methods.append(update_user)
@@ -541,7 +551,7 @@ _LDAP_methods.append(_place_group)
 def _get_gid_numbers(self):
     gid_numbers = []
     with self.tag(GROUPS_BASE_TAG).search(filter='(&(gidNumber=*)(objectClass={0}))'.format(GROUP_OBJECT_CLASS),
-                                          attrs=['gidNumber']) as search:
+                                          attrs=['gidNumber'], filter_syntax=FilterSyntax.STANDARD) as search:
         for group in search:
             gid_number = int(group['gidNumber'][0])
             if gid_number >= MIN_AUTO_GID_NUMBER:
@@ -581,7 +591,7 @@ def add_group(self, **kwds):
         my_gidnumber = _find_available_idnumber(all_gidnumbers, MIN_AUTO_GID_NUMBER, fill_gaps)
         kwds['gidNumber'] = [my_gidnumber]
     if 'objectClass' not in kwds:
-        kwds['objectClass'] = [GROUP_OBJECT_CLASS]
+        kwds['objectClass'] = ['top', GROUP_OBJECT_CLASS]
     try:
         dn = kwds.pop('dn')
     except KeyError:
@@ -669,10 +679,21 @@ def obj_update_user(self, **kwds):
 
     Pass attribute keywords with new values. Single-value attributes DO NOT need to be wrapped in a list.
 
+    Handles objectClass the same way as :meth:`LDAP.update_user`.
+
     :return: None
     """
     self._require_user()
-    # TODO objectClasses
+    kwds = CaseIgnoreDict(kwds)
+    current_oc = None
+    if 'objectClass' not in kwds:
+        if 'objectClass' in self:
+            current_oc = set(self['objectClass'])
+        elif not self.ldap_conn.strict_modify:
+            self.refresh(['objectClass'])
+            current_oc = set(self['objectClass'])
+    if current_oc is not None:
+        kwds['objectClass'] = _update_user_object_classes(current_oc, kwds.keys())
     self.replace_attrs(_kwds_to_attrs_dict(kwds))
 
 
@@ -816,7 +837,7 @@ def _get_user_object_classes(attrs):
     attrs_set.add('objectclass')
     attrs = attrs_set
 
-    object_classes = set((USER_OBJECT_CLASS,))
+    object_classes = set(('top', USER_OBJECT_CLASS))
 
     for attr in USER_ATTRS:
         try:
@@ -834,7 +855,7 @@ def _get_user_object_classes(attrs):
     if shadow_account:
         object_classes.add(_shadow_account.names[0])
 
-    inheritance_chain = ['top', 'person', 'organizationalPerson', 'inetOrgPerson']
+    inheritance_chain = ['person', 'organizationalPerson', 'inetOrgPerson']
     max_index = -1
     for i, oc_name in enumerate(inheritance_chain):
         for attr in _get_oc_name_attrs(oc_name):
@@ -850,6 +871,13 @@ def _get_user_object_classes(attrs):
     if attrs:
         raise LDAPPOSIXError('Could not find objectClass for attributes: ' + ','.join(attrs))
     return list(object_classes)
+
+
+def _update_user_object_classes(current_oc, attrs):
+    new_oc = _get_user_object_classes(attrs)
+    for oc in new_oc:
+        current_oc.add(oc)
+    return list(current_oc)
 
 
 def _add_or_get_child_ou(ldap, tag, ou):
