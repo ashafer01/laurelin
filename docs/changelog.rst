@@ -1,6 +1,14 @@
 Changelog
 =========
 
+1.5.1
+-----
+
+Released 2018.06.15
+
+* Minor fix: Added FilterSyntax to all
+* Doc update: added dependent info section to readme
+
 1.5.0
 -----
 
