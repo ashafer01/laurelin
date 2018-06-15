@@ -26,9 +26,9 @@ Released 2018.05.29
 
 * Validation updates:
 
-    * Added :meth:`.LDAP.disable_validation` which creates a context with any or all validators skipped
-    * Added an ``ldap_conn`` attribute to validator instances to allow validators to query the server
-    * Allowed passing a class as well as an instance with the ``validators`` constructor keyword
+  * Added :meth:`.LDAP.disable_validation` which creates a context with any or all validators skipped
+  * Added an ``ldap_conn`` attribute to validator instances to allow validators to query the server
+  * Allowed passing a class as well as an instance with the ``validators`` constructor keyword
 
 * Greatly improved handling of unsolcitied messages (message ID 0)
 * Fix: enforce maximum length for attribute types

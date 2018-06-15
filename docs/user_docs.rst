@@ -107,15 +107,15 @@ LDAP Methods Intro
 :meth:`.LDAP.search` sends a search request and returns an iterable over instances of :class:`.LDAPObject`. Basic
 arguments are described here (listed in order):
 
- * ``base_dn`` - the absolute DN to start the search from
- * ``scope`` - One of:
+* ``base_dn`` - the absolute DN to start the search from
+* ``scope`` - One of:
 
-   * :attr:`.Scope.BASE` - only search ``base_dn`` itself
-   * :attr:`.Scope.ONE` - search ``base_dn`` and its immediate children
-   * :attr:`.Scope.SUB` - search ``base_dn`` and all of its descendents (default)
+  * :attr:`.Scope.BASE` - only search ``base_dn`` itself
+  * :attr:`.Scope.ONE` - search ``base_dn`` and its immediate children
+  * :attr:`.Scope.SUB` - search ``base_dn`` and all of its descendents (default)
 
- * ``filter`` - standard LDAP filter string
- * ``attrs`` - a list of attributes to return for each object
+* ``filter`` - standard LDAP filter string
+* ``attrs`` - a list of attributes to return for each object
 
 Use :meth:`LDAP.get` if you just need to get a single object by its DN. Also accepts an optional list of attributes.
 
@@ -253,23 +253,23 @@ required with 3 arguments:
 
 1. One of the :class:`.Mod` constants which describe the operation to perform on an attribute:
 
-  * :attr:`.Mod.ADD` adds new attributes/values
-  * :attr:`.Mod.REPLACE` replaces all values for an attribute, creating new attributes if necessary
-  * :attr:`.Mod.DELETE` removes attributes/values.
+* :attr:`.Mod.ADD` adds new attributes/values
+* :attr:`.Mod.REPLACE` replaces all values for an attribute, creating new attributes if necessary
+* :attr:`.Mod.DELETE` removes attributes/values.
 
 2. The name of the attribute to modify. Each entry may only modify one attribute, but an unlimited number of entries may
    be specified in a single modify operation.
 3. A list of attribute values to use with the modify operation or the constant :attr:`.LDAP.DELETE_ALL`:
 
-  * The list may be empty for :attr:`.Mod.REPLACE` and :attr:`.Mod.DELETE`, both of which will cause all values for the
-    given attribute to be removed from the object. The list may not be empty for :attr:`.Mod.ADD`. You can also specify
-    the constant :attr:`.LDAP.DELETE_ALL` in place of any empty list. If you wish to warn about empty lists or require
-    the use of the constant, pass ``warn_empty_list=True`` or ``error_empty_list=True`` to the :class:`.LDAP`
-    constructor. You can also pass ``ignore_empty_list=True`` to silently prevent these from being sent to the server
-    (this will be the default behavior in a future release).
-  * A non-empty list for :attr:`.Mod.ADD` lists all new attribute values to add
-  * A non-empty list for :attr:`.Mod.DELETE` lists specific attribute values to remove
-  * A non-empty list for :attr:`.Mod.REPLACE` indicates ALL new values for the attribute - all others will be removed.
+* The list may be empty for :attr:`.Mod.REPLACE` and :attr:`.Mod.DELETE`, both of which will cause all values for the
+  given attribute to be removed from the object. The list may not be empty for :attr:`.Mod.ADD`. You can also specify
+  the constant :attr:`.LDAP.DELETE_ALL` in place of any empty list. If you wish to warn about empty lists or require
+  the use of the constant, pass ``warn_empty_list=True`` or ``error_empty_list=True`` to the :class:`.LDAP`
+  constructor. You can also pass ``ignore_empty_list=True`` to silently prevent these from being sent to the server
+  (this will be the default behavior in a future release).
+* A non-empty list for :attr:`.Mod.ADD` lists all new attribute values to add
+* A non-empty list for :attr:`.Mod.DELETE` lists specific attribute values to remove
+* A non-empty list for :attr:`.Mod.REPLACE` indicates ALL new values for the attribute - all others will be removed.
 
 Example custom modify operation::
 
