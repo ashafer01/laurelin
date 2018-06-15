@@ -58,7 +58,7 @@ class TestPosixExtension(unittest.TestCase):
         self.posix.HOMEDIR_FORMAT = test_homedir_format
 
         expected_homedir = test_homedir_format.format(uid=test_uid)
-        expected_ocs = set(['posixAccount', 'organizationalPerson'])
+        expected_ocs = set(['top', 'posixAccount', 'organizationalPerson'])
 
         mock_sock.add_ldap_result(rfc4511.AddResponse, 'addResponse')
         user = ldap.add_user(uid=test_uid, uidNumber='742', postalAddress='foo', userPassword='foo')
@@ -75,7 +75,7 @@ class TestPosixExtension(unittest.TestCase):
         mock_sock.add_ldap_result(rfc4511.AddResponse, 'addResponse')
         user = ldap.add_user(uid=test_uid, uidNumber='742', carLicense='foo', userPassword='foo')
 
-        expected_ocs = set(['posixAccount', 'inetOrgPerson'])
+        expected_ocs = set(['top', 'posixAccount', 'inetOrgPerson'])
         self.assertEqual(set(user['objectClass']), expected_ocs,
                          'incorrect auto objectClass selection')
 
