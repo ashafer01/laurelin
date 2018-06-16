@@ -685,14 +685,9 @@ def obj_update_user(self, **kwds):
     """
     self._require_user()
     kwds = CaseIgnoreDict(kwds)
-    current_oc = None
     if 'objectClass' not in kwds:
-        if 'objectClass' in self:
-            current_oc = set(self['objectClass'])
-        elif not self.ldap_conn.strict_modify:
-            self.refresh(['objectClass'])
-            current_oc = set(self['objectClass'])
-    if current_oc is not None:
+        # note: we always will have a local objectClass at this point due to the _require_user() call
+        current_oc = set(self['objectClass'])
         kwds['objectClass'] = _update_user_object_classes(current_oc, kwds.keys())
     self.replace_attrs(_kwds_to_attrs_dict(kwds))
 

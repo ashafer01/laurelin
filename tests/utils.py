@@ -1,5 +1,7 @@
-from laurelin.ldap import attributetype, objectclass, rules
+from laurelin.ldap import attributetype, objectclass, rules, protoutils
 from importlib import import_module
+import six
+from six.moves import range
 
 
 def get_reload():
@@ -64,3 +66,17 @@ def import_install_mock():
             pip.main(['install', 'mock'])
             import mock
             return mock
+
+
+def get_modify_value_set(lm, attr):
+    mid, mod_req, ctrls = protoutils.unpack('modifyRequest', lm)
+
+    changes = mod_req.getComponentByName('changes')
+    for i in range(len(changes)):
+        change = changes.getComponentByPosition(i)
+        pa = change.getComponentByName('modification')
+        have_attr = six.text_type(pa.getComponentByName('type'))
+        if attr.lower() == have_attr.lower():
+            vals = pa.getComponentByName('vals')
+            return set(protoutils.seq_to_list(vals))
+    raise Exception('attribute {0} was not present in the modifyRequest'.format(attr))

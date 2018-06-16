@@ -1,7 +1,7 @@
 import unittest
 from laurelin.ldap import LDAP, Scope
-from laurelin.ldap import rfc4511
-from ..utils import load_schema
+from laurelin.ldap import rfc4511, protoutils
+from ..utils import load_schema, get_modify_value_set
 from ..mock_ldapsocket import MockSockRootDSE
 
 
@@ -125,3 +125,105 @@ class TestPosixExtension(unittest.TestCase):
         user = ldap.add_group(cn=test_cn, fill_gaps=False)
         self.assertEqual(user['gidNumber'][0], '1004',
                          'incorrect auto gidNumber selection with fill_gaps disabled')
+
+    def test_update_user_object_class(self):
+        """Ensure update_user updates the objectClass correctly when strict_modify is disabled"""
+        mock_sock = MockSockRootDSE()
+        ldap = LDAP(mock_sock)
+        mock_sock.clear_sent()
+
+        ldap.strict_modify = False
+
+        ldap.base.obj('ou=users',
+                      tag=self.posix.GROUPS_BASE_TAG,
+                      rdn_attr='uid',
+                      relative_search_scope=Scope.ONE)
+
+        test_user_dn = 'uid=foo,ou=users,dc=example,dc=org'
+
+        mock_sock.add_search_res_entry(test_user_dn, {'objectClass': ['top', 'posixAccount']})
+        mock_sock.add_search_res_done(test_user_dn)
+        mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
+        ldap.update_user(test_user_dn, postalAddress='foo')
+
+        mock_sock.read_sent()  # throw away search request
+
+        expected_object_classes = set(('top', 'posixAccount', 'organizationalPerson'))
+        sent_object_classes = get_modify_value_set(mock_sock.read_sent(), 'objectClass')
+
+        self.assertEqual(expected_object_classes, sent_object_classes)
+
+    def test_update_user_object_class_strict_modify(self):
+        """Ensure update_user does not update the object class when strict_modify is enabled"""
+        mock_sock = MockSockRootDSE()
+        ldap = LDAP(mock_sock)
+        mock_sock.clear_sent()
+
+        ldap.strict_modify = True
+
+        ldap.base.obj('ou=users',
+                      tag=self.posix.GROUPS_BASE_TAG,
+                      rdn_attr='uid',
+                      relative_search_scope=Scope.ONE)
+
+        test_user_dn = 'uid=foo,ou=users,dc=example,dc=org'
+        mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
+        ldap.update_user(test_user_dn, postalAddress='foo')
+
+        self.assertEqual(1, mock_sock.num_sent())
+
+        with self.assertRaises(Exception):
+            get_modify_value_set(mock_sock.read_sent(), 'objectClass')
+
+    def test_update_user_object_class_explicit(self):
+        """Ensure update_user behaves correctly when an object class is explicitly passed in"""
+        mock_sock = MockSockRootDSE()
+        ldap = LDAP(mock_sock)
+        mock_sock.clear_sent()
+
+        ldap.base.obj('ou=users',
+                      tag=self.posix.GROUPS_BASE_TAG,
+                      rdn_attr='uid',
+                      relative_search_scope=Scope.ONE)
+
+        test_user_dn = 'uid=foo,ou=users,dc=example,dc=org'
+        test_object_classes = ['top', 'posixAccount', 'organizationalPerson']
+
+        ldap.strict_modify = False
+        mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
+        ldap.update_user(test_user_dn, postalAddress='foo', objectClass=test_object_classes)
+
+        sent_object_classes = get_modify_value_set(mock_sock.read_sent(), 'objectClass')
+
+        self.assertEqual(set(test_object_classes), sent_object_classes)
+
+        ldap.strict_modify = True
+        mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
+        ldap.update_user(test_user_dn, postalAddress='foo', objectClass=test_object_classes)
+
+        sent_object_classes = get_modify_value_set(mock_sock.read_sent(), 'objectClass')
+
+        self.assertEqual(set(test_object_classes), sent_object_classes)
+
+    def test_obj_update_user_object_class(self):
+        """Ensure correct objectClass is sent to the server when we have a local objectClass"""
+        mock_sock = MockSockRootDSE()
+        ldap = LDAP(mock_sock)
+        mock_sock.clear_sent()
+
+        user_base = ldap.base.obj('ou=users',
+                                  tag=self.posix.GROUPS_BASE_TAG,
+                                  rdn_attr='uid',
+                                  relative_search_scope=Scope.ONE)
+
+        test_user_rdn = 'uid=foo'
+
+        initial_oc = ['top', 'posixAccount']
+        expected_oc = initial_oc + ['organizationalPerson']
+        test_user = user_base.obj(test_user_rdn, {'objectClass': initial_oc})
+
+        mock_sock.add_ldap_result(rfc4511.ModifyResponse, 'modifyResponse')
+        test_user.update_user(postalAddress='foo')
+
+        sent_object_classes = get_modify_value_set(mock_sock.read_sent(), 'objectClass')
+        self.assertEqual(set(expected_oc), sent_object_classes)
