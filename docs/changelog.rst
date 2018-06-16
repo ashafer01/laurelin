@@ -1,10 +1,12 @@
 Changelog
 =========
 
-1.5.1
+1.5.2
 -----
 
 Released 2018.06.15
+
+1.5.1 was built off of the wrong branch and will be removed.
 
 * Minor fix: Added FilterSyntax to all
 * Doc update: added dependent info section to readme
