@@ -80,41 +80,46 @@ TAG = 'netgroup_base'
 
 _TRIPLE_RE = '^\(([^,]*),([^,]*),([^)]*)\)$'
 
-
-## Schema definitions from RFC 2307
-
-
-_nis_netgroup = ObjectClass('''
-( 1.3.6.1.1.1.2.8 NAME 'nisNetgroup' SUP top STRUCTURAL
-  MUST cn
-  MAY ( nisNetgroupTriple $ memberNisNetgroup $ description ) )
-''')
-
-AttributeType('''
-( 1.3.6.1.1.1.1.13 NAME 'memberNisNetgroup'
-  EQUALITY caseExactIA5Match
-  SUBSTR caseExactIA5SubstringsMatch
-  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
-''')
-
-AttributeType('''
-( 1.3.6.1.1.1.1.14 NAME 'nisNetgroupTriple'
-  DESC 'Netgroup triple'
-  EQUALITY caseExactMatch
-  SYNTAX 1.3.6.1.1.1.0.0 )
-''')
+LAURELIN_REQUIRES_BASE_SCHEMA = True
 
 
-class nisNetgroupTripleSytnax(RegexSyntaxRule):
-    OID = '1.3.6.1.1.1.0.0'
-    DESC = 'NIS netgroup triple'
-    regex = _TRIPLE_RE
+def laurelin_extension_setup():
+    # Schema definitions from RFC 2307
+
+    ObjectClass('''
+    ( 1.3.6.1.1.1.2.8 NAME 'nisNetgroup' SUP top STRUCTURAL
+      MUST cn
+      MAY ( nisNetgroupTriple $ memberNisNetgroup $ description ) )
+    ''')
+
+    AttributeType('''
+    ( 1.3.6.1.1.1.1.13 NAME 'memberNisNetgroup'
+      EQUALITY caseExactIA5Match
+      SUBSTR caseExactIA5SubstringsMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+    ''')
+
+    AttributeType('''
+    ( 1.3.6.1.1.1.1.14 NAME 'nisNetgroupTriple'
+      DESC 'Netgroup triple'
+      EQUALITY caseExactMatch
+      SYNTAX 1.3.6.1.1.1.0.0 )
+    ''')
+
+    class nisNetgroupTripleSytnax(RegexSyntaxRule):
+        OID = '1.3.6.1.1.1.0.0'
+        DESC = 'NIS netgroup triple'
+        regex = _TRIPLE_RE
 
 
 # constants
 
-OBJECT_CLASS = _nis_netgroup.names[0]
-NETGROUP_ATTRS = _nis_netgroup.must + _nis_netgroup.may
+# OBJECT_CLASS = _nis_netgroup.names[0]
+# NETGROUP_ATTRS = _nis_netgroup.must + _nis_netgroup.may
+
+# temporary workaround
+OBJECT_CLASS = 'nisNetgroup'
+NETGROUP_ATTRS = ['*']
 
 
 class LaurelinLDAPExtension(extensible.LaurelinLDAPExtension):
@@ -130,12 +135,10 @@ class LaurelinLDAPExtension(extensible.LaurelinLDAPExtension):
         :rtype: LDAPObject
         :raises TagError: if the base object has not been tagged.
         """
-        return self.tag(TAG).find(cn, attrs)
+        return self.parent.tag(TAG).find(cn, attrs)
 
     def search(self, filter, attrs=NETGROUP_ATTRS):
-        """netgroup_search(filter, attrs=NETGROUP_ATTRS)
-
-        Search for netgroups.
+        """Search for netgroups.
 
         This depends on the base object having been tagged and configured properly. See
         :mod:`laurelin.extensions.netgroups`.
@@ -147,7 +150,7 @@ class LaurelinLDAPExtension(extensible.LaurelinLDAPExtension):
         :rtype: SearchResultHandle
         :raises TagError: if the base object has not been tagged.
         """
-        return self.tag(TAG).search(_netgroup_filter(filter), attrs)
+        return self.parent.tag(TAG).search(_netgroup_filter(filter), attrs)
 
     def get_netgroup_obj_users(self, ng_obj, recursive=True):
         """Get a list of netgroup users from an already queried object, possibly querying for memberNisNetgroups if
@@ -206,7 +209,7 @@ class LaurelinLDAPExtension(extensible.LaurelinLDAPExtension):
         :rtype: list[str]
         :raises TagError: if the base object has not been tagged.
         """
-        ng = self.get_netgroup(cn)
+        ng = self.get(cn)
         return self.get_netgroup_obj_hosts(ng, recursive)
 
     def add_netgroup_users(self, dn, members, domain=''):

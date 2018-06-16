@@ -28,21 +28,15 @@ BASE_DIR = path_join(dirname(abspath(stack()[0][1])), '..')
 
 
 def main():
-    ldap_extensions = {}
-    ldapobject_extensions = {}
-
-    files = [
-        ('ldap_extensions.py', 'LDAP', ldap_extensions),
-        ('ldapobject_extensions.py', 'LDAPObject', ldapobject_extensions),
-    ]
     ext_classes = [
-        ('LaurelinLDAPExtension', ldap_extensions),
-        ('LaurelinLDAPObjectExtension', ldapobject_extensions),
+        ('LDAP', {}),
+        ('LDAPObject', {}),
     ]
 
     for name, extinfo in ExtensionBase.AVAILABLE_EXTENSIONS.items():
         mod = import_module(extinfo['module'])
         for classname, ext_dict in ext_classes:
+            classname = 'Laurelin{0}Extension'.format(classname)
             try:
                 # ensure the required class exists in the module
                 getattr(mod, classname)
@@ -52,7 +46,7 @@ def main():
                 # do nothing if it doesn't define the class
                 pass
 
-    for filename, extends_classname, available_extensions in files:
+    for extends_classname, available_extensions in ext_classes:
         # make a sorted list from the dict so we generate a deterministic file
         ext_names = list(available_extensions.keys())
         ext_names.sort()
@@ -61,6 +55,7 @@ def main():
             ext_list.append((name, available_extensions[name]))
 
         # render the template into a module
+        filename = '{0}_extensions.py'.format(extends_classname.lower())
         with open(path_join(BASE_DIR, 'laurelin', 'ldap', filename), 'w') as f:
             f.write(EXTENSION_TEMPLATE.render(AVAILABLE_EXTENSIONS=ext_list, EXTENDS=extends_classname))
 

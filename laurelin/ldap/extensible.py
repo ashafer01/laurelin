@@ -1,6 +1,26 @@
 from __future__ import absolute_import
 from .exceptions import LDAPExtensionError
+from .schema import load_base_schema
 from importlib import import_module
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def import_extension(modname):
+    mod = import_module(modname)
+    flag_attr = 'LAURELIN_EXTENSION_SETUP_COMPLETE'
+    if not getattr(mod, flag_attr, False):
+        # need to setup extension
+        try:
+            logger.info('Setting up extension {0}'.format(modname))
+            if getattr(mod, 'LAURELIN_REQUIRES_BASE_SCHEMA', False):
+                load_base_schema()
+            mod.laurelin_extension_setup()
+            setattr(mod, flag_attr, True)
+        except AttributeError:
+            pass
+    return mod
 
 
 class ExtensionBase(object):
@@ -27,7 +47,7 @@ class ExtensionBase(object):
             extinfo = self.AVAILABLE_EXTENSIONS[name]
             modname = extinfo['module']
             try:
-                mod = import_module(modname)
+                mod = import_extension(modname)
             except ImportError:
                 pip_package = extinfo['pip_package']
                 if pip_package is None:
