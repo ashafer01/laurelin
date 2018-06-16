@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def import_extension(modname):
+    """Import an extension module and run setup function if necessary"""
     mod = import_module(modname)
     flag_attr = 'LAURELIN_EXTENSION_SETUP_COMPLETE'
     if not getattr(mod, flag_attr, False):
@@ -16,7 +17,11 @@ def import_extension(modname):
             logger.info('Setting up extension {0}'.format(modname))
             if getattr(mod, 'LAURELIN_REQUIRES_BASE_SCHEMA', False):
                 load_base_schema()
-            mod.laurelin_extension_setup()
+            try:
+                setup_func = getattr(mod, 'laurelin_extension_setup')
+                setup_func()
+            except AttributeError:
+                pass
             setattr(mod, flag_attr, True)
         except AttributeError:
             pass
@@ -30,10 +35,12 @@ class ExtensionBase(object):
         'descattrs': {
             'module': 'laurelin.extensions.descattrs',
             'pip_package': None,  # built-in
+            'docstring': 'The built-in description attributes extension',
         },
         'netgroups': {
             'module': 'laurelin.extensions.netgroups',
             'pip_package': None,  # built-in
+            'docstring': 'The built-in NIS netgroups extension',
         }
     }
 

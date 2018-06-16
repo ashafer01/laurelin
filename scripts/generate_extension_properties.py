@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-import laurelin.ldap.schema  # hopefully can fix extension schema handling to not need this
+"""
+This script dynamically generates two python modules each containing one class. One is inherited by LDAP and the other
+by LDAPObject. They contain a ``@property`` for each extension defined in
+:attr:`.extensible.ExtensionBase.AVAILABLE_EXTENSIONS` which defines an extension class for the appropriate parent
+class.
+"""
 from laurelin.ldap.extensible import ExtensionBase
 from importlib import import_module
 from inspect import stack
@@ -15,7 +20,8 @@ class {{ EXTENDS }}Extensions(ExtensionBase):
 {% for name, extinfo in AVAILABLE_EXTENSIONS %}
     @property
     def {{ name }}(self):
-        """
+        """{{ extinfo['docstring'] }}
+
         :rtype: {{ extinfo['module'] }}.Laurelin{{ EXTENDS }}Extension
         """
         return self._get_extension_instance('{{ name }}')
@@ -58,6 +64,7 @@ def main():
         filename = '{0}_extensions.py'.format(extends_classname.lower())
         with open(path_join(BASE_DIR, 'laurelin', 'ldap', filename), 'w') as f:
             f.write(EXTENSION_TEMPLATE.render(AVAILABLE_EXTENSIONS=ext_list, EXTENDS=extends_classname))
+            print('Generated new {0}'.format(filename))
 
 
 if __name__ == '__main__':
