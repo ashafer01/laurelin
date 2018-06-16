@@ -6,9 +6,9 @@ from . import rfc4511
 from . import utils
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .exceptions import *
-from .extensible import Extensible
 from .filter import parse as parse_unified_filter, parse_standard_filter, parse_simple_filter
 from .ldapobject import LDAPObject
+from .ldap_extensions import LDAPExtensions
 from .modify import (
     Mod,
     Modlist,
@@ -79,7 +79,7 @@ def _check_obj_kwds(kwds):
         raise TypeError('Unknown keyword arguments: {0}'.format(', '.join(bad_kwds)))
 
 
-class LDAP(Extensible):
+class LDAP(LDAPExtensions):
     """Provides the connection to the LDAP DB. All constructor parameters have a matching global default as a class
     property on :class:`LDAP`
 
@@ -205,24 +205,6 @@ class LDAP(Extensible):
         """Always take the default action for warnings"""
         warnings.showwarning = _showwarning_default
 
-    @staticmethod
-    def activate_extension(module_name):
-        """Import the module name and call the ``activate_extension`` function on the module.
-
-        :param str module_name: The name of the module to import and activate
-        :return: The imported module
-        :rtype: module
-        """
-        mod = import_module(module_name)
-        if hasattr(mod, 'LAURELIN_ACTIVATED'):
-            logger.debug("Extension {0} already activated".format(module_name))
-            return mod
-        if hasattr(mod, 'activate_extension'):
-            mod.activate_extension()
-        mod.LAURELIN_ACTIVATED = True
-        logger.info("Activated extension {0} (File: {1})".format(module_name, mod.__file__))
-        return mod
-
     ## basic methods
 
     def __enter__(self):
@@ -236,6 +218,8 @@ class LDAP(Extensible):
                  ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
                  default_criticality=None, follow_referrals=None, validators=None, warn_empty_list=None,
                  error_empty_list=None, ignore_empty_list=None, filter_syntax=None):
+
+        LDAPExtensions.__init__(self)
 
         # setup
         if server is None:

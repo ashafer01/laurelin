@@ -70,7 +70,7 @@ Examples::
 """
 from __future__ import absolute_import
 import re
-from laurelin.ldap import LDAP, LDAPObject, LDAPError
+from laurelin.ldap import LDAP, LDAPObject, LDAPError, extensible
 from laurelin.ldap.attributetype import AttributeType
 from laurelin.ldap.objectclass import ObjectClass
 from laurelin.ldap.rules import RegexSyntaxRule
@@ -116,412 +116,268 @@ class nisNetgroupTripleSytnax(RegexSyntaxRule):
 OBJECT_CLASS = _nis_netgroup.names[0]
 NETGROUP_ATTRS = _nis_netgroup.must + _nis_netgroup.may
 
-## LDAP extension methods
 
-LDAP_methods = []
-
-
-def get_netgroup(self, cn, attrs=NETGROUP_ATTRS):
-    """get_netgroup(cn, attrs=NETGROUP_ATTRS)
-
-    Find a specific netgroup object.
-
-    This depends on the base object having been tagged and configured properly. See
-    :mod:`laurelin.extensions.netgroups`.
-
-    :param str cn: The name of the group or an RDN
-    :param list[str] attrs: List of attribute names to get. Defaults to all netgroup attributes.
-    :return: The netgroup object
-    :rtype: LDAPObject
-    :raises TagError: if the base object has not been tagged.
-    """
-    return self.tag(TAG).find(cn, attrs)
-
-
-LDAP_methods.append(get_netgroup)
-
-
-def netgroup_search(self, filter, attrs=NETGROUP_ATTRS):
-    """netgroup_search(filter, attrs=NETGROUP_ATTRS)
-
-    Search for netgroups.
-
-    This depends on the base object having been tagged and configured properly. See
-    :mod:`laurelin.extensions.netgroups`.
-
-    :param str filter: A partial filter string. The nisNetgroup objectClass will automatically be included in the
-                       filter sent to the server.
-    :param list[str] attrs: List of attribute names to get. Defaults to all netgroup attributes.
-    :return: An iterator over matching netgroup objects, yielding instances of :class:`.LDAPObject`.
-    :rtype: SearchResultHandle
-    :raises TagError: if the base object has not been tagged.
-    """
-    return self.tag(TAG).search(_netgroup_filter(filter), attrs)
-
-
-LDAP_methods.append(netgroup_search)
-
-
-def get_netgroup_obj_users(self, ng_obj, recursive=True):
-    """get_netgroup_obj_users(ng_obj, recursive=True)
-
-    Get a list of netgroup users from an already queried object, possibly querying for memberNisNetgroups if
-    ``recursive=True`` (the default).
-
-    :param LDAPObject ng_obj: A netgroup LDAP object
-    :param bool recursive: Set to False to only consider members of this group directly
-    :return: A list of usernames
-    :rtype: list[str]
-    """
-    users = _extract_triple_field(ng_obj, 2)
-    if recursive and ('memberNisNetgroup' in ng_obj):
-        for member in ng_obj['memberNisNetgroup']:
-            users += self.get_netgroup_users(member, True)
-    return users
-
-
-LDAP_methods.append(get_netgroup_obj_users)
-
-
-def get_netgroup_users(self, cn, recursive=True):
-    """get_netgroup_users(cn, recursive=True)
-
-    Get a list of all user entries for a netgroup.
-
-    This depends on the base object having been tagged and configured properly. See
-    :mod:`laurelin.extensions.netgroups`.
-
-    :param str cn: The name of the group or an RDN
-    :param bool recursive: Recursively get users by following memberNisNetgroups
-    :return: A list of usernames
-    :rtype: list[str]
-    :raises TagError: if the base object has not been tagged.
-    """
-    ng = self.get_netgroup(cn)
-    return self.get_netgroup_obj_users(ng, recursive)
-
-
-LDAP_methods.append(get_netgroup_users)
-
-
-def get_netgroup_obj_hosts(self, ng_obj, recursive=True):
-    """get_netgroup_obj_hosts(ng_obj, recursive=True)
-
-    Get a list of netgroup hosts from an already queried object, possibly querying for memberNisNetgroups if
-    ``recursive=True`` (the default).
-
-    :param LDAPObject ng_obj: A netgroup LDAP object
-    :param bool recursive: Set to False to only consider members of this group directly
-    :return: A list of hostnames
-    :rtype: list[str]
-    """
-    hosts = _extract_triple_field(ng_obj, 1)
-    if recursive and ('memberNisNetgroup' in ng_obj):
-        for member in ng_obj['memberNisNetgroup']:
-            hosts += self.get_netgroup_hosts(member, True)
-    return hosts
-
-
-LDAP_methods.append(get_netgroup_obj_hosts)
-
-
-def get_netgroup_hosts(self, cn, recursive=True):
-    """get_netgroup_hosts(cn, recursive=True)
-
-    Query a list of all host entries for a netgroup.
-
-    This depends on the base object having been tagged and configured properly. See
-    :mod:`laurelin.extensions.netgroups`.
-
-    :param str cn: The name of the group or an RDN
-    :param bool recursive: Recursively get hosts by following memberNisNetgroups
-    :return: A list of hostnames
-    :rtype: list[str]
-    :raises TagError: if the base object has not been tagged.
-    """
-    ng = self.get_netgroup(cn)
-    return self.get_netgroup_obj_hosts(ng, recursive)
-
-
-LDAP_methods.append(get_netgroup_hosts)
-
-
-def add_netgroup_users(self, dn, members, domain=''):
-    """add_netgroup_users(dn, members, domain='')
-
-    Add new users to a netgroup.
-
-    :param str dn: The absolute DN of the netgroup object
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or sinlge member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    """
-    self.add_attrs(dn, _member_user_list_to_attrs(members, domain))
-
-
-LDAP_methods.append(add_netgroup_users)
-
-
-def add_netgroup_hosts(self, dn, members, domain=''):
-    """add_netgroup_hosts(dn, members, domain='')
-
-    Add new hosts to a netgroup.
-
-    :param str dn: The absolute DN of the netgroup object
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    """
-    self.add_attrs(dn, _member_host_list_to_attrs(members, domain))
-
-
-LDAP_methods.append(add_netgroup_hosts)
-
-
-def replace_netgroup_users(self, dn, members, domain=''):
-    """replace_netgroup_users(dn, members, domain='')
-
-    Set new users on a netgroup.
-
-    :param str dn: The absolute DN of the netgroup object
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or sinlge member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    """
-    self.replace_attrs(dn, _member_user_list_to_attrs(members, domain))
-
-
-LDAP_methods.append(replace_netgroup_users)
-
-
-def replace_netgroup_hosts(self, dn, members, domain=''):
-    """replace_netgroup_hosts(dn, members, domain='')
-
-    Set new hosts on a netgroup.
-
-    :param str dn: The absolute DN of the netgroup object
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    """
-    self.replace_attrs(dn, _member_host_list_to_attrs(members, domain))
-
-
-LDAP_methods.append(replace_netgroup_hosts)
-
-
-def delete_netgroup_users(self, dn, members, domain=''):
-    """delete_netgroup_users(dn, members, domain='')
-
-    Delete users from a netgroup.
-
-    :param str dn: The absolute DN of the netgroup object
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or sinlge member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    """
-    self.delete_attrs(dn, _member_user_list_to_attrs(members, domain))
-
-
-LDAP_methods.append(delete_netgroup_users)
-
-
-def delete_netgroup_hosts(self, dn, members, domain=''):
-    """delete_netgroup_hosts(dn, members, domain='')
-
-    Delete hosts from a netgroup.
-
-    :param str dn: The absolute DN of the netgroup object
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    """
-    self.delete_attrs(dn, _member_host_list_to_attrs(members, domain))
-
-
-LDAP_methods.append(delete_netgroup_hosts)
-
-
-## LDAPObject extension methods
-
-LDAPObject_methods = []
-
-
-def _require_netgroup(self):
-    """Requires that this :class:`.LDAPObject` has the required netgroup object class.
-
-    :raises RuntimeError: if the object is missing the netgroup object class
-    """
-    if not self.has_object_class(OBJECT_CLASS):
-        raise RuntimeError('objectClass {0} is required'.format(OBJECT_CLASS))
-
-
-LDAPObject_methods.append(_require_netgroup)
-
-
-def obj_get_netgroup_users(self, recursive=True):
-    """obj_get_netgroup_users(recursive=True)
-
-    Get all users in this netgroup object.
-
-    :param bool recursive: Set to False to ignore any memberNisNetgroups defined for this object.
-    :return: A list of usernames
-    :rtype: list[str]
-    :raises RuntimeError: if this object is missing the netgroup object class
-    """
-    self._require_netgroup()
-    return self.ldap_conn.get_netgroup_obj_users(self, recursive)
-
-
-obj_get_netgroup_users.__name__ = 'get_netgroup_users'
-LDAPObject_methods.append(obj_get_netgroup_users)
-
-
-def obj_get_netgroup_hosts(self, recursive=True):
-    """obj_get_netgroup_hosts(recursive=True)
-
-    Get all hosts in this netgroup object.
-
-    :param bool recursive: Set to False to ignore any memberNisNetgroups defined for this object.
-    :return: A list of hostnames
-    :rtype: list[str]
-    :raises RuntimeError: if this object is missing the netgroup object class
-    """
-    self._require_netgroup()
-    return self.ldap_conn.get_netgroup_obj_hosts(self, recursive)
-
-
-obj_get_netgroup_hosts.__name__ = 'get_netgroup_hosts'
-LDAPObject_methods.append(obj_get_netgroup_hosts)
-
-
-def obj_add_netgroup_users(self, members, domain=''):
-    """obj_add_netgroup_users(members, domain='')
-
-    Add new user netgroup entries to this netgroup object.
-
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    :raises RuntimeError: if this object is missing the netgroup object class
-    """
-    self._require_netgroup()
-    self.add_attrs(_member_user_list_to_attrs(members, domain))
-
-
-obj_add_netgroup_users.__name__ = 'add_netgroup_users'
-LDAPObject_methods.append(obj_add_netgroup_users)
-
-
-def obj_add_netgroup_hosts(self, members, domain=''):
-    """obj_add_netgroup_hosts(members, domain='')
-
-    Add new host netgroup entries to this netgroup object.
-
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    :raises RuntimeError: if this object is missing the netgroup object class
-    """
-    self._require_netgroup()
-    self.add_attrs(_member_host_list_to_attrs(members, domain))
-
-
-obj_add_netgroup_hosts.__name__ = 'add_netgroup_hosts'
-LDAPObject_methods.append(obj_add_netgroup_hosts)
-
-
-def obj_replace_netgroup_users(self, members, domain=''):
-    """obj_replace_netgroup_users(members, domain='')
-
-    Set new user netgroup entries on this netgroup object.
-
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    :raises RuntimeError: if this object is missing the netgroup object class
-    """
-    self._require_netgroup()
-    self.replace_attrs(_member_user_list_to_attrs(members, domain))
-
-
-obj_replace_netgroup_users.__name__ = 'replace_netgroup_users'
-LDAPObject_methods.append(obj_replace_netgroup_users)
-
-
-def obj_replace_netgroup_hosts(self, members, domain=''):
-    """obj_replace_netgroup_hosts(members, domain='')
-
-    Set new host netgroup entries on this netgroup object.
-
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    :raises RuntimeError: if this object is missing the netgroup object class
-    """
-    self._require_netgroup()
-    self.replace_attrs(_member_host_list_to_attrs(members, domain))
-
-
-obj_replace_netgroup_hosts.__name__ = 'replace_netgroup_hosts'
-LDAPObject_methods.append(obj_replace_netgroup_hosts)
-
-
-def obj_delete_netgroup_users(self, members, domain=''):
-    """obj_delete_netgroup_users(members, domain='')
-
-    Delete user netgroup entries from this netgroup object.
-
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    :raises RuntimeError: if this object is missing the netgroup object class
-    """
-    self._require_netgroup()
-    self.delete_attrs(_member_user_list_to_attrs(members, domain))
-
-
-obj_delete_netgroup_users.__name__ = 'delete_netgroup_users'
-LDAPObject_methods.append(obj_delete_netgroup_users)
-
-
-def obj_delete_netgroup_hosts(self, members, domain=''):
-    """obj_delete_netgroup_hosts(members, domain='')
-
-    Delete host netgroup entries from this netgroup object.
-
-    :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
-    :type members: list or str or tuple
-    :param str domain: The default domain to use in nisNetgroupTriples where not already specified
-    :rtype: None
-    :raises RuntimeError: if this object is missing the netgroup object class
-    """
-    self._require_netgroup()
-    self.delete_attrs(_member_host_list_to_attrs(members, domain))
-
-
-obj_delete_netgroup_hosts.__name__ = 'delete_netgroup_hosts'
-LDAPObject_methods.append(obj_delete_netgroup_hosts)
-
-
-## Extension activation function
-
-
-def activate_extension():
-    """Extension activation function. Installs extension methods to :class:`.LDAP` and :class:`.LDAPObject`"""
-    LDAP.EXTEND(LDAP_methods)
-    LDAPObject.EXTEND(LDAPObject_methods)
+class LaurelinLDAPExtension(extensible.LaurelinLDAPExtension):
+    def get(self, cn, attrs=NETGROUP_ATTRS):
+        """Find a specific netgroup object.
+
+        This depends on the base object having been tagged and configured properly. See
+        :mod:`laurelin.extensions.netgroups`.
+
+        :param str cn: The name of the group or an RDN
+        :param list[str] attrs: List of attribute names to get. Defaults to all netgroup attributes.
+        :return: The netgroup object
+        :rtype: LDAPObject
+        :raises TagError: if the base object has not been tagged.
+        """
+        return self.tag(TAG).find(cn, attrs)
+
+    def search(self, filter, attrs=NETGROUP_ATTRS):
+        """netgroup_search(filter, attrs=NETGROUP_ATTRS)
+
+        Search for netgroups.
+
+        This depends on the base object having been tagged and configured properly. See
+        :mod:`laurelin.extensions.netgroups`.
+
+        :param str filter: A partial filter string. The nisNetgroup objectClass will automatically be included in the
+                           filter sent to the server.
+        :param list[str] attrs: List of attribute names to get. Defaults to all netgroup attributes.
+        :return: An iterator over matching netgroup objects, yielding instances of :class:`.LDAPObject`.
+        :rtype: SearchResultHandle
+        :raises TagError: if the base object has not been tagged.
+        """
+        return self.tag(TAG).search(_netgroup_filter(filter), attrs)
+
+    def get_netgroup_obj_users(self, ng_obj, recursive=True):
+        """Get a list of netgroup users from an already queried object, possibly querying for memberNisNetgroups if
+        ``recursive=True`` (the default).
+
+        :param LDAPObject ng_obj: A netgroup LDAP object
+        :param bool recursive: Set to False to only consider members of this group directly
+        :return: A list of usernames
+        :rtype: list[str]
+        """
+        users = _extract_triple_field(ng_obj, 2)
+        if recursive and ('memberNisNetgroup' in ng_obj):
+            for member in ng_obj['memberNisNetgroup']:
+                users += self.get_netgroup_users(member, True)
+        return users
+
+    def get_netgroup_users(self, cn, recursive=True):
+        """Get a list of all user entries for a netgroup.
+
+        This depends on the base object having been tagged and configured properly. See
+        :mod:`laurelin.extensions.netgroups`.
+
+        :param str cn: The name of the group or an RDN
+        :param bool recursive: Recursively get users by following memberNisNetgroups
+        :return: A list of usernames
+        :rtype: list[str]
+        :raises TagError: if the base object has not been tagged.
+        """
+        ng = self.get_netgroup(cn)
+        return self.get_netgroup_obj_users(ng, recursive)
+
+    def get_netgroup_obj_hosts(self, ng_obj, recursive=True):
+        """Get a list of netgroup hosts from an already queried object, possibly querying for memberNisNetgroups if
+        ``recursive=True`` (the default).
+
+        :param LDAPObject ng_obj: A netgroup LDAP object
+        :param bool recursive: Set to False to only consider members of this group directly
+        :return: A list of hostnames
+        :rtype: list[str]
+        """
+        hosts = _extract_triple_field(ng_obj, 1)
+        if recursive and ('memberNisNetgroup' in ng_obj):
+            for member in ng_obj['memberNisNetgroup']:
+                hosts += self.get_netgroup_hosts(member, True)
+        return hosts
+
+    def get_netgroup_hosts(self, cn, recursive=True):
+        """Query a list of all host entries for a netgroup.
+
+        This depends on the base object having been tagged and configured properly. See
+        :mod:`laurelin.extensions.netgroups`.
+
+        :param str cn: The name of the group or an RDN
+        :param bool recursive: Recursively get hosts by following memberNisNetgroups
+        :return: A list of hostnames
+        :rtype: list[str]
+        :raises TagError: if the base object has not been tagged.
+        """
+        ng = self.get_netgroup(cn)
+        return self.get_netgroup_obj_hosts(ng, recursive)
+
+    def add_netgroup_users(self, dn, members, domain=''):
+        """Add new users to a netgroup.
+
+        :param str dn: The absolute DN of the netgroup object
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or sinlge member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        """
+        self.parent.add_attrs(dn, _member_user_list_to_attrs(members, domain))
+
+    def add_netgroup_hosts(self, dn, members, domain=''):
+        """Add new hosts to a netgroup.
+
+        :param str dn: The absolute DN of the netgroup object
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        """
+        self.parent.add_attrs(dn, _member_host_list_to_attrs(members, domain))
+
+    def replace_netgroup_users(self, dn, members, domain=''):
+        """Set new users on a netgroup.
+
+        :param str dn: The absolute DN of the netgroup object
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or sinlge member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        """
+        self.parent.replace_attrs(dn, _member_user_list_to_attrs(members, domain))
+
+    def replace_netgroup_hosts(self, dn, members, domain=''):
+        """Set new hosts on a netgroup.
+
+        :param str dn: The absolute DN of the netgroup object
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        """
+        self.parent.replace_attrs(dn, _member_host_list_to_attrs(members, domain))
+
+    def delete_netgroup_users(self, dn, members, domain=''):
+        """Delete users from a netgroup.
+
+        :param str dn: The absolute DN of the netgroup object
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or sinlge member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        """
+        self.parent.delete_attrs(dn, _member_user_list_to_attrs(members, domain))
+
+    def delete_netgroup_hosts(self, dn, members, domain=''):
+        """Delete hosts from a netgroup.
+
+        :param str dn: The absolute DN of the netgroup object
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        """
+        self.parent.delete_attrs(dn, _member_host_list_to_attrs(members, domain))
+
+
+class LaurelinLDAPObjectExtension(extensible.LaurelinLDAPObjectExtension):
+    def _require_netgroup(self):
+        """Requires that this :class:`.LDAPObject` has the required netgroup object class.
+
+        :raises RuntimeError: if the object is missing the netgroup object class
+        """
+        if not self.parent.has_object_class(OBJECT_CLASS):
+            raise RuntimeError('objectClass {0} is required'.format(OBJECT_CLASS))
+
+    def get_users(self, recursive=True):
+        """Get all users in this netgroup object.
+
+        :param bool recursive: Set to False to ignore any memberNisNetgroups defined for this object.
+        :return: A list of usernames
+        :rtype: list[str]
+        :raises RuntimeError: if this object is missing the netgroup object class
+        """
+        self._require_netgroup()
+        return self.parent.ldap_conn.get_netgroup_obj_users(self, recursive)
+
+    def get_hosts(self, recursive=True):
+        """Get all hosts in this netgroup object.
+
+        :param bool recursive: Set to False to ignore any memberNisNetgroups defined for this object.
+        :return: A list of hostnames
+        :rtype: list[str]
+        :raises RuntimeError: if this object is missing the netgroup object class
+        """
+        self._require_netgroup()
+        return self.parent.ldap_conn.get_netgroup_obj_hosts(self, recursive)
+
+    def add_users(self, members, domain=''):
+        """Add new user netgroup entries to this netgroup object.
+
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        :raises RuntimeError: if this object is missing the netgroup object class
+        """
+        self._require_netgroup()
+        self.parent.add_attrs(_member_user_list_to_attrs(members, domain))
+
+    def add_hosts(self, members, domain=''):
+        """Add new host netgroup entries to this netgroup object.
+
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        :raises RuntimeError: if this object is missing the netgroup object class
+        """
+        self._require_netgroup()
+        self.parent.add_attrs(_member_host_list_to_attrs(members, domain))
+
+    def replace_users(self, members, domain=''):
+        """Set new user netgroup entries on this netgroup object.
+
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        :raises RuntimeError: if this object is missing the netgroup object class
+        """
+        self._require_netgroup()
+        self.parent.replace_attrs(_member_user_list_to_attrs(members, domain))
+
+    def replace_hosts(self, members, domain=''):
+        """Set new host netgroup entries on this netgroup object.
+
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        :raises RuntimeError: if this object is missing the netgroup object class
+        """
+        self._require_netgroup()
+        self.parent.replace_attrs(_member_host_list_to_attrs(members, domain))
+
+    def delete_users(self, members, domain=''):
+        """Delete user netgroup entries from this netgroup object.
+
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        :raises RuntimeError: if this object is missing the netgroup object class
+        """
+        self._require_netgroup()
+        self.parent.delete_attrs(_member_user_list_to_attrs(members, domain))
+
+    def delete_hosts(self, members, domain=''):
+        """Delete host netgroup entries from this netgroup object.
+
+        :param members: A Member List (see :mod:`laurelin.extensions.netgroups` doc) or single member list entry
+        :type members: list or str or tuple
+        :param str domain: The default domain to use in nisNetgroupTriples where not already specified
+        :rtype: None
+        :raises RuntimeError: if this object is missing the netgroup object class
+        """
+        self._require_netgroup()
+        self.parent.delete_attrs(_member_host_list_to_attrs(members, domain))
 
 
 ## private functions
