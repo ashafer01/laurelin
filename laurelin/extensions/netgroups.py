@@ -70,7 +70,7 @@ Examples::
 """
 from __future__ import absolute_import
 import re
-from laurelin.ldap import LDAP, LDAPObject, LDAPError, extensible
+from laurelin.ldap import LDAPError, extensible
 from laurelin.ldap.attributetype import AttributeType
 from laurelin.ldap.objectclass import ObjectClass
 from laurelin.ldap.rules import RegexSyntaxRule
@@ -80,36 +80,36 @@ TAG = 'netgroup_base'
 
 _TRIPLE_RE = '^\(([^,]*),([^,]*),([^)]*)\)$'
 
-LAURELIN_REQUIRES_BASE_SCHEMA = True
 
+class LaurelinExtension(extensible.LaurelinExtension):
+    NAME = 'netgroups'
+    REQUIRES_BASE_SCHEMA = True
 
-def laurelin_extension_setup():
-    # Schema definitions from RFC 2307
+    def __init__(self):
+        ObjectClass('''
+        ( 1.3.6.1.1.1.2.8 NAME 'nisNetgroup' SUP top STRUCTURAL
+          MUST cn
+          MAY ( nisNetgroupTriple $ memberNisNetgroup $ description ) )
+        ''')
 
-    ObjectClass('''
-    ( 1.3.6.1.1.1.2.8 NAME 'nisNetgroup' SUP top STRUCTURAL
-      MUST cn
-      MAY ( nisNetgroupTriple $ memberNisNetgroup $ description ) )
-    ''')
+        AttributeType('''
+        ( 1.3.6.1.1.1.1.13 NAME 'memberNisNetgroup'
+          EQUALITY caseExactIA5Match
+          SUBSTR caseExactIA5SubstringsMatch
+          SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+        ''')
 
-    AttributeType('''
-    ( 1.3.6.1.1.1.1.13 NAME 'memberNisNetgroup'
-      EQUALITY caseExactIA5Match
-      SUBSTR caseExactIA5SubstringsMatch
-      SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
-    ''')
+        AttributeType('''
+        ( 1.3.6.1.1.1.1.14 NAME 'nisNetgroupTriple'
+          DESC 'Netgroup triple'
+          EQUALITY caseExactMatch
+          SYNTAX 1.3.6.1.1.1.0.0 )
+        ''')
 
-    AttributeType('''
-    ( 1.3.6.1.1.1.1.14 NAME 'nisNetgroupTriple'
-      DESC 'Netgroup triple'
-      EQUALITY caseExactMatch
-      SYNTAX 1.3.6.1.1.1.0.0 )
-    ''')
-
-    class nisNetgroupTripleSytnax(RegexSyntaxRule):
-        OID = '1.3.6.1.1.1.0.0'
-        DESC = 'NIS netgroup triple'
-        regex = _TRIPLE_RE
+        class nisNetgroupTripleSytnax(RegexSyntaxRule):
+            OID = '1.3.6.1.1.1.0.0'
+            DESC = 'NIS netgroup triple'
+            regex = _TRIPLE_RE
 
 
 # constants
@@ -179,7 +179,7 @@ class LaurelinLDAPExtension(extensible.LaurelinLDAPExtension):
         :rtype: list[str]
         :raises TagError: if the base object has not been tagged.
         """
-        ng = self.get_netgroup(cn)
+        ng = self.get(cn)
         return self.get_netgroup_obj_users(ng, recursive)
 
     def get_netgroup_obj_hosts(self, ng_obj, recursive=True):
@@ -297,7 +297,7 @@ class LaurelinLDAPObjectExtension(extensible.LaurelinLDAPObjectExtension):
         :raises RuntimeError: if this object is missing the netgroup object class
         """
         self._require_netgroup()
-        return self.parent.ldap_conn.get_netgroup_obj_users(self, recursive)
+        return self.parent.ldap_conn.netgroups.get_netgroup_obj_users(self, recursive)
 
     def get_hosts(self, recursive=True):
         """Get all hosts in this netgroup object.
@@ -308,7 +308,7 @@ class LaurelinLDAPObjectExtension(extensible.LaurelinLDAPObjectExtension):
         :raises RuntimeError: if this object is missing the netgroup object class
         """
         self._require_netgroup()
-        return self.parent.ldap_conn.get_netgroup_obj_hosts(self, recursive)
+        return self.parent.ldap_conn.netgroups.get_netgroup_obj_hosts(self, recursive)
 
     def add_users(self, members, domain=''):
         """Add new user netgroup entries to this netgroup object.
@@ -394,7 +394,7 @@ def _netgroup_filter(filter):
 
 
 def _is_triple(val):
-    return (TRIPLE_RE.match(val) is not None)
+    return TRIPLE_RE.match(val) is not None
 
 
 def _nis_netgroup_triple(host, user, domain):
