@@ -8,6 +8,7 @@ from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .controls import critical, optional
 from .exceptions import LDAPError, NoSearchResults, Abandon
+from .extensible import add_extension, LaurelinExtension, LaurelinLDAPExtension, LaurelinLDAPObjectExtension
 from .filter import escape as filter_escape
 from .ldapobject import LDAPObject
 from .modify import Mod
@@ -37,8 +38,12 @@ __all__ = [
     'LDAPError',
     'NoSearchResults',
     'Abandon',
-    'LDAPObject',
+    'add_extension',
+    'LaurelinExtension',
+    'LaurelinLDAPExtension',
+    'LaurelinLDAPObjectExtension',
     'filter_escape',
+    'LDAPObject',
     'Mod',
     'dc',
     'domain',
