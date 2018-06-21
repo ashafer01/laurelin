@@ -6,9 +6,9 @@ Imports base objects for user import and defines user utility functions
 from __future__ import absolute_import
 from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
-from .controls import critical, optional
+from .controls import Control, critical, optional
 from .exceptions import LDAPError, NoSearchResults, Abandon
-from .extensible import add_extension, LaurelinExtension, LaurelinLDAPExtension, LaurelinLDAPObjectExtension
+from .extensible import add_extension, BaseLaurelinExtension, BaseLaurelinLDAPExtension, BaseLaurelinLDAPObjectExtension
 from .filter import escape as filter_escape
 from .ldapobject import LDAPObject
 from .modify import Mod
@@ -33,15 +33,16 @@ __all__ = [
     'DerefAliases',
     'DELETE_ALL',
     'FilterSyntax',
+    'Control',
     'critical',
     'optional',
     'LDAPError',
     'NoSearchResults',
     'Abandon',
     'add_extension',
-    'LaurelinExtension',
-    'LaurelinLDAPExtension',
-    'LaurelinLDAPObjectExtension',
+    'BaseLaurelinExtension',
+    'BaseLaurelinLDAPExtension',
+    'BaseLaurelinLDAPObjectExtension',
     'filter_escape',
     'LDAPObject',
     'Mod',

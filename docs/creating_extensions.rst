@@ -5,65 +5,104 @@ Creating Extensions
    :local:
 
 The most important thing to note about "extensions" is that they are not necessarily LDAP extensions. In laurelin, they
-are simply a module that binds additional methods to base classes (:class:`.LDAP`, or :class:`.LDAPObject`).
+are simply a module that does any combination of: defining new schema elements, defining new controls, or defining new
+methods to be attached to :class:`LDAP` or :class:`LDAPObject`.
 
-Extension Activation
---------------------
+Extension System and Basic Requirements
+---------------------------------------
 
-The :meth:`.LDAP.activate_extension` method accepts a string containing the name of the module to import. After
-importing, an ``activate_extension()`` function will be called on the module itself if defined. Any setup can be done in
-this function, including calls to ``EXTEND()`` (see below).
+Extensions live in an importable module or package. They must at minimum define a class called ``LaurelinExtension`` as
+follows::
 
-Binding New Methods
--------------------
+    from laurelin.ldap import BaseLaurelinExtension
 
-In order to ensure all extensions play nicely together, **do not** bind methods to these yourself. Each extensible class
-has a classmethod called ``EXTEND`` which accepts a list of methods (or any callable object) to bind. If you need to
-bind the method as a different name, override it's ``__name__`` attribute before calling ``EXTEND``.
+    class LaurelinExtension(BaseLaurelinExtension):
+        NAME = 'some_name'
 
-No method may ever be overwritten, built-in or otherwise. If you want to modify the behavior of existing methods, you
-should create a subclass in your extension module and instruct your users to import this instead.
-
-Below is a simple extension module::
-
-    from laurelin.ldap import LDAP, LDAPObject
-
-    def get_group_members(self, dn):
-        """get_group_members(dn)
-
-        Get all members of a group at a particular dn.
-
-        :param str dn: The group's distinguished name
-        :return: A list of member usernames
-        :rtype: list[str]
-        """
-        group = self.get(dn)
-        return group.get_attr('memberUid')
-
-    def obj_get_group_members(self):
-        """obj_get_group_members()
-
-        Get all members of this group object.
-
-        :return: A list of member usernames
-        :rtype: list[str]
-        """
-        return self.get_attr('memberUid')
-
-    obj_get_group_members.__name__ = 'get_group_members'
-
-    def activate_extension()
-        LDAP.EXTEND([get_group_members])
-        LDAPObject.EXTEND([obj_get_group_members])
-
-The module can then be used like so::
+At this point, for a user to use the package, they would first add your extension::
 
     from laurelin.ldap import LDAP
-    LDAP.activate_extension('extension.module.name')
+
+    LDAP.add_extension("your.extension.module")
+
+If you had also defined a class called ``LaurelinLDAPExtension`` the user would be able to access an instance of that
+class as follows (continuing above code block)::
 
     with LDAP() as ldap:
-        print(ldap.get_group_members('cn=foo,ou=groups,o=example'))  # Example LDAP usage
-        print(ldap.get('cn=foo,ou=groups,o=example').get_group_members())  # Example LDAPObject usage
+        ldap.some_name.some_method('foo')
+
+Where ``some_name`` is what you defined at ``LaurelinExtension.NAME``. You can also define a class called
+``LaurelinLDAPObjectExtension``, an instance of which gets attached to any :class:`.LDAPObject` that uses it in the same
+way.
+
+This is pretty cool, but since its fully dynamic, IDEs aren't aware of your extension's instance attributes. But for the
+low cost of a 4-line patch to laurelin, a ``@property`` can automatically be generated which includes a docstring
+specifying the return type; in other words, the absolute bare minimum of static declaration is included to let IDEs
+do their thing. I have tested this approach with PyCharm, but should work with any IDE that is Sphinx docstring aware.
+
+The needed patch is a simple addition to the :attr:`laurelin.ldap.extensible.Extensible.AVAILABLE_EXTENSIONS` dict::
+
+    AVAILABLE_EXTENSIONS = {
+        # ...
+        'my_name': {  # This must match your LaurelinExtension.NAME and be globally unique
+            'module': 'your.extension.module',
+            'pip_package': 'your_cool_laurelin_extension',
+            'docstring': 'This will get rendered on laurelin docs.'  # Feel free to include reST/Sphinx format such as
+                                                                     # a link to your docs, but keep it to one line.
+        },
+        # ...
+    }
+
+Any such PR will be prompty accepted after testing that the extension is installable and importable.
+
+Attaching New Methods
+---------------------
+
+As mentioned briefly in the previous section, you can define a class in your extension module called
+``LaurelinLDAPExtension`` and/or ``LaurelinLDAPObjectExtension``. An instance of the appropriate class will be created,
+one per :class:`.LDAP` connection and one per :class:`.LDAPObject`. Instances are created only when they are needed.
+
+For example::
+
+    """your.extension.module
+
+    An example Laurelin extension
+    """
+
+    from laurelin.ldap import BaseLaurelinExtension, BaseLaurelinLDAPExtension, BaseLaurelinLDAPObjectExtension
+
+    class LaurelinExtension(BaseLaurelinExtension):
+        NAME = 'your_name'
+
+    class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
+        def search(self, param):
+            # self.parent refers to the LDAP instance this instance is attached to
+            return self.parent.base.search(filter='(description={0})'.format(param))
+
+    class LaurelinLDAPObjectExtension(BaseLaurelinLDAPObjectExtension):
+        def delete(self, param):
+            # self.parent refers to the LDAPObject instance this instance is attached to
+            self.parent.delete_attrs({'description': [param]})
+
+User code might then look like the following (with the addition of a call to :func:`.add_extension` if not defined)::
+
+    from laurelin.ldap import LDAP
+
+    # LDAP.add_extension('your.extension.module')
+
+    with LDAP() as ldap:
+        for obj in ldap.your_name.search('foo'):
+            obj.your_name.delete('bar')
+
+Other points of note:
+
+* :func:`.add_extension` is attached to :class:`.LDAP` as a static method for convenience. Calling this function will
+  also potentially make new extensions available on :class:`.LDAPObject`. :func:`.add_extension` can also be imported
+  directly from :mod:`laurelin.ldap`.
+* Your ``LaurelinExtension`` class is instantiated once per interpreter when the extension is imported. This instance
+  is stored at the class attribute ``LaurelinExtension.INSTANCE``. Feel free to utilize ``__init__()`` on this class
+  for any setup tasks that need to be done and otherwise define anything you feel is appropriate here. You should
+  probably *not* put anything exposed to users here.
 
 LDAP Extensions
 ---------------
@@ -82,7 +121,7 @@ If your LDAP extension expects intermediateResponse messages, you can iterate th
 :meth:`LDAP.send_extended_request`. You can also call :meth:`.ExtendedResponseHandle.recv_response` to get only one
 message at a time (preferred to iteration if you only expect the one extendedResponse message).
 
-The built-in :meth:`LDAP.who_am_i` method is an excellent example of a simple LDAP extension::
+The built-in :meth:`.LDAP.who_am_i` method is an excellent example of a simple LDAP extension::
 
    from laurelin.ldap import LDAP
    from laurelin.ldap.protoutils import get_string_component
@@ -92,15 +131,39 @@ The built-in :meth:`LDAP.who_am_i` method is an excellent example of a simple LD
         xr, res_ctrls = handle.recv_response()
         return get_string_component(xr, 'responseValue')
 
-If this were a laurelin extension, you could go on to bind it to :class:`.LDAP` as follows::
+As an extension this might look like::
 
-   def activate_extension()
-      LDAP.EXTEND([who_am_i])
+    from laurelin.ldap import BaseLaurelinLDAPExtension
+
+    # ...
+
+    class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
+        def who_am_i(self):
+            handle = self.parent.send_extended_request(...)
+            # ...
+
+ Note the use of ``self.parent`` to access :meth:`.LDAP.send_extended_request`.
 
 Controls
 --------
 
-Extensions may wish to define controls for use on existing methods. See :ref:`defining-controls` for more information.
+Extensions may wish to define controls for use on existing methods. You will need to define one or more
+:class:`.Control` classes, see :ref:`defining-controls` for more information about this. The important part for the
+purposes of this document is where to place those class definitions in your extension module.
+
+You must define a method on your ``LaurelinExtension`` class called ``define_controls()`` and place class definitions
+inside it. This method will be called once when the extension is imported. For example::
+
+    from laurelin.ldap import BaseLaurelinExtension, Control
+
+    class LaurelinExtension(BaseLaurelinExtension):
+        NAME = 'your_name'
+
+        def define_controls(self):
+            class YourControl(Control):
+                method = ('search',)
+                keyword = 'some_kwd'
+                REQUEST_OID = '1.2.3.4'
 
 Schema
 ------
@@ -108,6 +171,29 @@ Schema
 Extensions may be associated with a set of new schema elements, including object classes, attribute types, matching
 rules, and syntax rules. Once defined, these will get used automatically by other parts of laurelin, including the
 :class:`.SchemaValidator`, and for comparing items in attribute value lists within an :class:`.LDAPObject`.
+
+Like controls, all extension schema elements must be defined in a ``LaurelinExtension`` method called
+``define_schema()``. This gets called once when the extension is imported.
+
+If your schema depends on the laurelin built-in base schema, set ``REQUIRES_BASE_SCHEMA = True`` on your
+``LaurelinExtension`` class.
+
+Below is a simple example of defining a new object class depending on the base schema::
+
+    from laurelin.ldap import BaseLaurelinExtension
+
+    class LaurelinExtension(BaseLaurelinExtension):
+        NAME = 'your_name'
+        REQUIRES_BASE_SCHEMA = True
+
+        def define_schema(self):
+            ObjectClass('''
+            ( 1.2.3.4 NAME 'myCompanyUser' SUP inetOrgPerson STRUCTURAL
+              MUST ( companyAttribute $ anotherAttribute )
+              MAY description
+            ''')
+
+ The superclass of ``inetOrgPerson`` makes this example require the base schema.
 
 Object Classes and Attribute Types
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

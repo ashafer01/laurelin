@@ -2,7 +2,7 @@
 """
 This script generates the requirements file needed to run the generate_extension_properties.py script
 """
-from laurelin.ldap.extensible import ExtensionBase
+from laurelin.ldap.extensible import Extensible
 from inspect import stack
 from os.path import dirname, abspath, join as path_join
 
@@ -15,7 +15,7 @@ STATIC_REQUIRES = [
 
 def main():
     requires = [] + STATIC_REQUIRES
-    for extinfo in ExtensionBase.AVAILABLE_EXTENSIONS.values():
+    for extinfo in Extensible.AVAILABLE_EXTENSIONS.values():
         pip_package = extinfo['pip_package']
         if pip_package:
             requires.append(pip_package)

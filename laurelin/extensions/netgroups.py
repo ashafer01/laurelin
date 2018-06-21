@@ -81,7 +81,7 @@ TAG = 'netgroup_base'
 _TRIPLE_RE = '^\(([^,]*),([^,]*),([^)]*)\)$'
 
 
-class LaurelinExtension(extensible.LaurelinExtension):
+class LaurelinExtension(extensible.BaseLaurelinExtension):
     NAME = 'netgroups'
     REQUIRES_BASE_SCHEMA = True
 
@@ -122,7 +122,7 @@ OBJECT_CLASS = 'nisNetgroup'
 NETGROUP_ATTRS = ['*']
 
 
-class LaurelinLDAPExtension(extensible.LaurelinLDAPExtension):
+class LaurelinLDAPExtension(extensible.BaseLaurelinLDAPExtension):
     def get(self, cn, attrs=NETGROUP_ATTRS):
         """Find a specific netgroup object.
 
@@ -279,7 +279,7 @@ class LaurelinLDAPExtension(extensible.LaurelinLDAPExtension):
         self.parent.delete_attrs(dn, _member_host_list_to_attrs(members, domain))
 
 
-class LaurelinLDAPObjectExtension(extensible.LaurelinLDAPObjectExtension):
+class LaurelinLDAPObjectExtension(extensible.BaseLaurelinLDAPObjectExtension):
     def _require_netgroup(self):
         """Requires that this :class:`.LDAPObject` has the required netgroup object class.
 

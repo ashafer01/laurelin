@@ -6,6 +6,7 @@ from . import rfc4511
 from . import utils
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .exceptions import *
+from .extensible import add_extension
 from .filter import parse as parse_unified_filter, parse_standard_filter, parse_simple_filter
 from .ldapobject import LDAPObject
 from .ldap_extensions import LDAPExtensions
@@ -37,7 +38,6 @@ import six
 import warnings
 from base64 import b64decode
 from collections import deque
-from importlib import import_module
 from six.moves import range
 from six.moves.urllib.parse import urlparse
 from six.moves.urllib.request import urlopen
@@ -204,6 +204,8 @@ class LDAP(LDAPExtensions):
     def default_warnings():
         """Always take the default action for warnings"""
         warnings.showwarning = _showwarning_default
+
+    add_extension = staticmethod(add_extension)
 
     ## basic methods
 
