@@ -5,7 +5,7 @@ by LDAPObject. They contain a ``@property`` for each extension defined in
 :attr:`.extensible.ExtensionBase.AVAILABLE_EXTENSIONS` which defines an extension class for the appropriate parent
 class.
 """
-from laurelin.ldap.extensible import ExtensionBase
+from laurelin.ldap.extensible import ExtensionBase, CLASS_EXTENSION_FMT
 from importlib import import_module
 from inspect import stack
 from os.path import dirname, abspath, join as path_join
@@ -42,7 +42,7 @@ def main():
     for name, extinfo in ExtensionBase.AVAILABLE_EXTENSIONS.items():
         mod = import_module(extinfo['module'])
         for classname, ext_dict in ext_classes:
-            classname = 'Laurelin{0}Extension'.format(classname)
+            classname = CLASS_EXTENSION_FMT.format(classname)
             try:
                 # ensure the required class exists in the module
                 getattr(mod, classname)

@@ -8,6 +8,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+EXTENSION_CLSNAME = 'LaurelinExtension'
+CLASS_EXTENSION_FMT = 'Laurelin{0}Extension'
+
 
 def add_extension(modname):
     """Import an extension and prepare it for binding under its internally-defined name to LDAP and/or LDAPObject
@@ -18,21 +21,30 @@ def add_extension(modname):
     :rtype: None
     """
     mod = _import_extension(modname)
-    ext_clsname = 'LaurelinExtension'
     try:
-        ext_cls = getattr(mod, ext_clsname)
+        ext_cls = getattr(mod, EXTENSION_CLSNAME)
         # note: _import_extension has already checked that the class is the correct type if it exists
     except AttributeError:
-        raise LDAPExtensionError('Extension {0} must define a class {1}'.format(modname, ext_clsname))
+        raise LDAPExtensionError('Extension {0} must define a class {1}'.format(modname, EXTENSION_CLSNAME))
     ext_attr_name = ext_cls.NAME
     if ext_attr_name == LaurelinExtension.NAME:
-        raise LDAPExtensionError('Extension {0}.{1} does not define a NAME'.format(modname, ext_clsname))
+        raise LDAPExtensionError('Extension {0}.{1} does not define a NAME'.format(modname, EXTENSION_CLSNAME))
+    try:
+        existing_ext_mod = ExtensionBase.ADDITIONAL_EXTENSIONS[ext_attr_name]
+        if existing_ext_mod is not mod:
+            raise LDAPExtensionError('NAME {0} is already loaded as an additional extension {1}'.format(
+                ext_attr_name, existing_ext_mod.__name__
+            ))
+        else:
+            logger.debug('Extension module {0} with NAME {1} has already been added'.format(modname, ext_attr_name))
+            return
+    except KeyError:
+        # no existing additional extension with the same NAME
+        pass
     if ext_attr_name in ExtensionBase.AVAILABLE_EXTENSIONS:
         raise LDAPExtensionError('{0} is already defined as an extension name'.format(ext_cls.NAME))
-    if ext_attr_name in ExtensionBase.ADDITIONAL_EXTENSIONS:
-        raise LDAPExtensionError('{0} is already loaded as an additional extension'.format(ext_cls.NAME))
     for cls in (LDAP, LDAPObject):
-        ext_clsname = 'Laurelin{0}Extension'.format(cls.__name__)
+        ext_clsname = CLASS_EXTENSION_FMT.format(cls.__name__)
         if hasattr(mod, ext_clsname) and hasattr(cls, ext_attr_name):
             raise LDAPExtensionError('{0} already has an attribute named {1}, cannot add extension {2}'.format(
                 cls.__name__, ext_attr_name, modname
@@ -48,14 +60,22 @@ def _import_extension(modname):
         # need to setup extension
         logger.info('Setting up extension {0}'.format(modname))
         try:
-            clsname = 'LaurelinExtension'
-            ext_cls = getattr(mod, clsname)
+            ext_cls = getattr(mod, EXTENSION_CLSNAME)
             if not issubclass(ext_cls, LaurelinExtension):
-                raise LDAPExtensionError('{0}.{1} does not subclass {2}.{3}'.format(modname, clsname, __name__,
-                                                                                    clsname))
+                raise LDAPExtensionError('{0}.{1} does not subclass {2}.{3}'.format(modname, EXTENSION_CLSNAME,
+                                                                                    __name__, EXTENSION_CLSNAME))
             if ext_cls.REQUIRES_BASE_SCHEMA:
                 load_base_schema()
+
+            # call one-time init functions
             ext_obj = ext_cls()
+            for method in ('define_schema', 'define_controls'):
+                try:
+                    getattr(ext_obj, method)()
+                except (NotImplemented, AttributeError):
+                    pass
+
+            # store the instance on a class attribute
             ext_cls.INSTANCE = ext_obj
         except AttributeError:
             pass
@@ -106,7 +126,7 @@ class ExtensionBase(object):
 
     def _create_class_extension_instance(self, mod):
         my_classname = self.__class__.__name__
-        ext_classname = 'Laurelin{0}Extension'.format(my_classname)
+        ext_classname = CLASS_EXTENSION_FMT.format(my_classname)
         try:
             cls = getattr(mod, ext_classname)
         except AttributeError:
@@ -139,7 +159,10 @@ class LaurelinExtension(object):
     INSTANCE = None
     REQUIRES_BASE_SCHEMA = False
 
-    def __init__(self):
+    def define_schema(self):
+        raise NotImplemented()
+
+    def define_controls(self):
         raise NotImplemented()
 
 
