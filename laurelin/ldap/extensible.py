@@ -128,10 +128,26 @@ class Extensible(object):
 
     ADDITIONAL_EXTENSIONS = {}
 
+    _EXTENSIBLE_CLASSES = ('LDAP', 'LDAPObject')
+
     def __init__(self):
         self._extension_instances = {}
+        self._extended_classname = None
+
+    def _get_extended_classname(self):
+        """Find the name of the class we are extending. Allows users to subclass LDAP or LDAPObject"""
+        if self._extended_classname:
+            return self._extended_classname
+        else:
+            for cls in self.__class__.__mro__:
+                if cls.__name__ in Extensible._EXTENSIBLE_CLASSES:
+                    self._extended_classname = cls.__name__
+                    return cls.__name__
+            else:
+                raise TypeError('This class does not inherit a known extensible class')
 
     def _get_extension_instance(self, name):
+        """This gets called and returned by auto-generated @property methods as their only line"""
         try:
             return self._extension_instances[name]
         except KeyError:
@@ -151,7 +167,8 @@ class Extensible(object):
         return obj
 
     def _create_class_extension_instance(self, name, mod):
-        my_classname = self.__class__.__name__
+        """Creates a new instance of the class extension for this class defined in mod"""
+        my_classname = self._get_extended_classname()
         ext_classname = CLASS_EXTENSION_FMT.format(my_classname)
         base_classname = 'Base' + ext_classname
         try:

@@ -131,7 +131,7 @@ The built-in :meth:`.LDAP.who_am_i` method is an excellent example of a simple L
         xr, res_ctrls = handle.recv_response()
         return get_string_component(xr, 'responseValue')
 
-As an extension this might look like::
+As a laurelin extension this might look like::
 
     from laurelin.ldap import BaseLaurelinLDAPExtension
 
@@ -142,7 +142,7 @@ As an extension this might look like::
             handle = self.parent.send_extended_request(...)
             # ...
 
- Note the use of ``self.parent`` to access :meth:`.LDAP.send_extended_request`.
+Note the use of ``self.parent`` to access :meth:`.LDAP.send_extended_request`.
 
 Controls
 --------
@@ -193,7 +193,7 @@ Below is a simple example of defining a new object class depending on the base s
               MAY description
             ''')
 
- The superclass of ``inetOrgPerson`` makes this example require the base schema.
+The superclass of ``inetOrgPerson`` makes this example require the base schema.
 
 Object Classes and Attribute Types
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
