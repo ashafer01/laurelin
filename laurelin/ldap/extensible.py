@@ -128,7 +128,7 @@ class Extensible(object):
 
     ADDITIONAL_EXTENSIONS = {}
 
-    _EXTENSIBLE_CLASSES = ('LDAP', 'LDAPObject')
+    EXTENSIBLE_CLASSES = ('LDAP', 'LDAPObject')
 
     def __init__(self):
         self._extension_instances = {}
@@ -140,7 +140,7 @@ class Extensible(object):
             return self._extended_classname
         else:
             for cls in self.__class__.__mro__:
-                if cls.__name__ in Extensible._EXTENSIBLE_CLASSES:
+                if cls.__name__ in Extensible.EXTENSIBLE_CLASSES:
                     self._extended_classname = cls.__name__
                     return cls.__name__
             else:

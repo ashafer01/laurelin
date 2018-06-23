@@ -24,6 +24,10 @@ from warnings import warn
 class SchemaValidator(Validator):
     """Ensures parameters conform to the available defined schema"""
 
+    def __init__(self):
+        load_base_schema()
+        Validator.__init__(self)
+
     def validate_object(self, obj, write=True):
         """Validates an object when all attributes are present
 
@@ -81,8 +85,6 @@ def load_base_schema():
     global _base_schema_loaded
     if _base_schema_loaded:
         return
-    else:
-        _base_schema_loaded = True
 
     ## RFC 2252 Syntaxes
 
@@ -302,7 +304,8 @@ def load_base_schema():
     class GeneralizedTime(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.24'
         DESC = 'Generalized Time'
-        regex = r'^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})?([0-9]{2})?([.,][0-9]+)?(Z|[+-]([0-9]{2})([0-9]{2})?)$'
+        regex = (r'^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})?([0-9]{2})?([.,][0-9]+)?(Z|[+-]([0-9]{2})' 
+                 r'([0-9]{2})?)$')
 
         def validate(self, s):
             m = self.compiled_re.match(s)
@@ -1679,3 +1682,5 @@ def load_base_schema():
             SUP top AUXILIARY
             MUST userPassword )
     """)
+
+    _base_schema_loaded = True

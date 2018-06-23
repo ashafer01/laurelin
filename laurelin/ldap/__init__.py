@@ -4,14 +4,22 @@ Imports base objects for user import and defines user utility functions
 """
 
 from __future__ import absolute_import
+from .attributetype import AttributeType
 from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .controls import Control, critical, optional
 from .exceptions import LDAPError, NoSearchResults, Abandon
-from .extensible import add_extension, BaseLaurelinExtension, BaseLaurelinLDAPExtension, BaseLaurelinLDAPObjectExtension
+from .extensible import (
+    add_extension,
+    BaseLaurelinExtension,
+    BaseLaurelinLDAPExtension,
+    BaseLaurelinLDAPObjectExtension,
+)
 from .filter import escape as filter_escape
 from .ldapobject import LDAPObject
 from .modify import Mod
+from .objectclass import ObjectClass
+from .validation import Validator
 
 import pyasn1.type.univ
 
@@ -27,6 +35,7 @@ def domain(dc):
 
 
 __all__ = [
+    'AttributeType',
     'LDAP',
     'LDAPURI',
     'Scope',
@@ -46,6 +55,8 @@ __all__ = [
     'filter_escape',
     'LDAPObject',
     'Mod',
+    'ObjectClass',
+    'Validator',
     'dc',
     'domain',
 ]

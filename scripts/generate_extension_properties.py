@@ -34,10 +34,9 @@ BASE_DIR = path_join(dirname(abspath(stack()[0][1])), '..')
 
 
 def main():
-    ext_classes = [
-        ('LDAP', {}),
-        ('LDAPObject', {}),
-    ]
+    ext_classes = []
+    for clsname in Extensible.EXTENSIBLE_CLASSES:
+        ext_classes.append((clsname, {}))
 
     for name, extinfo in Extensible.AVAILABLE_EXTENSIONS.items():
         mod = import_module(extinfo['module'])

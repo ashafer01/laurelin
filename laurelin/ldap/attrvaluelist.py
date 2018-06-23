@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 from .attributetype import get_attribute_type
+from .schema import load_base_schema
 
 
 class AttrValueList(list):
@@ -10,7 +11,7 @@ class AttrValueList(list):
     """
 
     def __init__(self, attr, values):
-        self.attr_type = get_attribute_type(attr)
+        self.attr = attr
         list.__init__(self, values)
 
     def __contains__(self, value):
@@ -30,7 +31,9 @@ class AttrValueList(list):
         :rtype: int
         :raises ValueError: if the value is not found or if the list has no values
         """
-        return self.attr_type.index(self, value)
+        load_base_schema()
+        attr_type = get_attribute_type(self.attr)
+        return attr_type.index(self, value)
 
     def count(self, value):
         """Count the number of occurrences of ``value``. Since attribute value lists are defined to only have at most
