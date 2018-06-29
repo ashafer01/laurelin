@@ -9,6 +9,14 @@ from .base import ExtensionsBase
 class Extensions(ExtensionsBase):
 
     @property
+    def base_schema(self):
+        """The standard base schema from various RFCs
+
+        :rtype: laurelin.extensions.base_schema.LaurelinExtension
+        """
+        return self._get_extension_instance('base_schema')
+
+    @property
     def descattrs(self):
         """The built-in description attributes extension
 

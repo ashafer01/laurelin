@@ -1,3 +1,4 @@
+from ..controls import register_module_controls
 from ..rules import register_module_syntax_rules, register_module_matching_rules
 from ..utils import get_obj_module
 
@@ -6,12 +7,11 @@ class BaseLaurelinExtension(object):
     """Base class for extensions that define schema and controls, required for any class not in AVAILABLE_EXTENSIONS"""
     NAME = '__undefined__'
     INSTANCE = None
-    REQUIRES_BASE_SCHEMA = False
+
+    def __init__(self):
+        self._schema_defined = False
 
     def _define_schema(self):
-        raise NotImplemented()
-
-    def _define_controls(self):
         raise NotImplemented()
 
     def require_schema(self):
@@ -19,15 +19,15 @@ class BaseLaurelinExtension(object):
         register_module_syntax_rules(modname)
         register_module_matching_rules(modname)
         try:
-            self._define_schema()
+            if not self._schema_defined:
+                self._define_schema()
+                self._schema_defined = True
         except NotImplemented:
             pass
 
     def require_controls(self):
-        try:
-            self._define_controls()
-        except NotImplemented:
-            pass
+        modname = get_obj_module(self.__class__)
+        register_module_controls(modname)
 
     def require(self):
         self.require_schema()

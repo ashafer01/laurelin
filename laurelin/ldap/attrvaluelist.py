@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 from .attributetype import get_attribute_type
-from .schema import load_base_schema
+from .extensible import extensions
 
 
 class AttrValueList(list):
@@ -31,7 +31,7 @@ class AttrValueList(list):
         :rtype: int
         :raises ValueError: if the value is not found or if the list has no values
         """
-        load_base_schema()
+        extensions.base_schema.require()
         attr_type = get_attribute_type(self.attr)
         return attr_type.index(self, value)
 

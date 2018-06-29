@@ -4,7 +4,7 @@ Imports base objects for user import and defines user utility functions
 """
 
 from __future__ import absolute_import
-from .attributetype import AttributeType
+from .attributetype import get_attribute_type, AttributeType
 from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .controls import Control, critical, optional
@@ -19,8 +19,9 @@ from .extensible import (
 from .filter import escape as filter_escape
 from .ldapobject import LDAPObject
 from .modify import Mod
-from .objectclass import ObjectClass
-from .schema import SchemaValidator, load_base_schema
+from .objectclass import get_object_class, ObjectClass, ExtensibleObjectClass
+from .rules import SyntaxRule, RegexSyntaxRule, EqualityMatchingRule
+from .schema import SchemaValidator
 from .validation import Validator
 
 import pyasn1.type.univ
@@ -37,6 +38,7 @@ def domain(dc):
 
 
 __all__ = [
+    'get_attribute_type',
     'AttributeType',
     'LDAP',
     'LDAPURI',
@@ -58,10 +60,14 @@ __all__ = [
     'filter_escape',
     'LDAPObject',
     'Mod',
+    'get_object_class',
     'ObjectClass',
+    'ExtensibleObjectClass',
+    'SyntaxRule',
+    'RegexSyntaxRule',
+    'EqualityMatchingRule',
     'Validator',
     'SchemaValidator',
-    'load_base_schema',
     'dc',
     'domain',
 ]

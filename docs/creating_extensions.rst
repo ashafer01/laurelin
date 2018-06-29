@@ -101,8 +101,8 @@ Other points of note:
   directly from :mod:`laurelin.ldap`.
 * Your ``LaurelinExtension`` class is instantiated once per interpreter when the extension is imported. This instance
   is stored at the class attribute ``LaurelinExtension.INSTANCE``. Feel free to utilize ``__init__()`` on this class
-  for any setup tasks that need to be done and otherwise define anything you feel is appropriate here. You should
-  probably *not* put anything exposed to users here.
+  for any setup tasks that need to be done and otherwise define anything you feel is appropriate here. This will be
+  exposed to users at ``laurelin.ldap.extensions.<name>``
 
 LDAP Extensions
 ---------------

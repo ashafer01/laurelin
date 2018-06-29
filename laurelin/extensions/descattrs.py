@@ -37,7 +37,7 @@ Example::
 
 """
 
-from laurelin.ldap import LDAPObject, extensible
+from laurelin.ldap import extensible
 from laurelin.ldap.attrsdict import AttrsDict
 import six
 

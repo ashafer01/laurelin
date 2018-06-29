@@ -7,6 +7,7 @@ from .rfc4511 import (
     Controls,
     ControlValue,
 )
+from .utils import get_obj_module
 import six
 from six.moves import range
 
@@ -81,10 +82,16 @@ def handle_response(obj, controls):
                                          ctrl.response_attr))
 
 
-class MetaControl(type):
-    """Metaclass which registers instances of subclasses"""
-    def __new__(meta, name, bases, dct):
-        cls = type.__new__(meta, name, bases, dct)
+_preregistered_controls = {}
+_controls_registered_mods = set()
+
+
+def register_module_controls(modname, require=False):
+    if modname in _controls_registered_mods:
+        return
+    if not require and modname not in _preregistered_controls:
+        return
+    for cls in _preregistered_controls[modname]:
         instance = cls()
         if cls.REQUEST_OID:
             if not cls.method:
@@ -106,7 +113,18 @@ class MetaControl(type):
             if cls.RESPONSE_OID in _response_controls:
                 raise LDAPExtensionError('Response control OID {0} is already defined'.format(cls.RESPONSE_OID))
             _response_controls[cls.RESPONSE_OID] = instance
+    _controls_registered_mods.add(modname)
+    del _preregistered_controls[modname]
 
+
+class MetaControl(type):
+    """Metaclass which registers instances of subclasses"""
+    def __new__(meta, name, bases, dct):
+        cls = type.__new__(meta, name, bases, dct)
+        modname = get_obj_module(cls)
+        if cls.REQUEST_OID or cls.RESPONSE_OID:
+            mod_controls = _preregistered_controls.setdefault(modname, [])
+            mod_controls.append(cls)
         return cls
 
 

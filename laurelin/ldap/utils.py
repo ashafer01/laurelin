@@ -200,23 +200,3 @@ def get_obj_module(obj):
         return modname
     except AttributeError:
         raise exceptions.LDAPError(_get_class_module_err_msg.format(obj.__name__))
-
-
-_run_once = set()
-
-
-def run_once(func):
-    """Decorator to only allow the function to be executed once"""
-
-    func_id = id(func)
-
-    def decorated(*args, **kwds):
-        if func_id in _run_once:
-            return
-        else:
-            ret = func(*args, **kwds)
-            _run_once.add(func_id)
-            return ret
-
-    decorated.__doc__ = func.__doc__
-    return decorated

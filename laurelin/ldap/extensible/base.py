@@ -1,11 +1,10 @@
 from __future__ import absolute_import
 from .user_base import BaseLaurelinExtension
 from ..exceptions import LDAPExtensionError
-from ..schema import load_base_schema
 from importlib import import_module
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('laurelin.ldap.extensible')
 
 # extensions must define a class with this name
 EXTENSION_CLSNAME = 'LaurelinExtension'
@@ -94,8 +93,6 @@ def _import_extension(modname):
                 raise LDAPExtensionError('{0}.{1} does not subclass {2}.BaseLaurelinExtension'.format(
                     modname, EXTENSION_CLSNAME, __name__
                 ))
-            if ext_cls.REQUIRES_BASE_SCHEMA:
-                load_base_schema()
 
             # call one-time setup functions
             ext_obj = ext_cls()
@@ -113,6 +110,11 @@ class Extensible(object):
     """Base for automatically-generated extension property classes"""
 
     AVAILABLE_EXTENSIONS = {
+        'base_schema': {
+            'module': 'laurelin.extensions.base_schema',
+            'pip_package': None,  # built-in
+            'docstring': 'The standard base schema from various RFCs'
+        },
         'descattrs': {
             'module': 'laurelin.extensions.descattrs',
             'pip_package': None,  # built-in
@@ -122,7 +124,7 @@ class Extensible(object):
             'module': 'laurelin.extensions.netgroups',
             'pip_package': None,  # built-in
             'docstring': 'The built-in NIS netgroups extension',
-        }
+        },
     }
 
     ADDITIONAL_EXTENSIONS = {}
@@ -213,5 +215,3 @@ class ExtensionsBase(Extensible):
     def _create_extension_instance(self, name, mod):
         instance = getattr(mod, EXTENSION_CLSNAME).INSTANCE
         return self._extension_instances.setdefault(name, instance)
-
-

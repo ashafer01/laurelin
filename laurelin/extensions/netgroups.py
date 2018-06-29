@@ -70,10 +70,7 @@ Examples::
 """
 from __future__ import absolute_import
 import re
-from laurelin.ldap import LDAPError, extensible
-from laurelin.ldap.attributetype import AttributeType
-from laurelin.ldap.objectclass import ObjectClass
-from laurelin.ldap.rules import RegexSyntaxRule
+from laurelin.ldap import AttributeType, ObjectClass, RegexSyntaxRule, LDAPError, extensible
 import six
 
 TAG = 'netgroup_base'

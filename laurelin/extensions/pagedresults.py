@@ -29,7 +29,7 @@ Note: When getting pages in a loop, you may set the cookie value to an empty str
     ldap.base.search(paged=(10, ''))
 """
 
-from laurelin.ldap.controls import Control
+from laurelin.ldap import Control
 from laurelin.ldap.protoutils import get_string_component
 from laurelin.ldap.rfc4511 import Integer0ToMax
 from laurelin.ldap.exceptions import LDAPError
