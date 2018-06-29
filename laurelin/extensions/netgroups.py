@@ -5,12 +5,11 @@ Includes schema definitions.
 You should begin by tagging the base object which all netgroups are below, and defining the RDN attribute and scope. If
 the structure is flat there is a performance advantage by setting ``relative_search_scope=Scope.ONE``::
 
-    from laurelin.ldap import LDAP, Scope
-    netgroups_extension = LDAP.activate_extension('laurelin.extensions.netgroups')
+    from laurelin.ldap import LDAP, Scope, extensions
 
     with LDAP() as ldap:
         netgroups = ldap.base.obj('ou=netgroups',
-                                  tag=netgroups_extension.TAG,
+                                  tag=extensions.netgroups.TAG,
                                   relative_search_scope=Scope.ONE,
                                   rdn_attr='cn')
 
@@ -43,7 +42,7 @@ Examples::
        '(dir.example.org,manager,example.org)',
     ]
 
-    ldap.add_netgroup_users('cn=managers,ou=netgroups,dc=example,dc=org', users, domain='example.org')
+    ldap.netgroups.add_netgroup_users('cn=managers,ou=netgroups,dc=example,dc=org', users, domain='example.org')
     # Adds the following nisNetgroupTriples:
     #  (,alice,example.org)
     #  (,bob,example.org)
@@ -59,7 +58,7 @@ Examples::
         '+aws_backup_dir_servers',
     ]
 
-    ldap.add_netgroup_hosts('cn=dir_servers,ou=netgroups,dc=example,dc=org', hosts)
+    ldap.netgroups.add_netgroup_hosts('cn=dir_servers,ou=netgroups,dc=example,dc=org', hosts)
     # Adds the following nisNetgroupTriples:
     #  (dir1.example.org,,)
     #  (dir2.example.org,,)
@@ -70,17 +69,36 @@ Examples::
 """
 from __future__ import absolute_import
 import re
-from laurelin.ldap import AttributeType, ObjectClass, RegexSyntaxRule, LDAPError, extensible
+from laurelin.ldap import (
+    AttributeType,
+    ObjectClass,
+    RegexSyntaxRule,
+    LDAPError,
+    extensions,
+    BaseLaurelinExtension,
+    BaseLaurelinLDAPExtension,
+    BaseLaurelinLDAPObjectExtension,
+)
 import six
+
+extensions.base_schema.require()
 
 TAG = 'netgroup_base'
 
 _TRIPLE_RE = '^\(([^,]*),([^,]*),([^)]*)\)$'
 
 
-class LaurelinExtension(extensible.BaseLaurelinExtension):
+class nisNetgroupTripleSytnax(RegexSyntaxRule):
+    OID = '1.3.6.1.1.1.0.0'
+    DESC = 'NIS netgroup triple'
+    regex = _TRIPLE_RE
+
+
+class LaurelinExtension(BaseLaurelinExtension):
     NAME = 'netgroups'
     REQUIRES_BASE_SCHEMA = True
+
+    TAG = TAG
 
     def _define_schema(self):
         ObjectClass('''
@@ -103,23 +121,18 @@ class LaurelinExtension(extensible.BaseLaurelinExtension):
           SYNTAX 1.3.6.1.1.1.0.0 )
         ''')
 
-        class nisNetgroupTripleSytnax(RegexSyntaxRule):
-            OID = '1.3.6.1.1.1.0.0'
-            DESC = 'NIS netgroup triple'
-            regex = _TRIPLE_RE
-
 
 # constants
 
 # OBJECT_CLASS = _nis_netgroup.names[0]
 # NETGROUP_ATTRS = _nis_netgroup.must + _nis_netgroup.may
 
-# temporary workaround
+# TODO temporary workaround
 OBJECT_CLASS = 'nisNetgroup'
 NETGROUP_ATTRS = ['*']
 
 
-class LaurelinLDAPExtension(extensible.BaseLaurelinLDAPExtension):
+class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
     def get(self, cn, attrs=NETGROUP_ATTRS):
         """Find a specific netgroup object.
 
@@ -276,7 +289,7 @@ class LaurelinLDAPExtension(extensible.BaseLaurelinLDAPExtension):
         self.parent.delete_attrs(dn, _member_host_list_to_attrs(members, domain))
 
 
-class LaurelinLDAPObjectExtension(extensible.BaseLaurelinLDAPObjectExtension):
+class LaurelinLDAPObjectExtension(BaseLaurelinLDAPObjectExtension):
     def _require_netgroup(self):
         """Requires that this :class:`.LDAPObject` has the required netgroup object class.
 

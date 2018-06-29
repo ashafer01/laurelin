@@ -126,6 +126,7 @@ class LDAP(LDAPExtensions):
                                        :class:`.FilterSyntax` constants. Can be overridden on a per-search basis
                                        by setting the ``filter_syntax`` keyword on :meth:`LDAP.search`. Defaults
                                        to ``FilterSyntax.STANDARD`` for RFC4515-compliant filter string syntax.
+    :param bool built_in_extensions_only: Set to True to raise an error when attempting to use a 3rd-party extension
 
     The class can be used as a context manager, which will automatically unbind and close the connection when the
     context manager exits.
@@ -167,6 +168,7 @@ class LDAP(LDAPExtensions):
     DEFAULT_ERROR_EMPTY_LIST = False
     DEFAULT_IGNORE_EMPTY_LIST = False
     DEFAULT_FILTER_SYNTAX = FilterSyntax.UNIFIED
+    DEFAULT_BUILT_IN_EXTENSIONS_ONLY = False
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -219,7 +221,7 @@ class LDAP(LDAPExtensions):
                  deref_aliases=None, strict_modify=None, ssl_verify=None, ssl_ca_file=None, ssl_ca_path=None,
                  ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
                  default_criticality=None, follow_referrals=None, validators=None, warn_empty_list=None,
-                 error_empty_list=None, ignore_empty_list=None, filter_syntax=None):
+                 error_empty_list=None, ignore_empty_list=None, filter_syntax=None, built_in_extensions_only=None):
 
         LDAPExtensions.__init__(self)
 
@@ -266,6 +268,8 @@ class LDAP(LDAPExtensions):
             ignore_empty_list = LDAP.DEFAULT_IGNORE_EMPTY_LIST
         if filter_syntax is None:
             filter_syntax = LDAP.DEFAULT_FILTER_SYNTAX
+        if built_in_extensions_only is None:
+            built_in_extensions_only = LDAP.DEFAULT_BUILT_IN_EXTENSIONS_ONLY
 
         self.default_search_timeout = search_timeout
         self.default_deref_aliases = deref_aliases
@@ -283,6 +287,8 @@ class LDAP(LDAPExtensions):
 
         self._tagged_objects = {}
         self._sasl_mechs = None
+
+        self._built_in_only = built_in_extensions_only
 
         self.sock_params = (connect_timeout, ssl_verify, ssl_ca_file, ssl_ca_path, ssl_ca_data)
         self.ssl_verify = ssl_verify

@@ -131,9 +131,12 @@ class Extensible(object):
 
     def __init__(self):
         self._extension_instances = {}
+        self._built_in_only = False
 
     def _get_extension_instance(self, name):
         """This gets called and returned by auto-generated @property methods as their only line"""
+        if self._built_in_only and self.AVAILABLE_EXTENSIONS[name]['pip_package'] is not None:
+            raise RuntimeError('3rd-party extensions have been disabled')
         try:
             return self._extension_instances[name]
         except KeyError:
@@ -164,6 +167,8 @@ class Extensible(object):
             pass
         try:
             ext_mod = self.ADDITIONAL_EXTENSIONS[item]
+            if self._built_in_only:
+                raise RuntimeError('3rd-party extensions have been disabled')
         except KeyError:
             raise AttributeError(item)
         obj = self._create_extension_instance(item, ext_mod)

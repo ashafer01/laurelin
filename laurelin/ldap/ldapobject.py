@@ -48,12 +48,14 @@ class LDAPObject(AttrsDict, LDAPObjectExtensions):
     """
 
     def __init__(self, dn, attrs_dict=None, ldap_conn=None, relative_search_scope=Scope.SUBTREE, rdn_attr=None):
+        AttrsDict.__init__(self, attrs_dict)
+        LDAPObjectExtensions.__init__(self)
+
         self.dn = dn
         self.ldap_conn = ldap_conn
         self.relative_search_scope = relative_search_scope
         self.rdn_attr = rdn_attr
-        AttrsDict.__init__(self, attrs_dict)
-        LDAPObjectExtensions.__init__(self)
+        self._built_in_only = ldap_conn._built_in_only
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))
