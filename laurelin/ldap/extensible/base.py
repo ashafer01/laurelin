@@ -1,8 +1,7 @@
 from __future__ import absolute_import
-from .base import LDAP
-from .exceptions import LDAPExtensionError
-from .ldapobject import LDAPObject
-from .schema import load_base_schema
+from .user_base import BaseLaurelinExtension
+from ..exceptions import LDAPExtensionError
+from ..schema import load_base_schema
 from importlib import import_module
 import logging
 
@@ -17,7 +16,8 @@ CLASS_EXTENSION_FMT = 'Laurelin{0}Extension'
 
 def add_extension(modname):
     """Import an extension and prepare it for binding under its internally-defined name to LDAP and/or LDAPObject
-    depending which extension classes are defined.
+    depending which extension classes are defined. This is only needed for extensions not yet patched into
+    AVAILABLE_EXTENSIONS.
 
     :param str modname: The string module name containing an extension, can be any importable module, e.g.
                         "laurelin.extensions.netgroups"
@@ -66,13 +66,16 @@ def add_extension(modname):
         # no predefined extension by this NAME
         pass
 
-    # if the extension defines class extensions, ensure the name does not collide with an actual attribute
-    for cls in (LDAP, LDAPObject):
-        ext_clsname = CLASS_EXTENSION_FMT.format(cls.__name__)
-        if hasattr(mod, ext_clsname) and hasattr(cls, ext_attr_name):
-            raise LDAPExtensionError('{0} already has an attribute named {1}, cannot add extension {2}'.format(
-                cls.__name__, ext_attr_name, modname
-            ))
+    # TODO make this work again - circular import for LDAP
+    #    * base imports this function in order to bind it to the LDAP class for convenience
+    #    * we import base to get LDAP for the purposes of this check
+    # # if the extension defines class extensions, ensure the name does not collide with an actual attribute
+    # for cls in (LDAP, LDAPObject):
+    #     ext_clsname = CLASS_EXTENSION_FMT.format(cls.__name__)
+    #     if hasattr(mod, ext_clsname) and hasattr(cls, ext_attr_name):
+    #         raise LDAPExtensionError('{0} already has an attribute named {1}, cannot add extension {2}'.format(
+    #             cls.__name__, ext_attr_name, modname
+    #         ))
 
     # store the imported module for later use
     Extensible.ADDITIONAL_EXTENSIONS[ext_attr_name] = mod
@@ -96,11 +99,7 @@ def _import_extension(modname):
 
             # call one-time setup functions
             ext_obj = ext_cls()
-            for method in ('define_schema', 'define_controls'):
-                try:
-                    getattr(ext_obj, method)()
-                except (NotImplemented, AttributeError):
-                    pass
+            ext_obj.require()
 
             # store the instance on a class attribute
             ext_cls.INSTANCE = ext_obj
@@ -111,7 +110,7 @@ def _import_extension(modname):
 
 
 class Extensible(object):
-    """Base for automatically-generated extension property classes inherited by LDAP and LDAPObject"""
+    """Base for automatically-generated extension property classes"""
 
     AVAILABLE_EXTENSIONS = {
         'descattrs': {
@@ -128,23 +127,8 @@ class Extensible(object):
 
     ADDITIONAL_EXTENSIONS = {}
 
-    EXTENSIBLE_CLASSES = ('LDAP', 'LDAPObject')
-
     def __init__(self):
         self._extension_instances = {}
-        self._extended_classname = None
-
-    def _get_extended_classname(self):
-        """Find the name of the class we are extending. Allows users to subclass LDAP or LDAPObject"""
-        if self._extended_classname:
-            return self._extended_classname
-        else:
-            for cls in self.__class__.__mro__:
-                if cls.__name__ in Extensible.EXTENSIBLE_CLASSES:
-                    self._extended_classname = cls.__name__
-                    return cls.__name__
-            else:
-                raise TypeError('This class does not inherit a known extensible class')
 
     def _get_extension_instance(self, name):
         """This gets called and returned by auto-generated @property methods as their only line"""
@@ -163,10 +147,49 @@ class Extensible(object):
             else:
                 raise LDAPExtensionError('Error importing {0}, the extension may not be installed. Try `pip '
                                          'install {1}`'.format(modname, pip_package))
-        obj = self._create_class_extension_instance(name, mod)
+        obj = self._create_extension_instance(name, mod)
         return obj
 
-    def _create_class_extension_instance(self, name, mod):
+    def _create_extension_instance(self, name, mod):
+        raise NotImplemented
+
+    def __getattr__(self, item):
+        # this acts like the auto-generated @property methods but fully dynamic, using modules that have been added
+        # using add_extension()
+        try:
+            return self._extension_instances[item]
+        except KeyError:
+            pass
+        try:
+            ext_mod = self.ADDITIONAL_EXTENSIONS[item]
+        except KeyError:
+            raise AttributeError(item)
+        obj = self._create_extension_instance(item, ext_mod)
+        return obj
+
+
+class ExtensibleClass(Extensible):
+    """Base for auto-generated classes inherited by LDAP and LDAPObject"""
+
+    EXTENSIBLE_CLASSES = ('LDAP', 'LDAPObject')
+
+    def __init__(self):
+        Extensible.__init__(self)
+        self._extended_classname = None
+
+    def _get_extended_classname(self):
+        """Find the name of the class we are extending. Allows users to subclass LDAP or LDAPObject"""
+        if self._extended_classname:
+            return self._extended_classname
+        else:
+            for cls in self.__class__.__mro__:
+                if cls.__name__ in self.EXTENSIBLE_CLASSES:
+                    self._extended_classname = cls.__name__
+                    return cls.__name__
+            else:
+                raise TypeError('This class does not inherit a known extensible class')
+
+    def _create_extension_instance(self, name, mod):
         """Creates a new instance of the class extension for this class defined in mod"""
         my_classname = self._get_extended_classname()
         ext_classname = CLASS_EXTENSION_FMT.format(my_classname)
@@ -184,47 +207,11 @@ class Extensible(object):
         self._extension_instances[name] = obj
         return obj
 
-    def __getattr__(self, item):
-        # this acts like the auto-generated @property methods but fully dynamic, using modules that have been added
-        # using add_extension()
-        try:
-            return self._extension_instances[item]
-        except KeyError:
-            pass
-        try:
-            ext_mod = self.ADDITIONAL_EXTENSIONS[item]
-        except KeyError:
-            raise AttributeError(item)
-        obj = self._create_class_extension_instance(item, ext_mod)
-        return obj
+
+class ExtensionsBase(Extensible):
+    """Base for the auto-generated class giving access to all LaurelinExtension instances"""
+    def _create_extension_instance(self, name, mod):
+        instance = getattr(mod, EXTENSION_CLSNAME).INSTANCE
+        return self._extension_instances.setdefault(name, instance)
 
 
-class BaseLaurelinExtension(object):
-    """Base class for extensions that define schema and controls, required for any class not in AVAILABLE_EXTENSIONS"""
-    NAME = '__undefined__'
-    INSTANCE = None
-    REQUIRES_BASE_SCHEMA = False
-
-    def define_schema(self):
-        raise NotImplemented()
-
-    def define_controls(self):
-        raise NotImplemented()
-
-
-class BaseLaurelinLDAPExtension(object):
-    """Base class for extensions to the LDAP class"""
-    def __init__(self, parent):
-        """
-        :param laurelin.ldap.LDAP parent: The parent LDAP instance
-        """
-        self.parent = parent
-
-
-class BaseLaurelinLDAPObjectExtension(object):
-    """Base class for extensions to the LDAPObject class"""
-    def __init__(self, parent):
-        """
-        :param laurelin.ldap.LDAPObject parent: The parent LDAPObject instance
-        """
-        self.parent = parent

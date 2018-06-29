@@ -8,7 +8,7 @@ from .exceptions import (
     Abandon,
     LDAPTransactionError,
 )
-from .ldapobject_extensions import LDAPObjectExtensions
+from .extensible.ldapobject_extensions import LDAPObjectExtensions
 from .modify import (
     Mod,
     Modlist,

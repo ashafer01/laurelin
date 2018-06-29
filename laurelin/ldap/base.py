@@ -7,9 +7,9 @@ from . import utils
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .exceptions import *
 from .extensible import add_extension
+from .extensible.ldap_extensions import LDAPExtensions
 from .filter import parse as parse_unified_filter, parse_standard_filter, parse_simple_filter
 from .ldapobject import LDAPObject
-from .ldap_extensions import LDAPExtensions
 from .modify import (
     Mod,
     Modlist,

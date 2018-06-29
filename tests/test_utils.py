@@ -1,5 +1,6 @@
 from laurelin.ldap import utils
 
+
 def test_findClosingParen():
     test_good = (
         ('(abc)def', 4),
@@ -46,3 +47,51 @@ def test_validatePhoneNumber():
 
     for test in test_bad:
         assert utils.validate_phone_number(test) is False
+
+
+def test_run_once():
+    class Foo(object):
+        def __init__(self):
+            self.foo_counter = 0
+            self.bar_counter = 0
+
+        @utils.run_once
+        def foo(self):
+            self.foo_counter += 1
+
+        @utils.run_once
+        def bar(self):
+            self.bar_counter += 1
+
+    class Bar(object):
+        def __init__(self):
+            self.foo_counter = 0
+
+        @utils.run_once
+        def foo(self):
+            self.foo_counter += 1
+
+    testobj = Foo()
+    assert testobj.foo_counter == 0
+    assert testobj.bar_counter == 0
+
+    testobj.foo()
+    assert testobj.foo_counter == 1
+
+    testobj.bar()
+    assert testobj.bar_counter == 1
+
+    testobj.foo()
+    assert testobj.foo_counter == 1
+
+    testobj.bar()
+    assert testobj.bar_counter == 1
+
+    testobj2 = Bar()
+    assert testobj2.foo_counter == 0
+
+    testobj2.foo()
+    assert testobj2.foo_counter == 1
+
+    testobj2.foo()
+    assert testobj2.foo_counter == 1

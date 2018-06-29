@@ -2,15 +2,17 @@
 
 from __future__ import absolute_import
 from .exceptions import InvalidSyntaxError, LDAPSchemaError
-from .utils import CaseIgnoreDict
+from .utils import CaseIgnoreDict, get_obj_module
 import re
 import six
-
 
 ## Syntax Rules
 
 _oid_syntax_rules = {}
 _oid_syntax_rule_objects = {}
+
+_preregistration_syntax_rules = {}
+_syntax_registered_mods = set()
 
 
 def get_syntax_rule(oid):
@@ -20,17 +22,32 @@ def get_syntax_rule(oid):
     return obj
 
 
+def register_module_syntax_rules(modname):
+    if modname in _syntax_registered_mods:
+        return
+    for cls in _preregistration_syntax_rules[modname]:
+        oid = getattr(cls, 'OID')
+        if oid in _oid_syntax_rules:
+            cur_class = _oid_syntax_rules[oid].__name__
+            cur_mod = get_obj_module(cur_class)
+            new_class = cls.__name__
+            new_mod = get_obj_module(new_class)
+            raise LDAPSchemaError('Duplicate OID {0} in syntax rule declaration (original class {1}.{2}, '
+                                  'new class {3}.{4})'.format(oid, cur_mod, cur_class, new_mod, new_class))
+        _oid_syntax_rules[oid] = cls
+    _syntax_registered_mods.add(modname)
+    del _preregistration_syntax_rules[modname]
+
+
 class MetaSyntaxRule(type):
     """Metaclass registering OIDs on subclasses"""
     def __new__(meta, name, bases, dct):
         oid = dct.get('OID')
         cls = type.__new__(meta, name, bases, dct)
         if oid:
-            if oid in _oid_syntax_rules:
-                cur_class = _oid_syntax_rules[oid].__name__
-                raise LDAPSchemaError('Duplicate OID {0} in syntax rule declaration (original class {1}, '
-                                      'new class {2})'.format(oid, cur_class, name))
-            _oid_syntax_rules[oid] = cls
+            modname = get_obj_module(cls)
+            mod_rules = _preregistration_syntax_rules.setdefault(modname, [])
+            mod_rules.append(cls)
         return cls
 
 
@@ -95,6 +112,9 @@ _name_matching_rules = CaseIgnoreDict()
 _oid_matching_rule_objects = {}
 _name_matching_rule_objects = CaseIgnoreDict()
 
+_preregistration_matching_rules = {}
+_matching_registered_mods = set()
+
 
 def get_matching_rule(ident):
     """Obtains matching rule instance for name or OID"""
@@ -110,6 +130,26 @@ def get_matching_rule(ident):
     return obj
 
 
+def register_module_matching_rules(modname):
+    if modname in _matching_registered_mods:
+        return
+    if modname not in _preregistration_matching_rules:
+        return
+    for cls in _preregistration_matching_rules[modname]:
+        oid = getattr(cls, 'OID')
+        names = getattr(cls, 'NAME', ())
+        if oid:
+            if oid in _oid_matching_rules:
+                raise LDAPSchemaError('Duplicate OID {0} in matching rule declaration'.format(oid))
+            _oid_matching_rules[oid] = cls
+        for name in names:
+            if name in _name_matching_rules:
+                raise LDAPSchemaError('Duplicate name {0} in matching rule declaration'.format(name))
+            _name_matching_rules[name] = cls
+    _matching_registered_mods.add(modname)
+    del _preregistration_matching_rules[modname]
+
+
 class MetaMatchingRule(type):
     """Metaclass registering OIDs and NAMEs on subclasses"""
     def __new__(meta, clsname, bases, dct):
@@ -119,14 +159,10 @@ class MetaMatchingRule(type):
             names = (names,)
             dct['NAME'] = names
         cls = type.__new__(meta, clsname, bases, dct)
-        if oid:
-            if oid in _oid_matching_rules:
-                raise LDAPSchemaError('Duplicate OID {0} in matching rule declaration'.format(oid))
-            _oid_matching_rules[oid] = cls
-        for name in names:
-            if name in _name_matching_rules:
-                raise LDAPSchemaError('Duplicate name {0} in matching rule declaration'.format(name))
-            _name_matching_rules[name] = cls
+        if oid or names:
+            modname = get_obj_module(cls)
+            mod_rules = _preregistration_matching_rules.setdefault(modname, [])
+            mod_rules.append(cls)
         return cls
 
 

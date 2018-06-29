@@ -10,6 +10,7 @@ from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .controls import Control, critical, optional
 from .exceptions import LDAPError, NoSearchResults, Abandon
 from .extensible import (
+    extensions,
     add_extension,
     BaseLaurelinExtension,
     BaseLaurelinLDAPExtension,
@@ -19,6 +20,7 @@ from .filter import escape as filter_escape
 from .ldapobject import LDAPObject
 from .modify import Mod
 from .objectclass import ObjectClass
+from .schema import SchemaValidator, load_base_schema
 from .validation import Validator
 
 import pyasn1.type.univ
@@ -48,6 +50,7 @@ __all__ = [
     'LDAPError',
     'NoSearchResults',
     'Abandon',
+    'extensions',
     'add_extension',
     'BaseLaurelinExtension',
     'BaseLaurelinLDAPExtension',
@@ -57,6 +60,8 @@ __all__ = [
     'Mod',
     'ObjectClass',
     'Validator',
+    'SchemaValidator',
+    'load_base_schema',
     'dc',
     'domain',
 ]

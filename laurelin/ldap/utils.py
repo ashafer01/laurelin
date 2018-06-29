@@ -179,3 +179,44 @@ def get_one_result(results):
         raise exceptions.MultipleSearchResults()
     else:
         return results[0]
+
+
+_get_class_module_err_msg = ('Could not identify the source module for object {0}. This may indicate an incompatability'
+                             ' between your Python version or implementation and laurelin.')
+
+
+def get_obj_module(obj):
+    """Identify the name of the module where the given object was defined.
+
+    This uses the __module__ attribute with some error handling since there is some suggestion around the internet
+    that this attribute may not be 100% reliable. But, the consensus seems to be that it is at least "pretty reliable"
+    so this function performs a little bit of error handling just in case. It could probably do more, but the actual
+    presentation of lack of support for this is unknown.
+    """
+    try:
+        modname = obj.__module__
+        if not modname:
+            raise exceptions.LDAPError(_get_class_module_err_msg.format(obj.__name__))
+        return modname
+    except AttributeError:
+        raise exceptions.LDAPError(_get_class_module_err_msg.format(obj.__name__))
+
+
+_run_once = set()
+
+
+def run_once(func):
+    """Decorator to only allow the function to be executed once"""
+
+    func_id = id(func)
+
+    def decorated(*args, **kwds):
+        if func_id in _run_once:
+            return
+        else:
+            ret = func(*args, **kwds)
+            _run_once.add(func_id)
+            return ret
+
+    decorated.__doc__ = func.__doc__
+    return decorated

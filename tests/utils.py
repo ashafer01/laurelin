@@ -6,12 +6,14 @@ def get_reload():
     try:
         return reload
     except NameError:
-        try:
-            from imp import reload
-            return reload
-        except ImportError:
-            from importlib import reload
-            return reload
+        pass
+    try:
+        from importlib import reload
+        return reload
+    except ImportError:
+        pass
+    from imp import reload
+    return reload
 
 
 reload = get_reload()
@@ -46,21 +48,11 @@ def load_schema():
     schema_mod = 'laurelin.ldap.schema'
     clear_schema_registrations()
     schema = import_module(schema_mod)
-    clear_schema_registrations()
-    reload(schema)
-    return import_module(schema_mod)
+    schema._base_schema_loaded = False
+    schema.load_base_schema()
+    return schema
 
 
 def import_install_mock():
-    try:
-        import unittest.mock as mock
-        return mock
-    except ImportError:
-        try:
-            import mock
-            return mock
-        except ImportError:
-            import pip
-            pip.main(['install', 'mock'])
-            import mock
-            return mock
+    import unittest.mock as mock
+    return mock

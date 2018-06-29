@@ -472,20 +472,6 @@ class TestLDAP(unittest.TestCase):
         with self.assertRaises(exceptions.LDAPError):
             ldap.who_am_i()
 
-    def test_activate_extension(self):
-        """Ensure extension activation/loading works"""
-        ext = 'laurelin.extensions.netgroups'
-        netgroups = LDAP.activate_extension(ext)
-        self.assertIsInstance(netgroups, ModuleType)
-        self.assertTrue(hasattr(LDAP, 'get_netgroup'))
-        self.assertTrue(hasattr(netgroups, 'LAURELIN_ACTIVATED'))
-
-        # ensure activating again does not cause an error
-        LDAP.activate_extension(ext)
-
-        with self.assertRaises(ImportError):
-            LDAP.activate_extension('i.am.not.a.module')
-
     def test_unbind(self):
         """Test unbind/unbound behavior"""
         mock_sock = MockLDAPSocket()

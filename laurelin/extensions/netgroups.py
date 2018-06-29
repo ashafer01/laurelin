@@ -85,7 +85,7 @@ class LaurelinExtension(extensible.BaseLaurelinExtension):
     NAME = 'netgroups'
     REQUIRES_BASE_SCHEMA = True
 
-    def define_schema(self):
+    def _define_schema(self):
         ObjectClass('''
         ( 1.3.6.1.1.1.2.8 NAME 'nisNetgroup' SUP top STRUCTURAL
           MUST cn
