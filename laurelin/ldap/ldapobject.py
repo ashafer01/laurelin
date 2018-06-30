@@ -55,7 +55,8 @@ class LDAPObject(AttrsDict, LDAPObjectExtensions):
         self.ldap_conn = ldap_conn
         self.relative_search_scope = relative_search_scope
         self.rdn_attr = rdn_attr
-        self._built_in_only = ldap_conn._built_in_only
+        if ldap_conn:
+            self._built_in_only = ldap_conn._built_in_only
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))

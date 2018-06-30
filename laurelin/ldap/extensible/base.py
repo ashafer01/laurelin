@@ -125,6 +125,11 @@ class Extensible(object):
             'pip_package': None,  # built-in
             'docstring': 'The built-in NIS netgroups extension',
         },
+        'paged_results': {
+            'module': 'laurelin.extensions.pagedresults',
+            'pip_package': None,  # built-in
+            'docstring': 'Built-in extension defining standard paged results control for search'
+        },
     }
 
     ADDITIONAL_EXTENSIONS = {}
@@ -156,7 +161,7 @@ class Extensible(object):
         return obj
 
     def _create_extension_instance(self, name, mod):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def __getattr__(self, item):
         # this acts like the auto-generated @property methods but fully dynamic, using modules that have been added

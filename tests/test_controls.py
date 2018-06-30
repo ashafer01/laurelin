@@ -1,5 +1,5 @@
 import unittest
-from laurelin.ldap import LDAP, critical
+from laurelin.ldap import LDAP, critical, extensions
 from laurelin.extensions import pagedresults
 from .mock_ldapsocket import MockLDAPSocket
 from laurelin.ldap import rfc4511
@@ -9,7 +9,8 @@ from pyasn1.codec.ber.encoder import encode as ber_encode
 class TestControls(unittest.TestCase):
     def test_pagedresults(self):
         """Use the paged results controls to exercise the controls subsystem"""
-        LDAP.activate_extension('laurelin.extensions.pagedresults')
+        extensions.paged_results.require()
+
         mock_sock = MockLDAPSocket()
         mock_sock.add_search_res_entry('', {
             'supportedControl': [pagedresults.OID],

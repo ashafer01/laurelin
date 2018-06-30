@@ -4,7 +4,7 @@ from laurelin.ldap.attributetype import (
     get_attribute_type,
 )
 from laurelin.ldap.exceptions import LDAPSchemaError
-from .utils import clear_attribute_types
+from .utils import clear_attribute_types, load_schema
 
 
 def setup():
@@ -123,6 +123,7 @@ def test_supertype_inhertiance():
 
 
 def test_index():
+    load_schema()
     spec = '''
       ( 1.2.3.4 NAME 'testing'
         EQUALITY caseIgnoreMatch
@@ -151,6 +152,7 @@ def test_index():
 
 
 def test_getAttributeType():
+    load_schema()
     spec = '''
       ( 1.2.3.4 NAME 'testing'
         EQUALITY caseIgnoreMatch

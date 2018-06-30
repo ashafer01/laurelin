@@ -1,6 +1,6 @@
 from . import utils
 from .mock_ldapsocket import MockSockRootDSE
-from laurelin.ldap import config, LDAP, LDAPObject
+from laurelin.ldap import config, LDAP, LDAPObject, SchemaValidator
 from laurelin.ldap.base import LDAPResponse
 import laurelin.ldap.base
 import six
@@ -11,7 +11,7 @@ mock = utils.import_install_mock()
 
 class TestConfig(unittest.TestCase):
     def setUp(self):
-        self.schema = utils.load_schema()
+        utils.load_schema()
 
     def test_normalize_global_config_param(self):
         """Ensure normalize_global_config_param functions correctly"""
@@ -113,9 +113,9 @@ class TestConfig(unittest.TestCase):
 
         conn['validators'] = ['laurelin.ldap.schema.SchemaValidator']
         ldap = config.create_connection({'connection': conn})
-        self.assertIsInstance(ldap.validators[0], self.schema.SchemaValidator)
+        self.assertIsInstance(ldap.validators[0], SchemaValidator)
 
-        validator = self.schema.SchemaValidator()
+        validator = SchemaValidator()
         conn['validators'] = [validator]
         ldap = config.create_connection({'connection': conn})
         self.assertIs(ldap.validators[0], validator)

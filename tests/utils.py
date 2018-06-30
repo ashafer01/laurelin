@@ -1,5 +1,4 @@
-from laurelin.ldap import attributetype, objectclass, rules
-from importlib import import_module
+from laurelin.ldap import attributetype, objectclass, rules, extensions, BaseLaurelinExtension
 
 
 def get_reload():
@@ -36,21 +35,19 @@ def clear_rules():
     rules._name_matching_rules.clear()
     rules._oid_matching_rule_objects.clear()
     rules._name_matching_rule_objects.clear()
+    rules._syntax_registered_mods.clear()
+    rules._matching_registered_mods.clear()
 
 
 def clear_schema_registrations():
     clear_attribute_types()
     clear_object_classes()
     clear_rules()
+    BaseLaurelinExtension._schema_defined.clear()
 
 
 def load_schema():
-    schema_mod = 'laurelin.ldap.schema'
-    clear_schema_registrations()
-    schema = import_module(schema_mod)
-    schema._base_schema_loaded = False
-    schema.load_base_schema()
-    return schema
+    extensions.base_schema.require()
 
 
 def import_install_mock():

@@ -29,3 +29,11 @@ class Extensions(ExtensionsBase):
         :rtype: laurelin.extensions.netgroups.LaurelinExtension
         """
         return self._get_extension_instance('netgroups')
+
+    @property
+    def paged_results(self):
+        """Built-in extension defining standard paged results control for search
+
+        :rtype: laurelin.extensions.pagedresults.LaurelinExtension
+        """
+        return self._get_extension_instance('paged_results')

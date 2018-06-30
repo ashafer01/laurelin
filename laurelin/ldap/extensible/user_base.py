@@ -8,21 +8,20 @@ class BaseLaurelinExtension(object):
     NAME = '__undefined__'
     INSTANCE = None
 
-    def __init__(self):
-        self._schema_defined = False
+    _schema_defined = set()
 
     def _define_schema(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def require_schema(self):
         modname = get_obj_module(self.__class__)
         register_module_syntax_rules(modname)
         register_module_matching_rules(modname)
         try:
-            if not self._schema_defined:
+            if modname not in BaseLaurelinExtension._schema_defined:
                 self._define_schema()
-                self._schema_defined = True
-        except NotImplemented:
+                BaseLaurelinExtension._schema_defined.add(modname)
+        except NotImplementedError:
             pass
 
     def require_controls(self):

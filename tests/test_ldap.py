@@ -9,7 +9,6 @@ from laurelin.ldap import (
 )
 import laurelin.ldap.base
 import inspect
-import six
 import unittest
 from .mock_ldapsocket import MockLDAPSocket
 from types import ModuleType
@@ -529,6 +528,8 @@ class TestLDAP(unittest.TestCase):
             method = ('search',)
             keyword = 'mock_control'
             REQUEST_OID = '9.999.999.999.999.9999999'
+
+        controls.register_module_controls(__name__)
 
         test_dn = 'o=foo'
         mock_sock.add_search_res_entry(test_dn, {'description': ['foo']})

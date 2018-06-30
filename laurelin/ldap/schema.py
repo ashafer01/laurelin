@@ -1,12 +1,8 @@
 """Schema specifications from various RFCs"""
 
 from __future__ import absolute_import
-from . import utils
+from .extensible import extensions
 from .exceptions import LDAPValidationError, LDAPWarning
-from .rules import (
-    register_module_syntax_rules,
-    register_module_matching_rules,
-)
 from .attributetype import get_attribute_type
 from .objectclass import get_object_class
 from .validation import Validator
@@ -18,7 +14,7 @@ class SchemaValidator(Validator):
     """Ensures parameters conform to the available defined schema"""
 
     def __init__(self):
-        load_base_schema()
+        extensions.base_schema.require()
         Validator.__init__(self)
 
     def validate_object(self, obj, write=True):

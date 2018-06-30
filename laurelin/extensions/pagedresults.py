@@ -29,10 +29,9 @@ Note: When getting pages in a loop, you may set the cookie value to an empty str
     ldap.base.search(paged=(10, ''))
 """
 
-from laurelin.ldap import Control
+from laurelin.ldap import Control, BaseLaurelinExtension, LDAPError
 from laurelin.ldap.protoutils import get_string_component
 from laurelin.ldap.rfc4511 import Integer0ToMax
-from laurelin.ldap.exceptions import LDAPError
 from pyasn1.codec.ber.encoder import encode as ber_encode
 from pyasn1.codec.ber.decoder import decode as ber_decode
 from pyasn1.type.univ import OctetString, Sequence
@@ -94,3 +93,9 @@ class PagedResultsControl(Control):
             raise LDAPError('Unexpected leftover bits in response control value')
         cookie = get_string_component(real_ctrl_value, 'cookie')
         return cookie
+
+
+class LaurelinExtension(BaseLaurelinExtension):
+    NAME = 'paged_results'
+
+    OID = OID

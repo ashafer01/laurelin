@@ -178,6 +178,7 @@ class DefaultObjectClass(ObjectClass):
         self.supertype = None
         self.kind = 'STRUCTURAL'
         self.obsolete = False
+        self.superclasses = ()
         self.my_must = []
         self.my_may = []
         self._must = None

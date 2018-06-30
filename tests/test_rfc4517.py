@@ -1,10 +1,10 @@
 from laurelin.ldap.exceptions import InvalidSyntaxError
-from laurelin.ldap.rules import get_matching_rule, get_syntax_rule
-from .utils import load_schema
+from laurelin.extensions import base_schema as schema
+from .utils import clear_schema_registrations
 
 
 def setup():
-    load_schema()
+    clear_schema_registrations()
 
 
 def run_syntax(testobj, tests_good, tests_bad):

@@ -25,6 +25,8 @@ def get_syntax_rule(oid):
 def register_module_syntax_rules(modname):
     if modname in _syntax_registered_mods:
         return
+    if modname not in _preregistration_syntax_rules:
+        return
     for cls in _preregistration_syntax_rules[modname]:
         oid = getattr(cls, 'OID')
         if oid in _oid_syntax_rules:
@@ -36,7 +38,6 @@ def register_module_syntax_rules(modname):
                                   'new class {3}.{4})'.format(oid, cur_mod, cur_class, new_mod, new_class))
         _oid_syntax_rules[oid] = cls
     _syntax_registered_mods.add(modname)
-    del _preregistration_syntax_rules[modname]
 
 
 class MetaSyntaxRule(type):
@@ -147,7 +148,6 @@ def register_module_matching_rules(modname):
                 raise LDAPSchemaError('Duplicate name {0} in matching rule declaration'.format(name))
             _name_matching_rules[name] = cls
     _matching_registered_mods.add(modname)
-    del _preregistration_matching_rules[modname]
 
 
 class MetaMatchingRule(type):
