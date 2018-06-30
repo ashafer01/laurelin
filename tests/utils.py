@@ -51,5 +51,9 @@ def load_schema():
 
 
 def import_install_mock():
-    import unittest.mock as mock
-    return mock
+    try:
+        import unittest.mock as mock
+        return mock
+    except ImportError:
+        import mock
+        return mock
