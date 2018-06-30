@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from . import user_base
 from .user_base import BaseLaurelinExtension
 from ..exceptions import LDAPExtensionError
 from importlib import import_module
@@ -211,7 +212,7 @@ class ExtensibleClass(Extensible):
         except AttributeError:
             raise LDAPExtensionError('Extension {0} does not define an extension class for {1}'.format(mod.__name__,
                                                                                                        my_classname))
-        if not issubclass(cls, globals()[base_classname]):
+        if not issubclass(cls, getattr(user_base, base_classname)):
             raise LDAPExtensionError('Extension class {0}.{1} does not subclass {2}.{3}'.format(
                 mod.__name__, ext_classname, __name__, base_classname
             ))

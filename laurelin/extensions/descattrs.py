@@ -50,6 +50,7 @@ considered unstructured and ignored.
 class LaurelinLDAPObjectExtension(extensible.BaseLaurelinLDAPObjectExtension):
     def __init__(self, parent):
         extensible.BaseLaurelinLDAPObjectExtension.__init__(self, parent)
+        self.parent.refresh_missing(['description'])
         self._desc_dict = AttrsDict()
         self._unstructured_desc = set()
         for desc in self.parent.get_attr('description'):
