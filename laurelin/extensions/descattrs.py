@@ -37,7 +37,7 @@ Example::
 
 """
 
-from laurelin.ldap import extensible
+from laurelin.ldap import BaseLaurelinLDAPObjectExtension, BaseLaurelinExtension
 from laurelin.ldap.attrsdict import AttrsDict
 import six
 
@@ -47,9 +47,13 @@ considered unstructured and ignored.
 """
 
 
-class LaurelinLDAPObjectExtension(extensible.BaseLaurelinLDAPObjectExtension):
+class LaurelinExtension(BaseLaurelinExtension):
+    NAME = 'descattrs'
+
+
+class LaurelinLDAPObjectExtension(BaseLaurelinLDAPObjectExtension):
     def __init__(self, parent):
-        extensible.BaseLaurelinLDAPObjectExtension.__init__(self, parent)
+        BaseLaurelinLDAPObjectExtension.__init__(self, parent)
         self.parent.refresh_missing(['description'])
         self._desc_dict = AttrsDict()
         self._unstructured_desc = set()
@@ -61,8 +65,18 @@ class LaurelinLDAPObjectExtension(extensible.BaseLaurelinLDAPObjectExtension):
             else:
                 self._unstructured_desc.add(desc)
 
+    def __iter__(self):
+        for attr in self._desc_dict:
+            yield attr
+
     def __getitem__(self, attr):
         return self._desc_dict[attr]
+
+    def __contains__(self, item):
+        return item in self._desc_dict
+
+    def __getattr__(self, item):
+        return getattr(self._desc_dict, item)
 
     def _modify_desc_attrs(self, method, attrs_dict):
         """Perform modification to the object's description attributes.

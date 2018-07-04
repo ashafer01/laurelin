@@ -8,6 +8,7 @@ from .base import (
 )
 from .user_base import (
     BaseLaurelinExtension,
+    BaseLaurelinSchema,
     BaseLaurelinLDAPExtension,
     BaseLaurelinLDAPObjectExtension,
 )
@@ -18,6 +19,7 @@ extensions = Extensions()
 __all__ = [
     'add_extension',
     'BaseLaurelinExtension',
+    'BaseLaurelinSchema',
     'BaseLaurelinLDAPExtension',
     'BaseLaurelinLDAPObjectExtension',
     'Extensible',

@@ -28,9 +28,10 @@ def add_extension(modname):
     mod = _import_extension(modname)
     try:
         ext_cls = getattr(mod, EXTENSION_CLSNAME)
-        # note: _import_extension has already checked that the class is the correct type if it exists
     except AttributeError:
         raise LDAPExtensionError('Extension {0} must define a class {1}'.format(modname, EXTENSION_CLSNAME))
+
+    # note: _import_extension has already checked that the class is the correct type if it exists
 
     ext_attr_name = ext_cls.NAME
 
@@ -210,8 +211,9 @@ class ExtensibleClass(Extensible):
         try:
             cls = getattr(mod, ext_classname)
         except AttributeError:
-            raise LDAPExtensionError('Extension {0} does not define an extension class for {1}'.format(mod.__name__,
-                                                                                                       my_classname))
+            raise LDAPExtensionError('Extension {0} does not define an extension class for {1}'.format(
+                mod.__name__, my_classname
+            ))
         if not issubclass(cls, getattr(user_base, base_classname)):
             raise LDAPExtensionError('Extension class {0}.{1} does not subclass {2}.{3}'.format(
                 mod.__name__, ext_classname, __name__, base_classname

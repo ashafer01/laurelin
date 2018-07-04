@@ -88,7 +88,7 @@ TAG = 'netgroup_base'
 _TRIPLE_RE = '^\(([^,]*),([^,]*),([^)]*)\)$'
 
 
-class nisNetgroupTripleSytnax(RegexSyntaxRule):
+class NisNetgroupTripleSytnax(RegexSyntaxRule):
     OID = '1.3.6.1.1.1.0.0'
     DESC = 'NIS netgroup triple'
     regex = _TRIPLE_RE
@@ -96,8 +96,6 @@ class nisNetgroupTripleSytnax(RegexSyntaxRule):
 
 class LaurelinExtension(BaseLaurelinExtension):
     NAME = 'netgroups'
-    REQUIRES_BASE_SCHEMA = True
-
     TAG = TAG
 
     def _define_schema(self):

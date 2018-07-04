@@ -13,6 +13,7 @@ from .extensible import (
     extensions,
     add_extension,
     BaseLaurelinExtension,
+    BaseLaurelinSchema,
     BaseLaurelinLDAPExtension,
     BaseLaurelinLDAPObjectExtension,
 )
@@ -20,7 +21,7 @@ from .filter import escape as filter_escape
 from .ldapobject import LDAPObject
 from .modify import Mod
 from .objectclass import get_object_class, ObjectClass, ExtensibleObjectClass
-from .rules import SyntaxRule, RegexSyntaxRule, EqualityMatchingRule
+from .rules import SyntaxRule, RegexSyntaxRule, MatchingRule, EqualityMatchingRule
 from .schema import SchemaValidator
 from .validation import Validator
 
@@ -55,6 +56,7 @@ __all__ = [
     'extensions',
     'add_extension',
     'BaseLaurelinExtension',
+    'BaseLaurelinSchema',
     'BaseLaurelinLDAPExtension',
     'BaseLaurelinLDAPObjectExtension',
     'filter_escape',
@@ -65,6 +67,7 @@ __all__ = [
     'ExtensibleObjectClass',
     'SyntaxRule',
     'RegexSyntaxRule',
+    'MatchingRule',
     'EqualityMatchingRule',
     'Validator',
     'SchemaValidator',
