@@ -385,12 +385,3 @@ Users can then access it like so::
    with LDAP('ldaps://dir.example.org', validators=[extensions.my_ext.MyValidator]) as ldap:
       # do stuff
 
-
-Packaging
----------
-
-``laurelin.extensions`` is a
-`namespace package <https://setuptools.readthedocs.io/en/latest/setuptools.html#namespace-packages>`_ meaning you can
-add your own modules and packages to it. You can use this on your private infrastructure, publish it in its own
-package that way, or submit it as a pull request to be shipped as a built-in extension. You're also welcome to package
-in your own namespace, as long as it is reachable for import.
