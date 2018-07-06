@@ -1,7 +1,4 @@
-""" laurelin.ldap
-
-Imports base objects for user import and defines user utility functions
-"""
+"""Imports and defines the core of the public API"""
 
 from __future__ import absolute_import
 from .attributetype import get_attribute_type, AttributeType
@@ -14,6 +11,7 @@ from .extensible import (
     add_extension,
     BaseLaurelinExtension,
     BaseLaurelinSchema,
+    BaseLaurelinControls,
     BaseLaurelinLDAPExtension,
     BaseLaurelinLDAPObjectExtension,
 )
@@ -57,6 +55,7 @@ __all__ = [
     'add_extension',
     'BaseLaurelinExtension',
     'BaseLaurelinSchema',
+    'BaseLaurelinControls',
     'BaseLaurelinLDAPExtension',
     'BaseLaurelinLDAPObjectExtension',
     'filter_escape',

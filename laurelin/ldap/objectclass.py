@@ -86,18 +86,9 @@ class ObjectClass(object):
         if not m:
             raise LDAPSchemaError('Invalid object class description')
 
-        # register OID
         self.oid = m.group('oid')
-        if self.oid in _oid_object_classes:
-            raise LDAPSchemaError('Duplicate object class OID {0}'.format(self.oid))
-        _oid_object_classes[self.oid] = self
 
-        # register names
         self.names = parse_qdescrs(m.group('name'))
-        for name in self.names:
-            if name in _name_object_classes:
-                raise LDAPSchemaError('Duplicate object class name {0}'.format(name))
-            _name_object_classes[name] = self
 
         self.superclasses = _parse_oids(m.group('superclass'))
 
@@ -118,6 +109,18 @@ class ObjectClass(object):
 
         self._must = None
         self._may = None
+
+    def register(self):
+        # register OID
+        if self.oid in _oid_object_classes:
+            raise LDAPSchemaError('Duplicate object class OID {0}'.format(self.oid))
+        _oid_object_classes[self.oid] = self
+
+        # register names
+        for name in self.names:
+            if name in _name_object_classes:
+                raise LDAPSchemaError('Duplicate object class name {0}'.format(name))
+            _name_object_classes[name] = self
 
     @property
     def must(self):

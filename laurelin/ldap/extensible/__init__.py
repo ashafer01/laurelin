@@ -6,9 +6,10 @@ from .base import (
     EXTENSION_CLSNAME,
     CLASS_EXTENSION_FMT,
 )
+from .controls import BaseLaurelinControls
+from .schema import BaseLaurelinSchema
 from .user_base import (
     BaseLaurelinExtension,
-    BaseLaurelinSchema,
     BaseLaurelinLDAPExtension,
     BaseLaurelinLDAPObjectExtension,
 )
@@ -20,6 +21,7 @@ __all__ = [
     'add_extension',
     'BaseLaurelinExtension',
     'BaseLaurelinSchema',
+    'BaseLaurelinControls',
     'BaseLaurelinLDAPExtension',
     'BaseLaurelinLDAPObjectExtension',
     'Extensible',

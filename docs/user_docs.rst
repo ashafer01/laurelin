@@ -57,7 +57,7 @@ common ones are included in :mod:`laurelin.ldap`. Beyond that, you should not ne
 you are defining controls, extensions, schema, or validators.
 
 
-:doc:`/built_in_extensions` are stored in the :mod:`laurelin.extensions` package.
+Built-in extensions are stored in the :mod:`laurelin.extensions` package.
 
 
 Getting Started

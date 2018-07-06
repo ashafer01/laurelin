@@ -50,7 +50,8 @@ def test_invalid_specs():
 
     for test in bad:
         try:
-            AttributeType(test)
+            t = AttributeType(test)
+            t.register()
             assert False
         except LDAPSchemaError:
             pass
@@ -63,9 +64,11 @@ def test_duplicate_oid():
         SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )
     '''
 
-    AttributeType(spec)
+    t1 = AttributeType(spec)
+    t1.register()
     try:
-        AttributeType(spec)
+        t2 = AttributeType(spec)
+        t2.register()
         assert False
     except LDAPSchemaError:
         pass
@@ -85,9 +88,11 @@ def test_duplicate_name():
         SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 )
     '''
 
-    AttributeType(spec1)
+    t1 = AttributeType(spec1)
+    t1.register()
     try:
-        AttributeType(spec2)
+        t2 = AttributeType(spec2)
+        t2.register()
         assert False
     except LDAPSchemaError:
         pass
@@ -110,6 +115,8 @@ def test_supertype_inhertiance():
 
     t1 = AttributeType(supertype)
     t2 = AttributeType(subtype)
+    t1.register()
+    t2.register()
 
     try:
         assert t1.oid != t2.oid
@@ -131,6 +138,7 @@ def test_index():
     '''
 
     t = AttributeType(spec)
+    t.register()
 
     values = [
         'abc',
@@ -159,6 +167,7 @@ def test_getAttributeType():
         SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
     '''
     t1 = AttributeType(spec)
+    t1.register()
 
     t2 = get_attribute_type('testing')
     t3 = get_attribute_type('1.2.3.4')

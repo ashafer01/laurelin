@@ -76,6 +76,7 @@ from laurelin.ldap import (
     LDAPError,
     extensions,
     BaseLaurelinExtension,
+    BaseLaurelinSchema,
     BaseLaurelinLDAPExtension,
     BaseLaurelinLDAPObjectExtension,
 )
@@ -88,36 +89,36 @@ TAG = 'netgroup_base'
 _TRIPLE_RE = '^\(([^,]*),([^,]*),([^)]*)\)$'
 
 
-class NisNetgroupTripleSytnax(RegexSyntaxRule):
-    OID = '1.3.6.1.1.1.0.0'
-    DESC = 'NIS netgroup triple'
-    regex = _TRIPLE_RE
-
-
 class LaurelinExtension(BaseLaurelinExtension):
     NAME = 'netgroups'
     TAG = TAG
 
-    def _define_schema(self):
-        ObjectClass('''
-        ( 1.3.6.1.1.1.2.8 NAME 'nisNetgroup' SUP top STRUCTURAL
-          MUST cn
-          MAY ( nisNetgroupTriple $ memberNisNetgroup $ description ) )
-        ''')
 
-        AttributeType('''
-        ( 1.3.6.1.1.1.1.13 NAME 'memberNisNetgroup'
-          EQUALITY caseExactIA5Match
-          SUBSTR caseExactIA5SubstringsMatch
-          SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
-        ''')
+class LaurelinSchema(BaseLaurelinSchema):
+    NIS_NETGROUP = ObjectClass('''
+    ( 1.3.6.1.1.1.2.8 NAME 'nisNetgroup' SUP top STRUCTURAL
+      MUST cn
+      MAY ( nisNetgroupTriple $ memberNisNetgroup $ description ) )
+    ''')
 
-        AttributeType('''
-        ( 1.3.6.1.1.1.1.14 NAME 'nisNetgroupTriple'
-          DESC 'Netgroup triple'
-          EQUALITY caseExactMatch
-          SYNTAX 1.3.6.1.1.1.0.0 )
-        ''')
+    MEMBER_NIS_NETGROUP = AttributeType('''
+    ( 1.3.6.1.1.1.1.13 NAME 'memberNisNetgroup'
+      EQUALITY caseExactIA5Match
+      SUBSTR caseExactIA5SubstringsMatch
+      SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+    ''')
+
+    NIS_NETGROUP_TRIPLE = AttributeType('''
+    ( 1.3.6.1.1.1.1.14 NAME 'nisNetgroupTriple'
+      DESC 'Netgroup triple'
+      EQUALITY caseExactMatch
+      SYNTAX 1.3.6.1.1.1.0.0 )
+    ''')
+
+    class NisNetgroupTripleSytnax(RegexSyntaxRule):
+        OID = '1.3.6.1.1.1.0.0'
+        DESC = 'NIS netgroup triple'
+        regex = _TRIPLE_RE
 
 
 # constants

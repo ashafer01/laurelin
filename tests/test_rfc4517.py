@@ -1,5 +1,5 @@
 from laurelin.ldap.exceptions import InvalidSyntaxError
-from laurelin.extensions import base_schema as schema
+from laurelin.extensions.base_schema import LaurelinSchema as schema
 from .utils import clear_schema_registrations
 
 

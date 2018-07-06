@@ -322,7 +322,7 @@ class LDAP(LDAPExtensions):
             if isinstance(validator, six.class_types):
                 validator = validator()
             if not isinstance(validator, Validator):
-                raise TypeError('Validators must subclass laurelin.ldap.validation.Validator')
+                raise TypeError('Validators must subclass laurelin.ldap.Validator')
             logger.info('Using validator {0}'.format(validator.__class__.__name__))
             validator.ldap_conn = self
             self.validators.append(validator)

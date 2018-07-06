@@ -92,8 +92,8 @@ def _import_extension(modname):
         try:
             ext_cls = getattr(mod, EXTENSION_CLSNAME)
             if not issubclass(ext_cls, BaseLaurelinExtension):
-                raise LDAPExtensionError('{0}.{1} does not subclass {2}.BaseLaurelinExtension'.format(
-                    modname, EXTENSION_CLSNAME, __name__
+                raise LDAPExtensionError('{0}.{1} does not subclass laurelin.ldap.BaseLaurelinExtension'.format(
+                    modname, EXTENSION_CLSNAME
                 ))
 
             # call one-time setup functions

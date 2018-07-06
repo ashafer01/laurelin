@@ -95,13 +95,14 @@ class TestSchemaValidator(unittest.TestCase):
         with six.assertRaisesRegex(self, LDAPValidationError, 'single-value'):
             sv.validate_object(iop)
 
-        ObjectClass("""
+        o = ObjectClass("""
             ( 99.99.99 NAME 'mockTestingClass'
                 SUP top
                 STRUCTURAL
                 MAY creatorsName
             )
         """)
+        o.register()
         obj_with_oper = LDAPObject('o=foo', {
             'objectClass': ['top', 'mockTestingClass'],
             'creatorsName': ['cn=foo'],  # operational attribute, not user modifiable
