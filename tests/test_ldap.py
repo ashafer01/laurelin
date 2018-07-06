@@ -529,7 +529,7 @@ class TestLDAP(unittest.TestCase):
             keyword = 'mock_control'
             REQUEST_OID = '9.999.999.999.999.9999999'
 
-        controls.register_module_controls(__name__)
+        MockControl.register()
 
         test_dn = 'o=foo'
         mock_sock.add_search_res_entry(test_dn, {'description': ['foo']})
