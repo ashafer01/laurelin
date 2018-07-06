@@ -168,6 +168,9 @@ class ObjectClass(object):
         """
         return (name in self.must)
 
+    def __repr__(self):
+        return '<{0} "{1}">'.format(self.__class__.__name__, self.names[0])
+
 
 class DefaultObjectClass(ObjectClass):
     """The default ObjectClass returned by :func:`get_object_class` when the requested object class is undefined.

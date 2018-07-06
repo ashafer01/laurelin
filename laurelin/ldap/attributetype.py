@@ -201,6 +201,9 @@ class AttributeType(object):
                 return i
         raise ValueError('assertion_value not found')
 
+    def __repr__(self):
+        return '<{0} "{1}">'.format(self.__class__.__name__, self.names[0])
+
 
 ## Defaults used when an attribute type is undefined
 

@@ -11,21 +11,21 @@ Example::
     with LDAP() as ldap:
         result = ldap.base.get_child('cn=someObject')
 
-        result.add_desc_attrs({'foo':['one', 'two']})
+        result.descattrs.add({'foo':['one', 'two']})
         print(result.format_ldif())
         # ...
         # description: foo=one
         # description: foo=two
         # ...
 
-        attr_vals = result.desc_attrs().get_attr('foo')
+        attr_vals = result.descattrs.get_attr('foo')
         print(attr_vals)
         # ['one', 'two']
 
-        result.replace_desc_attrs({'foo':['one','two','three']})
-        result.delete_desc_attrs({'foo':['two']})
+        result.descattrs.replace({'foo':['one','two','three']})
+        result.descattrs.delete({'foo':['two']})
 
-        attr_vals = result.desc_attrs().get_attr('foo')
+        attr_vals = result.descattrs.get_attr('foo')
         print(attr_vals)
         # ['one', 'three']
 
