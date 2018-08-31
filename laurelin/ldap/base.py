@@ -1567,7 +1567,7 @@ class SearchResultHandle(ResponseHandle):
     def __iter__(self):
         if self.abandoned:
             logger.debug('ID={0} has been abandoned'.format(self.message_id))
-            raise StopIteration()
+            return
         for msg in self.ldap_conn.sock.recv_messages(self.message_id):
             try:
                 mid, entry, res_ctrls = unpack('searchResEntry', msg)
@@ -1593,7 +1593,7 @@ class SearchResultHandle(ResponseHandle):
                             mid, repr(res)
                         ))
                         controls.handle_response(self, res_ctrls)
-                        raise StopIteration()
+                        return
                     elif res == RESULT_referral:
                         if self.follow_referrals:
                             logger.info('Following referral for ID={0}'.format(mid))
@@ -1603,7 +1603,7 @@ class SearchResultHandle(ResponseHandle):
                                 yield obj
                         else:
                             logger.debug('Ignoring referral for ID={0}'.format(mid))
-                            raise StopIteration()
+                            return
                     else:
                         raise LDAPError('Got {0} for search results (ID {1})'.format(repr(res), mid))
                 except UnexpectedResponseType:
