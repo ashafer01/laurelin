@@ -20,7 +20,7 @@ Features Overview
 -----------------
 
 * Fully compliant with RFC 4510 and its children, as well as several other related standards.
-* Tested against CPython 2.7, 3.4, 3.5, 3.6, PyPy, and PyPy3.
+* Tested against CPython 2.7, 3.4 - 3.7, PyPy, and PyPy3.
 * Simplified filter syntax (optional, standard filter syntax is fully supported and used by default)
 * Pythonic attributes input and presentation. It's just a dictionary.
 * Exceedingly easy relative searching. All objects have a suite of search methods which will automatically pass the
@@ -39,3 +39,29 @@ Features Overview
 * Seamless integration of controls. Once defined, these are just new keyword arguments on particular methods, and
   additional attributes on the response object.
 * Includes Python implementations of standard schema elements.
+
+Dependent Info
+--------------
+
+Laurelin follows `SemVer <https://semver.org/>`_. When you add ``laurelin-ldap`` to your requirements, I strongly
+suggest using the `compatible release operator <https://www.python.org/dev/peps/pep-0440/#compatible-release>`_ with
+the ``major.minor`` that you use initially. For example::
+
+    % pip install laurelin-ldap
+    ...
+    Successfully installed laurelin-ldap-1.5.0 ...
+                                         ^^^
+
+Since ``1.5.0`` was installed, add the following to your ``requirements.txt`` and/or ``install_requires`` list::
+
+    laurelin-ldap~=1.5
+
+But of course use whatever version you actually installed. You're also welcome to ``pip freeze``, but patch and
+minor releases will always be compatible. Patch releases tend to contain important fixes, too. If you're sure you don't
+want new features coming in and only fixes, you can still use the compatible release operator like so (again subbing in
+your actual installed version)::
+
+    laurelin-ldap~=1.5.0
+
+
+Feel free to open a GitHub issue with any questions or concerns.

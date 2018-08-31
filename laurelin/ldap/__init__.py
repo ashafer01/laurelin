@@ -31,6 +31,7 @@ __all__ = [
     'Scope',
     'DerefAliases',
     'DELETE_ALL',
+    'FilterSyntax',
     'critical',
     'optional',
     'LDAPError',
