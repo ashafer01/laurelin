@@ -1,6 +1,13 @@
 Changelog
 =========
 
+1.5.3
+-----
+
+Release 2018.08.30
+
+* Add python 3.7 support
+
 1.5.2
 -----
 

@@ -331,7 +331,7 @@ class LDAPSocket(object):
             else:
                 flush_queue = True
             if want_message_id in self.abandoned_mids:
-                raise StopIteration()
+                return
             try:
                 newraw = self._sock.recv(LDAPSocket.RECV_BUFFER)
                 if self._has_sasl_client():
