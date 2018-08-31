@@ -328,6 +328,7 @@ class LDAP(LDAPExtensions):
             self.validators.append(validator)
 
         # find base_dn
+        self.root_dse = None
         self.refresh_root_dse()
         if base_dn is None:
             if 'defaultNamingContext' in self.root_dse:

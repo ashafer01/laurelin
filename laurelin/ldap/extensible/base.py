@@ -67,17 +67,6 @@ def add_extension(modname):
         # no predefined extension by this NAME
         pass
 
-    # TODO make this work again - circular import for LDAP
-    #    * base imports this function in order to bind it to the LDAP class for convenience
-    #    * we import base to get LDAP for the purposes of this check
-    # # if the extension defines class extensions, ensure the name does not collide with an actual attribute
-    # for cls in (LDAP, LDAPObject):
-    #     ext_clsname = CLASS_EXTENSION_FMT.format(cls.__name__)
-    #     if hasattr(mod, ext_clsname) and hasattr(cls, ext_attr_name):
-    #         raise LDAPExtensionError('{0} already has an attribute named {1}, cannot add extension {2}'.format(
-    #             cls.__name__, ext_attr_name, modname
-    #         ))
-
     # store the imported module for later use
     Extensible.ADDITIONAL_EXTENSIONS[ext_attr_name] = mod
 

@@ -72,6 +72,7 @@ import re
 from laurelin.ldap import (
     AttributeType,
     ObjectClass,
+    get_object_class,
     RegexSyntaxRule,
     LDAPError,
     extensions,
@@ -121,18 +122,23 @@ class LaurelinSchema(BaseLaurelinSchema):
         regex = _TRIPLE_RE
 
 
-# constants
-
-# OBJECT_CLASS = _nis_netgroup.names[0]
-# NETGROUP_ATTRS = _nis_netgroup.must + _nis_netgroup.may
-
-# TODO temporary workaround
 OBJECT_CLASS = 'nisNetgroup'
-NETGROUP_ATTRS = ['*']
+
+
+def _netgroup_attrs():
+    oc = get_object_class(OBJECT_CLASS)
+    return oc.must + oc.may
+
+
+def _netgroup_attrs_arg(attrs_arg):
+    if attrs_arg is None:
+        return _netgroup_attrs()
+    else:
+        return attrs_arg
 
 
 class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
-    def get(self, cn, attrs=NETGROUP_ATTRS):
+    def get(self, cn, attrs=None):
         """Find a specific netgroup object.
 
         This depends on the base object having been tagged and configured properly. See
@@ -144,9 +150,10 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         :rtype: LDAPObject
         :raises TagError: if the base object has not been tagged.
         """
+        attrs = _netgroup_attrs_arg(attrs)
         return self.parent.tag(TAG).find(cn, attrs)
 
-    def search(self, filter, attrs=NETGROUP_ATTRS):
+    def search(self, filter, attrs=None):
         """Search for netgroups.
 
         This depends on the base object having been tagged and configured properly. See
@@ -159,6 +166,7 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         :rtype: SearchResultHandle
         :raises TagError: if the base object has not been tagged.
         """
+        attrs = _netgroup_attrs_arg(attrs)
         return self.parent.tag(TAG).search(_netgroup_filter(filter), attrs)
 
     def get_netgroup_obj_users(self, ng_obj, recursive=True):

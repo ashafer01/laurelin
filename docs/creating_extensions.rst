@@ -385,3 +385,12 @@ Users can then access it like so::
    with LDAP('ldaps://dir.example.org', validators=[extensions.my_ext.MyValidator]) as ldap:
       # do stuff
 
+Class Diagram
+-------------
+
+The extension subsystem has several interconnecting classes. Blue are auto-generated classes, and green are defined in
+extension modules. Unlabeled arrows indicate class inheritance or are self-explanatory.
+
+.. image:: laurelin_extensions_diagram.svg
+   :width: 100%
+   :alt: Laurelin extensions class and instance diagram
