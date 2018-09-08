@@ -332,7 +332,7 @@ Regex syntax rules must also define:
 
 * ``regex`` - the regular expression.
 
-Below are examples from :mod:`laurelin.ldap.schema`::
+Below are examples from :mod:`laurelin.extensions.base_schema`::
 
    from laurelin.ldap.rules import SyntaxRule, RegexSyntaxRule
    from laurelin.ldap.exceptions import InvalidSyntaxError
@@ -402,7 +402,6 @@ Users can enable this like so::
       with LDAP('ldaps://dir.example.org', validators=[SchemaValidator]) as ldap:
          # do stuff
 
-You can also define your own validators, see below.
 
 Class Diagram
 -------------
