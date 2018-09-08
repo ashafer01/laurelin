@@ -14,6 +14,8 @@ from .extensible import (
     BaseLaurelinControls,
     BaseLaurelinLDAPExtension,
     BaseLaurelinLDAPObjectExtension,
+    LaurelinTransiter,
+    LaurelinRegistrar,
 )
 from .filter import escape as filter_escape
 from .ldapobject import LDAPObject
@@ -58,6 +60,8 @@ __all__ = [
     'BaseLaurelinControls',
     'BaseLaurelinLDAPExtension',
     'BaseLaurelinLDAPObjectExtension',
+    'LaurelinTransiter',
+    'LaurelinRegistrar',
     'filter_escape',
     'LDAPObject',
     'Mod',

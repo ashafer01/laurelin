@@ -35,10 +35,10 @@ BASE_DIR = path_join(dirname(abspath(stack()[0][1])), '..')
 
 
 def _render_extensions_module(**kwds):
-    extends_classname = kwds.get('EXTENDS', 'laurelin')
+    fn_prefix = kwds.get('EXTENDS', 'laurelin')
 
     # render the template into a module
-    filename = '{0}_extensions.py'.format(extends_classname.lower())
+    filename = '{0}_extensions.py'.format(fn_prefix.lower())
     with open(path_join(BASE_DIR, 'laurelin', 'ldap', 'extensible', filename), 'w') as f:
         f.write(EXTENSION_TEMPLATE.render(**kwds))
         print('Generated new {0}'.format(filename))

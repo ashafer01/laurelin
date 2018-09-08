@@ -44,10 +44,13 @@ def add_extension(modname):
     try:
         existing_ext_mod = Extensible.ADDITIONAL_EXTENSIONS[ext_attr_name]
         if existing_ext_mod is not mod:
+            # the 2 extension modules are not identical; report that a different extension by this NAME is already
+            # added
             raise LDAPExtensionError('NAME {0} is already loaded as an additional extension {1}'.format(
                 ext_attr_name, existing_ext_mod.__name__
             ))
         else:
+            # the 2 extension modules are identical; quietly move on
             logger.debug('Extension module {0} with NAME {1} has already been added'.format(modname, ext_attr_name))
             return
     except KeyError:
@@ -59,8 +62,11 @@ def add_extension(modname):
     try:
         ext_info = Extensible.AVAILABLE_EXTENSIONS[ext_attr_name]
         if ext_info['module'] != modname:
+            # the module names of the 2 extensions differ; assume they are different extensions and report that the
+            # NAME is already in use
             raise LDAPExtensionError('{0} is already defined as an extension name'.format(ext_cls.NAME))
         else:
+            # the modules names of the 2 extensions are equal; assume they are the same extension and quietly move on
             logger.debug('Extension module {0} does not need to be added'.format(modname))
             return
     except KeyError:
@@ -74,7 +80,7 @@ def add_extension(modname):
 def _import_extension(modname):
     """Import an extension module and run setup functions if necessary"""
     mod = import_module(modname)
-    flag_attr = 'LAURELIN_EXTENSION_SETUP_COMPLETE'
+    flag_attr = '__LAURELIN_EXTENSION_SETUP_COMPLETE'
     if not getattr(mod, flag_attr, False):
         # need to setup extension
         logger.info('Setting up extension {0}'.format(modname))
@@ -204,8 +210,8 @@ class ExtensibleClass(Extensible):
                 mod.__name__, my_classname
             ))
         if not issubclass(cls, getattr(user_base, base_classname)):
-            raise LDAPExtensionError('Extension class {0}.{1} does not subclass {2}.{3}'.format(
-                mod.__name__, ext_classname, __name__, base_classname
+            raise LDAPExtensionError('Extension class {0}.{1} does not subclass laurelin.ldap.{2}'.format(
+                mod.__name__, ext_classname, base_classname
             ))
         obj = cls(parent=self)
         self._extension_instances[name] = obj

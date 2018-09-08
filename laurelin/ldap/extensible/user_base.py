@@ -1,24 +1,10 @@
-from .schema import register_module_schema
-from .controls import register_module_controls
-from ..utils import get_obj_module
+from .registration import LaurelinRegistrar, LaurelinTransiter
 
 
-class BaseLaurelinExtension(object):
-    """Base class for extensions that define schema and controls, required for any class not in AVAILABLE_EXTENSIONS"""
+class BaseLaurelinExtension(LaurelinRegistrar, LaurelinTransiter):
+    """Base class for basic extension class. Can house schema and controls definitions."""
     NAME = '__undefined__'
     INSTANCE = None
-
-    def require_schema(self):
-        modname = get_obj_module(self.__class__)
-        register_module_schema(modname)
-
-    def require_controls(self):
-        modname = get_obj_module(self.__class__)
-        register_module_controls(modname)
-
-    def require(self):
-        self.require_schema()
-        self.require_controls()
 
 
 class BaseLaurelinLDAPExtension(object):
@@ -37,3 +23,13 @@ class BaseLaurelinLDAPObjectExtension(object):
         :param laurelin.ldap.LDAPObject parent: The parent LDAPObject instance
         """
         self.parent = parent
+
+
+class BaseLaurelinSchema(LaurelinTransiter):
+    """Optional base class for a class defining schema elements - only subclassing LaurelinTransiter is required"""
+    pass
+
+
+class BaseLaurelinControls(LaurelinTransiter):
+    """Optional base class for a class defining controls - only subclassing LaurelinTransiter is required"""
+    pass

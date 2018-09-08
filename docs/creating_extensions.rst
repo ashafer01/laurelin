@@ -63,6 +63,10 @@ about actually defining these below, the class signatures should look like this,
 ``class LaurelinControls(`` :class:`.BaseLaurelinControls` ``):``
    Define all :class:`.Control` classes as local classes within this class.
 
+Note that the placement of schema and control definitions is fairly flexible and are not restricted to these 2 classes
+(but this kind of organization or a variation upon it is suggested). See the Schema and Controls sections below for more
+details.
+
 Also note that if your schema depends on the base schema, you must require it at the top of your extension like so::
 
     from laurelin.ldap import extensions
@@ -196,8 +200,9 @@ Extensions may wish to define controls for use on existing methods. You will nee
 :class:`.Control` classes, see :ref:`defining-controls` for more information about this. The important part for the
 purposes of this document is where to place those class definitions in your extension module.
 
-You must define a subclass of :class:`.BaseLaurelinControls` with :class:`.Control` subclasses defined within that. For
-example::
+You must define a subclass of :class:`.LaurelinTransiter`, or the more semantically appropriate but functionally
+identical :class:`.BaseLaurelinControls`. Your subclass must then have local :class:`.Control` subclasses defined within
+it. For example::
 
     from laurelin.ldap import BaseLaurelinExtension, BaseLaurelinControls, Control
 
@@ -210,6 +215,8 @@ example::
             keyword = 'some_kwd'
             REQUEST_OID = '1.2.3.4'
 
+Note that controls may alternatively be defined directly in your ``LaurelinExtension`` class.
+
 Schema
 ------
 
@@ -218,7 +225,9 @@ rules, and syntax rules. Once defined, these will get used automatically by othe
 :class:`.SchemaValidator`, and for comparing items in attribute value lists within an :class:`.LDAPObject`.
 
 Like controls, all extension schema elements must be defined as attributes on a subclass of
-:class:`.BaseLaurelinSchema`.
+:class:`.LaurelinTransiter`. The more semantically appropriate :class:`.BaseLaurelinSchema` is provided as well. You
+can use these base classes to organize your schema and controls however appropriate. Alternatively, you may also define
+schema elements directly in your ``LaurelinExtension`` class.
 
 If your schema depends on the laurelin built-in base schema, you must explicitly call
 ``laurelin.ldap.extensions.base_schema.require()`` near the top of your extension module.
@@ -342,21 +351,16 @@ Below are examples from :mod:`laurelin.ldap.schema`::
         DESC = 'INTEGER'
         regex = r'^-?[1-9][0-9]*$'
 
+Schema/Controls Registration System
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-SchemaValidator
-^^^^^^^^^^^^^^^
+Schema and controls go through an identical 2-step registration system. The :class:`.LaurelinTransiter` class first
+stores a list of all schema and control attributes mapped to the module name that defined them. This occurs when the
+class is defined, i.e. at import time.
 
-Laurelin ships with :class:`.SchemaValidator` which, when applied to a connection, automatically checks write operations
-for schema validity *before* sending the request to the server. This includes any schema you define in your extensions.
-Users can enable this like so::
-
-      from laurelin.ldap import LDAP
-      from laurelin.ldap.schema import SchemaValidator
-
-      with LDAP('ldaps://dir.example.org', validators=[SchemaValidator]) as ldap:
-         # do stuff
-
-You can also define your own validators, see below.
+The :meth:`.LaurelinRegistrar.require` method then invokes the ``.register()`` method on each schema element or control
+class defined in the same module. This causes the element to be mapped according to its class, name, and OID - which are
+ultimately what is needed for laurelin to make use of the object.
 
 Validators
 ----------
@@ -384,6 +388,21 @@ Users can then access it like so::
 
    with LDAP('ldaps://dir.example.org', validators=[extensions.my_ext.MyValidator]) as ldap:
       # do stuff
+
+SchemaValidator
+^^^^^^^^^^^^^^^
+
+Laurelin ships with :class:`.SchemaValidator` which, when applied to a connection, automatically checks write operations
+for schema validity *before* sending the request to the server. This includes any schema you define in your extensions.
+Users can enable this like so::
+
+      from laurelin.ldap import LDAP
+      from laurelin.ldap.schema import SchemaValidator
+
+      with LDAP('ldaps://dir.example.org', validators=[SchemaValidator]) as ldap:
+         # do stuff
+
+You can also define your own validators, see below.
 
 Class Diagram
 -------------

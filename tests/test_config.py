@@ -6,7 +6,7 @@ import laurelin.ldap.base
 import six
 import unittest
 
-mock = utils.import_install_mock()
+mock = utils.get_mock()
 
 
 class TestConfig(unittest.TestCase):
