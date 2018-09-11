@@ -39,12 +39,12 @@ class TestControls(unittest.TestCase):
         mock_sock.add_search_res_done(test_dn, controls=controls)
 
         # do search with critical
-        ctrl_kwds = {pagedresults.LaurelinControls.PagedResultsControl.keyword: critical(test_size)}
+        ctrl_kwds = {pagedresults.LaurelinExtension.PagedResultsControl.keyword: critical(test_size)}
         search = ldap.search(test_dn, **ctrl_kwds)
 
         # get all results
         results = list(search)
 
         self.assertEqual(len(results), test_size)
-        self.assertTrue(hasattr(search, pagedresults.LaurelinControls.PagedResultsControl.response_attr))
-        self.assertEqual(getattr(search, pagedresults.LaurelinControls.PagedResultsControl.response_attr), test_cookie)
+        self.assertTrue(hasattr(search, pagedresults.LaurelinExtension.PagedResultsControl.response_attr))
+        self.assertEqual(getattr(search, pagedresults.LaurelinExtension.PagedResultsControl.response_attr), test_cookie)

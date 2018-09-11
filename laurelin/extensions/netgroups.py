@@ -19,8 +19,8 @@ Member Lists
 This extension module allows a shortcut to specify members of netgroups. Any function with a ``members`` argument uses
 this feature.
 
-The function name will tell you whether it expects users (e.g., :meth:`LDAP.add_netgroup_users`) or hosts (e.g.
-:meth:`LDAP.add_netgroup_hosts`). If you just specify a string in your member list, it will be assumed to be either a
+The function name will tell you whether it expects users (e.g., :meth:`LDAP.add_users`) or hosts (e.g.
+:meth:`LDAP.add_hosts`). If you just specify a string in your member list, it will be assumed to be either a
 user or a host accordingly.
 
 You can also specify a tuple with up to 3 elements for any member list entry. These fields must correspond to the
@@ -42,7 +42,7 @@ Examples::
        '(dir.example.org,manager,example.org)',
     ]
 
-    ldap.netgroups.add_netgroup_users('cn=managers,ou=netgroups,dc=example,dc=org', users, domain='example.org')
+    ldap.netgroups.add_users('cn=managers,ou=netgroups,dc=example,dc=org', users, domain='example.org')
     # Adds the following nisNetgroupTriples:
     #  (,alice,example.org)
     #  (,bob,example.org)
@@ -58,7 +58,7 @@ Examples::
         '+aws_backup_dir_servers',
     ]
 
-    ldap.netgroups.add_netgroup_hosts('cn=dir_servers,ou=netgroups,dc=example,dc=org', hosts)
+    ldap.netgroups.add_hosts('cn=dir_servers,ou=netgroups,dc=example,dc=org', hosts)
     # Adds the following nisNetgroupTriples:
     #  (dir1.example.org,,)
     #  (dir2.example.org,,)
@@ -169,7 +169,7 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         attrs = _netgroup_attrs_arg(attrs)
         return self.parent.tag(TAG).search(_netgroup_filter(filter), attrs)
 
-    def get_netgroup_obj_users(self, ng_obj, recursive=True):
+    def get_obj_users(self, ng_obj, recursive=True):
         """Get a list of netgroup users from an already queried object, possibly querying for memberNisNetgroups if
         ``recursive=True`` (the default).
 
@@ -181,10 +181,10 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         users = _extract_triple_field(ng_obj, 2)
         if recursive and ('memberNisNetgroup' in ng_obj):
             for member in ng_obj['memberNisNetgroup']:
-                users += self.get_netgroup_users(member, True)
+                users += self.get_users(member, True)
         return users
 
-    def get_netgroup_users(self, cn, recursive=True):
+    def get_users(self, cn, recursive=True):
         """Get a list of all user entries for a netgroup.
 
         This depends on the base object having been tagged and configured properly. See
@@ -197,9 +197,9 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         :raises TagError: if the base object has not been tagged.
         """
         ng = self.get(cn)
-        return self.get_netgroup_obj_users(ng, recursive)
+        return self.get_obj_users(ng, recursive)
 
-    def get_netgroup_obj_hosts(self, ng_obj, recursive=True):
+    def get_obj_hosts(self, ng_obj, recursive=True):
         """Get a list of netgroup hosts from an already queried object, possibly querying for memberNisNetgroups if
         ``recursive=True`` (the default).
 
@@ -211,10 +211,10 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         hosts = _extract_triple_field(ng_obj, 1)
         if recursive and ('memberNisNetgroup' in ng_obj):
             for member in ng_obj['memberNisNetgroup']:
-                hosts += self.get_netgroup_hosts(member, True)
+                hosts += self.get_hosts(member, True)
         return hosts
 
-    def get_netgroup_hosts(self, cn, recursive=True):
+    def get_hosts(self, cn, recursive=True):
         """Query a list of all host entries for a netgroup.
 
         This depends on the base object having been tagged and configured properly. See
@@ -227,9 +227,9 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         :raises TagError: if the base object has not been tagged.
         """
         ng = self.get(cn)
-        return self.get_netgroup_obj_hosts(ng, recursive)
+        return self.get_obj_hosts(ng, recursive)
 
-    def add_netgroup_users(self, dn, members, domain=''):
+    def add_users(self, dn, members, domain=''):
         """Add new users to a netgroup.
 
         :param str dn: The absolute DN of the netgroup object
@@ -240,7 +240,7 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         """
         self.parent.add_attrs(dn, _member_user_list_to_attrs(members, domain))
 
-    def add_netgroup_hosts(self, dn, members, domain=''):
+    def add_hosts(self, dn, members, domain=''):
         """Add new hosts to a netgroup.
 
         :param str dn: The absolute DN of the netgroup object
@@ -251,7 +251,7 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         """
         self.parent.add_attrs(dn, _member_host_list_to_attrs(members, domain))
 
-    def replace_netgroup_users(self, dn, members, domain=''):
+    def replace_users(self, dn, members, domain=''):
         """Set new users on a netgroup.
 
         :param str dn: The absolute DN of the netgroup object
@@ -262,7 +262,7 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         """
         self.parent.replace_attrs(dn, _member_user_list_to_attrs(members, domain))
 
-    def replace_netgroup_hosts(self, dn, members, domain=''):
+    def replace_hosts(self, dn, members, domain=''):
         """Set new hosts on a netgroup.
 
         :param str dn: The absolute DN of the netgroup object
@@ -273,7 +273,7 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         """
         self.parent.replace_attrs(dn, _member_host_list_to_attrs(members, domain))
 
-    def delete_netgroup_users(self, dn, members, domain=''):
+    def delete_users(self, dn, members, domain=''):
         """Delete users from a netgroup.
 
         :param str dn: The absolute DN of the netgroup object
@@ -284,7 +284,7 @@ class LaurelinLDAPExtension(BaseLaurelinLDAPExtension):
         """
         self.parent.delete_attrs(dn, _member_user_list_to_attrs(members, domain))
 
-    def delete_netgroup_hosts(self, dn, members, domain=''):
+    def delete_hosts(self, dn, members, domain=''):
         """Delete hosts from a netgroup.
 
         :param str dn: The absolute DN of the netgroup object
@@ -314,7 +314,7 @@ class LaurelinLDAPObjectExtension(BaseLaurelinLDAPObjectExtension):
         :raises RuntimeError: if this object is missing the netgroup object class
         """
         self._require_netgroup()
-        return self.parent.ldap_conn.netgroups.get_netgroup_obj_users(self, recursive)
+        return self.parent.ldap_conn.netgroups.get_obj_users(self, recursive)
 
     def get_hosts(self, recursive=True):
         """Get all hosts in this netgroup object.
@@ -325,7 +325,7 @@ class LaurelinLDAPObjectExtension(BaseLaurelinLDAPObjectExtension):
         :raises RuntimeError: if this object is missing the netgroup object class
         """
         self._require_netgroup()
-        return self.parent.ldap_conn.netgroups.get_netgroup_obj_hosts(self, recursive)
+        return self.parent.ldap_conn.netgroups.get_obj_hosts(self, recursive)
 
     def add_users(self, members, domain=''):
         """Add new user netgroup entries to this netgroup object.

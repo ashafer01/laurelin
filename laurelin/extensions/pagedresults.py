@@ -29,7 +29,7 @@ Note: When getting pages in a loop, you may set the cookie value to an empty str
     ldap.base.search(paged=(10, ''))
 """
 
-from laurelin.ldap import Control, BaseLaurelinExtension, BaseLaurelinControls, LDAPError
+from laurelin.ldap import Control, BaseLaurelinExtension, LDAPError
 from laurelin.ldap.protoutils import get_string_component
 from laurelin.ldap.rfc4511 import Integer0ToMax
 from pyasn1.codec.ber.encoder import encode as ber_encode
@@ -64,8 +64,6 @@ class LaurelinExtension(BaseLaurelinExtension):
 
     OID = OID
 
-
-class LaurelinControls(BaseLaurelinControls):
     class PagedResultsControl(Control):
         REQUEST_OID = OID
         RESPONSE_OID = OID
