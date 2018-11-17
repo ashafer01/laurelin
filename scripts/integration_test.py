@@ -45,7 +45,6 @@ test_servers = [
 ]
 
 LDAP.enable_logging()
-LDAP.activate_extension('laurelin.extensions.descattrs')
 fails = []
 for info in test_servers:
     print('Testing {0}'.format(info['name']))
@@ -65,12 +64,11 @@ for info in test_servers:
                 'ou': ['functest'],
                 'description': ['unstructured desc'],
             })
-            testobj.add_desc_attrs({'foo': ['one', 'two']})
-            print(testobj.desc_attrs())
-            testobj.replace_desc_attrs({'foo': ['three', 'four']})
-            testobj.delete_desc_attrs({'foo': ['three']})
-            assert testobj.desc_attrs().get_attr('foo') == ['four']
-            assert set(testobj.get_attr('description')) == set(('unstructured desc', 'foo=four'))
+            testobj.descattrs.add({'foo': ['one', 'two']})
+            testobj.descattrs.replace({'foo': ['three', 'four']})
+            testobj.descattrs.delete({'foo': ['three']})
+            assert testobj.descattrs['foo'] == ['four']
+            assert set(testobj['description']) == set(('unstructured desc', 'foo=four'))
             print(testobj.format_ldif())
             testobj.delete()
 

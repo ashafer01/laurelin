@@ -70,20 +70,11 @@ class AttributeType(object):
         if not m:
             raise LDAPSchemaError('Invalid attribute type specification')
 
-        # register OID
         self.oid = m.group('oid')
         if not self.oid:
             raise LDAPSchemaError('No OID defined for attribute type')
-        if self.oid in _oid_attribute_types:
-            raise LDAPSchemaError('Duplicate attribute type OID {0}'.format(self.oid))
-        _oid_attribute_types[self.oid] = self
 
-        # register name(s)
         self.names = parse_qdescrs(m.group('name'))
-        for name in self.names:
-            if name in _name_attribute_types:
-                raise LDAPSchemaError('Duplicate attribute type name {0}'.format(name))
-            _name_attribute_types[name] = self
         if not self.names:
             raise LDAPSchemaError('No names defined for attribute type {0}'.format(self.oid))
 
@@ -142,6 +133,18 @@ class AttributeType(object):
         elif not self.supertype:
             self.usage = 'userApplications'
 
+    def register(self):
+        # register OID
+        if self.oid in _oid_attribute_types:
+            raise LDAPSchemaError('Duplicate attribute type OID {0}'.format(self.oid))
+        _oid_attribute_types[self.oid] = self
+
+        # register name(s)
+        for name in self.names:
+            if name in _name_attribute_types:
+                raise LDAPSchemaError('Duplicate attribute type name {0}'.format(name))
+            _name_attribute_types[name] = self
+
     @property
     def syntax(self):
         """Gets the :class:`SyntaxRule` for this attribute type."""
@@ -197,6 +200,9 @@ class AttributeType(object):
             if self.equality.do_match(val, assertion_value):
                 return i
         raise ValueError('assertion_value not found')
+
+    def __repr__(self):
+        return '<{0} "{1}">'.format(self.__class__.__name__, self.names[0])
 
 
 ## Defaults used when an attribute type is undefined
