@@ -75,9 +75,6 @@ class LaurelinLDAPObjectExtension(BaseLaurelinLDAPObjectExtension):
     def __contains__(self, item):
         return item in self._desc_dict
 
-    def __getattr__(self, item):
-        return getattr(self._desc_dict, item)
-
     def _modify_desc_attrs(self, method, attrs_dict):
         """Perform modification to the object's description attributes.
 

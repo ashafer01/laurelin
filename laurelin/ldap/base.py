@@ -166,7 +166,7 @@ class LDAP(LDAPExtensions):
     DEFAULT_VALIDATORS = None
     DEFAULT_WARN_EMPTY_LIST = False
     DEFAULT_ERROR_EMPTY_LIST = False
-    DEFAULT_IGNORE_EMPTY_LIST = False
+    DEFAULT_IGNORE_EMPTY_LIST = True
     DEFAULT_FILTER_SYNTAX = FilterSyntax.UNIFIED
     DEFAULT_BUILT_IN_EXTENSIONS_ONLY = False
 
@@ -1010,14 +1010,14 @@ class LDAP(LDAPExtensions):
             for mod in modlist:
                 if mod.op in (Mod.REPLACE, Mod.DELETE):
                     if isinstance(mod.vals, list) and not mod.vals:
-                        if self.warn_empty_list:
-                            warn('empty list in replace/delete modify, will delete all values for attribute {0}'.format(
-                                mod.attr), LDAPWarning)
+                        if self.error_empty_list:
+                            raise LDAPError('empty list in replace/delete modify for attr {0}'.format(mod.attr))
                         if self.ignore_empty_list:
                             logger.debug('> Ignoring Mod with empty value list: {0} {1}'.format(mod.op, mod.attr))
                             continue
-                        if self.error_empty_list:
-                            raise LDAPError('empty list in replace/delete modify for attr {0}'.format(mod.attr))
+                        if self.warn_empty_list:
+                            warn('empty list in replace/delete modify, will delete all values for attribute {0}'.format(
+                                mod.attr), LDAPWarning)
                     if mod.vals is DELETE_ALL:
                         mod.vals = []
                 logger.debug('> {0}'.format(mod))
