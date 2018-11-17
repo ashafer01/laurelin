@@ -1,5 +1,11 @@
-from laurelin.ldap import attributetype, objectclass, rules, protoutils
-from importlib import import_module
+from laurelin.ldap import (
+    attributetype,
+    objectclass,
+    rules,
+    extensions,
+    protoutils,
+)
+from laurelin.ldap.extensible import registration
 import six
 from six.moves import range
 
@@ -8,12 +14,14 @@ def get_reload():
     try:
         return reload
     except NameError:
-        try:
-            from imp import reload
-            return reload
-        except ImportError:
-            from importlib import reload
-            return reload
+        pass
+    try:
+        from importlib import reload
+        return reload
+    except ImportError:
+        pass
+    from imp import reload
+    return reload
 
 
 reload = get_reload()
@@ -24,48 +32,30 @@ def clear_attribute_types():
     attributetype._oid_attribute_types.clear()
 
 
-def clear_object_classes():
+def clear_schema_registrations():
+    clear_attribute_types()
     objectclass._name_object_classes.clear()
     objectclass._oid_object_classes.clear()
-
-
-def clear_rules():
     rules._oid_syntax_rules.clear()
     rules._oid_syntax_rule_objects.clear()
     rules._oid_matching_rules.clear()
     rules._name_matching_rules.clear()
     rules._oid_matching_rule_objects.clear()
     rules._name_matching_rule_objects.clear()
-
-
-def clear_schema_registrations():
-    clear_attribute_types()
-    clear_object_classes()
-    clear_rules()
+    registration._registered_mods.clear()
 
 
 def load_schema():
-    schema_mod = 'laurelin.ldap.schema'
-    clear_schema_registrations()
-    schema = import_module(schema_mod)
-    clear_schema_registrations()
-    reload(schema)
-    return import_module(schema_mod)
+    extensions.base_schema.require()
 
 
-def import_install_mock():
+def get_mock():
     try:
         import unittest.mock as mock
         return mock
     except ImportError:
-        try:
-            import mock
-            return mock
-        except ImportError:
-            import pip
-            pip.main(['install', 'mock'])
-            import mock
-            return mock
+        import mock
+        return mock
 
 
 def get_modify_value_set(lm, attr):

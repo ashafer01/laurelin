@@ -1,16 +1,29 @@
-""" laurelin.ldap
-
-Imports base objects for user import and defines user utility functions
-"""
+"""Imports and defines the core of the public API"""
 
 from __future__ import absolute_import
+from .attributetype import get_attribute_type, AttributeType
 from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
-from .controls import critical, optional
+from .controls import Control, critical, optional
 from .exceptions import LDAPError, NoSearchResults, Abandon
+from .extensible import (
+    extensions,
+    add_extension,
+    BaseLaurelinExtension,
+    BaseLaurelinSchema,
+    BaseLaurelinControls,
+    BaseLaurelinLDAPExtension,
+    BaseLaurelinLDAPObjectExtension,
+    LaurelinTransiter,
+    LaurelinRegistrar,
+)
 from .filter import escape as filter_escape
 from .ldapobject import LDAPObject
 from .modify import Mod
+from .objectclass import get_object_class, ObjectClass, ExtensibleObjectClass
+from .rules import SyntaxRule, RegexSyntaxRule, MatchingRule, EqualityMatchingRule
+from .schema import SchemaValidator
+from .validation import Validator
 
 import pyasn1.type.univ
 
@@ -26,20 +39,41 @@ def domain(dc):
 
 
 __all__ = [
+    'get_attribute_type',
+    'AttributeType',
     'LDAP',
     'LDAPURI',
     'Scope',
     'DerefAliases',
     'DELETE_ALL',
     'FilterSyntax',
+    'Control',
     'critical',
     'optional',
     'LDAPError',
     'NoSearchResults',
     'Abandon',
-    'LDAPObject',
+    'extensions',
+    'add_extension',
+    'BaseLaurelinExtension',
+    'BaseLaurelinSchema',
+    'BaseLaurelinControls',
+    'BaseLaurelinLDAPExtension',
+    'BaseLaurelinLDAPObjectExtension',
+    'LaurelinTransiter',
+    'LaurelinRegistrar',
     'filter_escape',
+    'LDAPObject',
     'Mod',
+    'get_object_class',
+    'ObjectClass',
+    'ExtensibleObjectClass',
+    'SyntaxRule',
+    'RegexSyntaxRule',
+    'MatchingRule',
+    'EqualityMatchingRule',
+    'Validator',
+    'SchemaValidator',
     'dc',
     'domain',
 ]

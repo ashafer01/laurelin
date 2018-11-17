@@ -1,5 +1,5 @@
 import unittest
-from laurelin.ldap import LDAP, critical
+from laurelin.ldap import LDAP, critical, extensions
 from laurelin.extensions import pagedresults
 from .mock_ldapsocket import MockLDAPSocket
 from laurelin.ldap import rfc4511
@@ -9,7 +9,8 @@ from pyasn1.codec.ber.encoder import encode as ber_encode
 class TestControls(unittest.TestCase):
     def test_pagedresults(self):
         """Use the paged results controls to exercise the controls subsystem"""
-        LDAP.activate_extension('laurelin.extensions.pagedresults')
+        extensions.paged_results.require()
+
         mock_sock = MockLDAPSocket()
         mock_sock.add_search_res_entry('', {
             'supportedControl': [pagedresults.OID],
@@ -38,12 +39,12 @@ class TestControls(unittest.TestCase):
         mock_sock.add_search_res_done(test_dn, controls=controls)
 
         # do search with critical
-        ctrl_kwds = {pagedresults.PagedResultsControl.keyword: critical(test_size)}
+        ctrl_kwds = {pagedresults.LaurelinExtension.PagedResultsControl.keyword: critical(test_size)}
         search = ldap.search(test_dn, **ctrl_kwds)
 
         # get all results
         results = list(search)
 
         self.assertEqual(len(results), test_size)
-        self.assertTrue(hasattr(search, pagedresults.PagedResultsControl.response_attr))
-        self.assertEqual(getattr(search, pagedresults.PagedResultsControl.response_attr), test_cookie)
+        self.assertTrue(hasattr(search, pagedresults.LaurelinExtension.PagedResultsControl.response_attr))
+        self.assertEqual(getattr(search, pagedresults.LaurelinExtension.PagedResultsControl.response_attr), test_cookie)

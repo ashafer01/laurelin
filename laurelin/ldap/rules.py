@@ -2,12 +2,8 @@
 
 from __future__ import absolute_import
 from .exceptions import InvalidSyntaxError, LDAPSchemaError
-from .utils import CaseIgnoreDict
+from .utils import CaseIgnoreDict, get_obj_module
 import re
-import six
-
-_skip_registration = False
-
 
 ## Syntax Rules
 
@@ -22,21 +18,6 @@ def get_syntax_rule(oid):
     return obj
 
 
-class MetaSyntaxRule(type):
-    """Metaclass registering OIDs on subclasses"""
-    def __new__(meta, name, bases, dct):
-        oid = dct.get('OID')
-        cls = type.__new__(meta, name, bases, dct)
-        if oid and not _skip_registration:
-            if oid in _oid_syntax_rules:
-                cur_class = _oid_syntax_rules[oid].__name__
-                raise LDAPSchemaError('Duplicate OID {0} in syntax rule declaration (original class {1}, '
-                                      'new class {2})'.format(oid, cur_class, name))
-            _oid_syntax_rules[oid] = cls
-        return cls
-
-
-@six.add_metaclass(MetaSyntaxRule)
 class SyntaxRule(object):
     """Base class for all syntax rules"""
 
@@ -48,11 +29,21 @@ class SyntaxRule(object):
     """Short text description of the rule. Must be defined by subclasses."""
 
     def __init__(self):
-        oid = getattr(self, 'OID', None)
-        if oid:
-            if oid in _oid_syntax_rule_objects:
-                raise LDAPSchemaError('Multiple instantiations of syntax rule with OID {0}'.format(oid))
-            _oid_syntax_rule_objects[oid] = self
+        if self.OID:
+            if self.OID in _oid_syntax_rule_objects:
+                raise LDAPSchemaError('Multiple instantiations of syntax rule with OID {0}'.format(self.OID))
+            _oid_syntax_rule_objects[self.OID] = self
+
+    @classmethod
+    def register(cls):
+        if cls.OID in _oid_syntax_rules:
+            cur_class = _oid_syntax_rules[cls.OID].__name__
+            cur_mod = get_obj_module(cur_class)
+            new_class = cls.__name__
+            new_mod = get_obj_module(new_class)
+            raise LDAPSchemaError('Duplicate OID {0} in syntax rule declaration (original class {1}.{2}, '
+                                  'new class {3}.{4})'.format(cls.OID, cur_mod, cur_class, new_mod, new_class))
+        _oid_syntax_rules[cls.OID] = cls
 
     def validate(self, s):
         """Validate a string. Must be implemented by subclasses.
@@ -112,28 +103,6 @@ def get_matching_rule(ident):
     return obj
 
 
-class MetaMatchingRule(type):
-    """Metaclass registering OIDs and NAMEs on subclasses"""
-    def __new__(meta, clsname, bases, dct):
-        oid = dct.get('OID')
-        names = dct.get('NAME', ())
-        if isinstance(names, six.string_types):
-            names = (names,)
-            dct['NAME'] = names
-        cls = type.__new__(meta, clsname, bases, dct)
-        if not _skip_registration:
-            if oid:
-                if oid in _oid_matching_rules:
-                    raise LDAPSchemaError('Duplicate OID {0} in matching rule declaration'.format(oid))
-                _oid_matching_rules[oid] = cls
-            for name in names:
-                if name in _name_matching_rules:
-                    raise LDAPSchemaError('Duplicate name {0} in matching rule declaration'.format(name))
-                _name_matching_rules[name] = cls
-        return cls
-
-
-@six.add_metaclass(MetaMatchingRule)
 class MatchingRule(object):
     """Base class for all matching rules"""
 
@@ -151,16 +120,25 @@ class MatchingRule(object):
     """A tuple of callables used to prepare attribute and asserion values. Subclasses may optionally define this."""
 
     def __init__(self):
-        oid = getattr(self, 'OID', None)
-        if oid:
-            if oid in _oid_matching_rule_objects:
-                raise LDAPSchemaError('Multiple instantiations of matching rule with OID {0}'.format(oid))
-            _oid_matching_rule_objects[oid] = self
-        names = getattr(self, 'NAME', ())
-        for name in names:
-            if name in _name_matching_rule_objects:
-                raise LDAPSchemaError('Multiple instantiations of matching rule with name {0}'.format(name))
-            _name_matching_rule_objects[name] = self
+        if self.OID:
+            if self.OID in _oid_matching_rule_objects:
+                raise LDAPSchemaError('Multiple instantiations of matching rule with OID {0}'.format(self.OID))
+            _oid_matching_rule_objects[self.OID] = self
+        if self.NAME:
+            if self.NAME in _name_matching_rule_objects:
+                raise LDAPSchemaError('Multiple instantiations of matching rule with name {0}'.format(self.NAME))
+            _name_matching_rule_objects[self.NAME] = self
+
+    @classmethod
+    def register(cls):
+        if cls.OID:
+            if cls.OID in _oid_matching_rules:
+                raise LDAPSchemaError('Duplicate OID {0} in matching rule declaration'.format(cls.OID))
+            _oid_matching_rules[cls.OID] = cls
+        if cls.NAME:
+            if cls.NAME in _name_matching_rules:
+                raise LDAPSchemaError('Duplicate name {0} in matching rule declaration'.format(cls.NAME))
+            _name_matching_rules[cls.NAME] = cls
 
     def validate(self, value):
         """Perform validation according to the matching rule's syntax"""

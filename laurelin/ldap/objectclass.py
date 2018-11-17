@@ -10,8 +10,6 @@ import logging
 import re
 from warnings import warn
 
-_skip_registration = False
-
 _re_object_class = re.compile(utils.re_anchor(rfc4512.ObjectClassDescription))
 
 _oid_object_classes = {}
@@ -88,20 +86,9 @@ class ObjectClass(object):
         if not m:
             raise LDAPSchemaError('Invalid object class description')
 
-        # register OID
         self.oid = m.group('oid')
-        if not _skip_registration:
-            if self.oid in _oid_object_classes:
-                raise LDAPSchemaError('Duplicate object class OID {0}'.format(self.oid))
-            _oid_object_classes[self.oid] = self
 
-        # register names
         self.names = parse_qdescrs(m.group('name'))
-        if not _skip_registration:
-            for name in self.names:
-                if name in _name_object_classes:
-                    raise LDAPSchemaError('Duplicate object class name {0}'.format(name))
-                _name_object_classes[name] = self
 
         self.superclasses = _parse_oids(m.group('superclass'))
 
@@ -122,6 +109,18 @@ class ObjectClass(object):
 
         self._must = None
         self._may = None
+
+    def register(self):
+        # register OID
+        if self.oid in _oid_object_classes:
+            raise LDAPSchemaError('Duplicate object class OID {0}'.format(self.oid))
+        _oid_object_classes[self.oid] = self
+
+        # register names
+        for name in self.names:
+            if name in _name_object_classes:
+                raise LDAPSchemaError('Duplicate object class name {0}'.format(name))
+            _name_object_classes[name] = self
 
     @property
     def must(self):
@@ -168,6 +167,9 @@ class ObjectClass(object):
         :rtype: bool
         """
         return (name in self.must)
+
+    def __repr__(self):
+        return '<{0} "{1}">'.format(self.__class__.__name__, self.names[0])
 
 
 class DefaultObjectClass(ObjectClass):

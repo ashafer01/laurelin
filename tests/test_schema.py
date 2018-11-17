@@ -1,24 +1,17 @@
 import six
 import unittest
-from importlib import import_module
 
-from laurelin.ldap import objectclass, attributetype, rules, LDAPObject
+from laurelin.ldap import objectclass, attributetype, rules, LDAPObject, SchemaValidator, extensions
 from laurelin.ldap.objectclass import get_object_class, ObjectClass, DefaultObjectClass
 from laurelin.ldap.attributetype import get_attribute_type, DefaultAttributeType
 from laurelin.ldap.rules import get_matching_rule, get_syntax_rule
 from laurelin.ldap.exceptions import LDAPValidationError
-from .utils import load_schema, get_reload
-
-reload = get_reload()
 
 
 class TestSchema(unittest.TestCase):
     def setUp(self):
-        load_schema()
-
-        # reload built-in extensions defining new schema elements
-        reload(import_module('laurelin.extensions.netgroups'))
-        import_module('laurelin.extensions.posix')
+        extensions.base_schema.require()
+        extensions.netgroups.require()
 
     def test_object_classes(self):
         """Ensure all defined object classes have defined attributes and superclasses"""
@@ -64,12 +57,9 @@ class TestSchema(unittest.TestCase):
 
 
 class TestSchemaValidator(unittest.TestCase):
-    def setUp(self):
-        self.schema = load_schema()
-
     def test_validate_object(self):
         """Exercise validate_object()"""
-        sv = self.schema.SchemaValidator()
+        sv = SchemaValidator()
 
         # missing objectClass
         empty_object = LDAPObject('o=foo', {})
@@ -105,13 +95,14 @@ class TestSchemaValidator(unittest.TestCase):
         with six.assertRaisesRegex(self, LDAPValidationError, 'single-value'):
             sv.validate_object(iop)
 
-        ObjectClass("""
+        o = ObjectClass("""
             ( 99.99.99 NAME 'mockTestingClass'
                 SUP top
                 STRUCTURAL
                 MAY creatorsName
             )
         """)
+        o.register()
         obj_with_oper = LDAPObject('o=foo', {
             'objectClass': ['top', 'mockTestingClass'],
             'creatorsName': ['cn=foo'],  # operational attribute, not user modifiable
