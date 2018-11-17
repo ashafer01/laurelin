@@ -14,8 +14,8 @@ source on `GitHub <https://github.com/ashafer01/laurelin>`_.
 
    user_docs
    simple_filters
+   extensions
    config_files
-   built_in_extensions
    creating_extensions
    controls
    changelog

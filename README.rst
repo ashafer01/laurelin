@@ -65,3 +65,20 @@ your actual installed version)::
 
 
 Feel free to open a GitHub issue with any questions or concerns.
+
+Public API Definition
+---------------------
+
+* **Everything in laurelin.ldap.__all__** - import directly ``from laurelin.ldap`` whenever possible
+* ``laurelin.ldap.exceptions``
+* ``laurelin.ldap.rfc*``
+* ``laurelin.ldap.protoutils``
+* ``laurelin.ldap.config``
+* ``laurelin.extensions``
+
+Note that stability of any 3rd party extensions with names hard coded into the laurelin core code cannot be guaranteed.
+The stability guarantee applies only to built-in extensions shipped with laurelin-ldap in the ``laurelin.extensions``
+package (There are no 3rd party extensions defined at this time).
+
+If the user should venture into other modules outside of the declared public API above, I strongly suggest pinning your
+version. I also strongly advise against EVER calling a private function or method (with underscore prefix).

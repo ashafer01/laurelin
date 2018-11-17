@@ -57,7 +57,7 @@ common ones are included in :mod:`laurelin.ldap`. Beyond that, you should not ne
 you are defining controls, extensions, schema, or validators.
 
 
-:doc:`/built_in_extensions` are stored in the :mod:`laurelin.extensions` package.
+Built-in extensions are stored in the :mod:`laurelin.extensions` package.
 
 
 Getting Started
@@ -354,6 +354,7 @@ Global Default                                   :class:`.LDAP` instance attribu
 :attr:`.LDAP.DEFAULT_ERROR_EMPTY_LIST`           ``error_empty_list``              ``error_empty_list``
 :attr:`.LDAP.DEFAULT_IGNORE_EMPTY_LIST`          ``ignore_empty_list``             ``ignore_empty_list``
 :attr:`.LDAP.DEFAULT_FILTER_SYNTAX`              ``default_filter_syntax``         ``filter_syntax``
+:attr:`.LDAP.DEFAULT_BUILT_IN_EXTENSIONS_ONLY``  none public                       ``built_in_extensions_only``
 ================================================ ================================= ==================================
 
 The :class:`.LDAP` instance attributes beginning with ``default_`` are used as the defaults for corresponding arguments

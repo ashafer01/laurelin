@@ -29,10 +29,9 @@ Note: When getting pages in a loop, you may set the cookie value to an empty str
     ldap.base.search(paged=(10, ''))
 """
 
-from laurelin.ldap.controls import Control
+from laurelin.ldap import Control, BaseLaurelinExtension, LDAPError
 from laurelin.ldap.protoutils import get_string_component
 from laurelin.ldap.rfc4511 import Integer0ToMax
-from laurelin.ldap.exceptions import LDAPError
 from pyasn1.codec.ber.encoder import encode as ber_encode
 from pyasn1.codec.ber.decoder import decode as ber_decode
 from pyasn1.type.univ import OctetString, Sequence
@@ -60,37 +59,42 @@ class RealSearchControlValue(Sequence):
                                NamedType('cookie', Cookie()))
 
 
-class PagedResultsControl(Control):
-    REQUEST_OID = OID
-    RESPONSE_OID = OID
-    method = ('search',)
-    keyword = 'paged'
-    response_attr = 'page_cookie'
+class LaurelinExtension(BaseLaurelinExtension):
+    NAME = 'paged_results'
 
-    def prepare(self, ctrl_value, criticality):
-        """Prepare the paged results control value
+    OID = OID
 
-        :param ctrl_value: Either an integer page size or a tuple of (page size, cookie)
-        :type ctrl_value: int or tuple
-        :param criticality: True if the control is critical, false otherwise
-        :return: The protocol-level control object
-        """
-        if isinstance(ctrl_value, int):
-            page_size = ctrl_value
-            cookie = ''
-        elif isinstance(ctrl_value, tuple):
-            page_size, cookie = ctrl_value
-        else:
-            raise TypeError('Must be int or tuple')
-        real_ctrl_value = RealSearchControlValue()
-        real_ctrl_value.setComponentByName('size', Size(page_size))
-        real_ctrl_value.setComponentByName('cookie', Cookie(cookie))
-        real_ctrl_value = ber_encode(real_ctrl_value)
-        return Control.prepare(self, real_ctrl_value, criticality)
+    class PagedResultsControl(Control):
+        REQUEST_OID = OID
+        RESPONSE_OID = OID
+        method = ('search',)
+        keyword = 'paged'
+        response_attr = 'page_cookie'
 
-    def handle(self, ctrl_value):
-        real_ctrl_value, raw = ber_decode(ctrl_value, asn1Spec=RealSearchControlValue())
-        if raw:
-            raise LDAPError('Unexpected leftover bits in response control value')
-        cookie = get_string_component(real_ctrl_value, 'cookie')
-        return cookie
+        def prepare(self, ctrl_value, criticality):
+            """Prepare the paged results control value
+
+            :param ctrl_value: Either an integer page size or a tuple of (page size, cookie)
+            :type ctrl_value: int or tuple
+            :param criticality: True if the control is critical, false otherwise
+            :return: The protocol-level control object
+            """
+            if isinstance(ctrl_value, int):
+                page_size = ctrl_value
+                cookie = ''
+            elif isinstance(ctrl_value, tuple):
+                page_size, cookie = ctrl_value
+            else:
+                raise TypeError('Must be int or tuple')
+            real_ctrl_value = RealSearchControlValue()
+            real_ctrl_value.setComponentByName('size', Size(page_size))
+            real_ctrl_value.setComponentByName('cookie', Cookie(cookie))
+            real_ctrl_value = ber_encode(real_ctrl_value)
+            return Control.prepare(self, real_ctrl_value, criticality)
+
+        def handle(self, ctrl_value):
+            real_ctrl_value, raw = ber_decode(ctrl_value, asn1Spec=RealSearchControlValue())
+            if raw:
+                raise LDAPError('Unexpected leftover bits in response control value')
+            cookie = get_string_component(real_ctrl_value, 'cookie')
+            return cookie

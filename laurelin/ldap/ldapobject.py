@@ -7,10 +7,8 @@ from .exceptions import (
     LDAPError,
     Abandon,
     LDAPTransactionError,
-    NoSearchResults,
-    MultipleSearchResults,
 )
-from .extensible import Extensible
+from .extensible.ldapobject_extensions import LDAPObjectExtensions
 from .modify import (
     Mod,
     Modlist,
@@ -21,7 +19,7 @@ import re
 from base64 import b64encode
 
 
-class LDAPObject(AttrsDict, Extensible):
+class LDAPObject(AttrsDict, LDAPObjectExtensions):
     """Represents a single object with optional server affinity.
 
     Many methods will raise an exception if used without a server connection. To instantiate an :class:`LDAPObject`
@@ -50,11 +48,15 @@ class LDAPObject(AttrsDict, Extensible):
     """
 
     def __init__(self, dn, attrs_dict=None, ldap_conn=None, relative_search_scope=Scope.SUBTREE, rdn_attr=None):
+        AttrsDict.__init__(self, attrs_dict)
+        LDAPObjectExtensions.__init__(self)
+
         self.dn = dn
         self.ldap_conn = ldap_conn
         self.relative_search_scope = relative_search_scope
         self.rdn_attr = rdn_attr
-        AttrsDict.__init__(self, attrs_dict)
+        if ldap_conn:
+            self._built_in_only = ldap_conn._built_in_only
 
     def __repr__(self):
         return "LDAPObject(dn='{0}', attrs={1})".format(self.dn, AttrsDict.__repr__(self))

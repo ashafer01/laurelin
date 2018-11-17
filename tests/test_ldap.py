@@ -9,7 +9,6 @@ from laurelin.ldap import (
 )
 import laurelin.ldap.base
 import inspect
-import six
 import unittest
 from .mock_ldapsocket import MockLDAPSocket
 from types import ModuleType
@@ -472,20 +471,6 @@ class TestLDAP(unittest.TestCase):
         with self.assertRaises(exceptions.LDAPError):
             ldap.who_am_i()
 
-    def test_activate_extension(self):
-        """Ensure extension activation/loading works"""
-        ext = 'laurelin.extensions.netgroups'
-        netgroups = LDAP.activate_extension(ext)
-        self.assertIsInstance(netgroups, ModuleType)
-        self.assertTrue(hasattr(LDAP, 'get_netgroup'))
-        self.assertTrue(hasattr(netgroups, 'LAURELIN_ACTIVATED'))
-
-        # ensure activating again does not cause an error
-        LDAP.activate_extension(ext)
-
-        with self.assertRaises(ImportError):
-            LDAP.activate_extension('i.am.not.a.module')
-
     def test_unbind(self):
         """Test unbind/unbound behavior"""
         mock_sock = MockLDAPSocket()
@@ -543,6 +528,8 @@ class TestLDAP(unittest.TestCase):
             method = ('search',)
             keyword = 'mock_control'
             REQUEST_OID = '9.999.999.999.999.9999999'
+
+        MockControl.register()
 
         test_dn = 'o=foo'
         mock_sock.add_search_res_entry(test_dn, {'description': ['foo']})

@@ -62,8 +62,8 @@ MAXINT = Integer(2147483647)
 rangeInt0ToMaxConstraint = ValueRangeConstraint(0, MAXINT)
 rangeInt1To127Constraint = ValueRangeConstraint(1, 127)
 size1ToMaxConstraint = ValueSizeConstraint(1, MAXINT)
-responseValueConstraint = SingleValueConstraint(0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 32, 33, 34, 36, 48, 49, 50, 51, 52, 53, 54, 64, 65, 66, 67, 68, 69, 71, 80, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123,
-                                                4096)
+responseValueConstraint = SingleValueConstraint(0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 32, 33, 34, 36, 48, 49, 50, 51, 52, 53, 54, 64, 65, 66, 67, 68, 69, 71, 80, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 4096)
+
 
 # custom constraints
 numericOIDConstraint = None  # TODO
