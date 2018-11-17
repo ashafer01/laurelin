@@ -195,8 +195,7 @@ class ExtensibleClass(Extensible):
                 if cls.__name__ in self.EXTENSIBLE_CLASSES:
                     self._extended_classname = cls.__name__
                     return cls.__name__
-            else:
-                raise TypeError('This class does not inherit a known extensible class')
+            raise TypeError('This class does not inherit a known extensible class')
 
     def _create_extension_instance(self, name, mod):
         """Creates a new instance of the class extension for this class defined in mod"""

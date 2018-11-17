@@ -46,6 +46,7 @@ case_ignore_prep_methods = (
     rfc4518.Insignificant.space,
 )
 
+
 class LaurelinSchema(BaseLaurelinSchema):
     ## RFC 4512 2.4.1 Abstract Object Classes
 

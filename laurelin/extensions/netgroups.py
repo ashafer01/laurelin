@@ -8,10 +8,10 @@ the structure is flat there is a performance advantage by setting ``relative_sea
     from laurelin.ldap import LDAP, Scope, extensions
 
     with LDAP() as ldap:
-        netgroups = ldap.base.obj('ou=netgroups',
-                                  tag=extensions.netgroups.TAG,
-                                  relative_search_scope=Scope.ONE,
-                                  rdn_attr='cn')
+        ldap.base.obj('ou=netgroups',
+                      tag=extensions.netgroups.TAG,
+                      relative_search_scope=Scope.ONE,
+                      rdn_attr='cn')
 
 Member Lists
 ^^^^^^^^^^^^
@@ -19,9 +19,8 @@ Member Lists
 This extension module allows a shortcut to specify members of netgroups. Any function with a ``members`` argument uses
 this feature.
 
-The function name will tell you whether it expects users (e.g., :meth:`LDAP.add_users`) or hosts (e.g.
-:meth:`LDAP.add_hosts`). If you just specify a string in your member list, it will be assumed to be either a
-user or a host accordingly.
+The function name will tell you whether it expects users (e.g., ``add_users``) or hosts (e.g. ``add_hosts``). If you
+just specify a string in your member list, it will be assumed to be either a user or a host accordingly.
 
 You can also specify a tuple with up to 3 elements for any member list entry. These fields must correspond to the
 ``nisNetgroupTriple`` fields: host, user, and domain. For user functions, at least the first 2 tuple elements must be
@@ -39,7 +38,7 @@ Examples::
        'alice',
        'bob',
        ('dir.example.org', 'admin'),
-       '(dir.example.org,manager,example.org)',
+       '(dir.example.org,manager,secrets.example.org)',
     ]
 
     ldap.netgroups.add_users('cn=managers,ou=netgroups,dc=example,dc=org', users, domain='example.org')
@@ -47,7 +46,7 @@ Examples::
     #  (,alice,example.org)
     #  (,bob,example.org)
     #  (dir.example.org,admin,example.org)
-    #  (dir.example.org,manager,example.org)
+    #  (dir.example.org,manager,secrets.example.org)
     # Does not add any memberNisNetgroups
 
     hosts = [
@@ -415,6 +414,12 @@ def _is_triple(val):
 
 
 def _nis_netgroup_triple(host, user, domain):
+    if not host:
+        host = ''
+    if not user:
+        user = ''
+    if not domain:
+        domain = ''
     return '({0},{1},{2})'.format(host, user, domain)
 
 

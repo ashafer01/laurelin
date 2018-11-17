@@ -1315,6 +1315,8 @@ class LDAP(LDAPExtensions):
             while len(ldif_lines) > 1 and ldif_lines[0].startswith(token):
                 control = ldif_lines.popleft()[len(token):].strip()
                 m = re.match(r'^(?P<oid>[0-9]+(\.[0-9]+)+)(?P<crit> (true|false))?(?P<value>:.+)$', control)
+                if not m:
+                    raise ValueError('Invalid control specification')
                 value = m.group('value')
                 if not value:
                     value = ''
@@ -1331,8 +1333,6 @@ class LDAP(LDAPExtensions):
                         criticality = False
                 else:
                     criticality = self.default_criticality
-                if not m:
-                    raise ValueError('Invalid control specification')
                 oid = m.group('oid')
                 try:
                     keyword = controls.get_control(oid).keyword
