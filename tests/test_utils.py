@@ -1,5 +1,6 @@
 from laurelin.ldap import utils
 
+
 def test_findClosingParen():
     test_good = (
         ('(abc)def', 4),

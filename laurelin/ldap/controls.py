@@ -81,36 +81,6 @@ def handle_response(obj, controls):
                                          ctrl.response_attr))
 
 
-class MetaControl(type):
-    """Metaclass which registers instances of subclasses"""
-    def __new__(meta, name, bases, dct):
-        cls = type.__new__(meta, name, bases, dct)
-        instance = cls()
-        if cls.REQUEST_OID:
-            if not cls.method:
-                raise ValueError('no method set on control {0}'.format(name))
-            if not cls.keyword:
-                raise ValueError('no keyword set on control {0}'.format(name))
-            if cls.keyword in _reserved_kwds:
-                raise LDAPExtensionError('Control keyword "{0}" is reserved'.format(cls.keyword))
-            if cls.keyword in _request_controls:
-                raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(cls.keyword))
-            if cls.REQUEST_OID in _request_controls_oid:
-                raise LDAPExtensionError('Control {0} is already defined'.format(cls.REQUEST_OID))
-            _request_controls[cls.keyword] = instance
-            _request_controls_oid[cls.REQUEST_OID] = instance
-
-        if cls.RESPONSE_OID:
-            if not cls.response_attr:
-                raise ValueError('Missing response_attr on control {0}'.format(name))
-            if cls.RESPONSE_OID in _response_controls:
-                raise LDAPExtensionError('Response control OID {0} is already defined'.format(cls.RESPONSE_OID))
-            _response_controls[cls.RESPONSE_OID] = instance
-
-        return cls
-
-
-@six.add_metaclass(MetaControl)
 class Control(object):
     """
      Request controls are exposed by allowing an additional keyword argument on
@@ -172,6 +142,31 @@ class Control(object):
                  value/type/structure.
         """
         return six.text_type(ctrl_value)
+
+    @classmethod
+    def register(cls):
+        instance = cls()
+        name = cls.__name__
+        if cls.REQUEST_OID:
+            if not cls.method:
+                raise ValueError('no method set on control {0}'.format(name))
+            if not cls.keyword:
+                raise ValueError('no keyword set on control {0}'.format(name))
+            if cls.keyword in _reserved_kwds:
+                raise LDAPExtensionError('Control keyword "{0}" is reserved'.format(cls.keyword))
+            if cls.keyword in _request_controls:
+                raise LDAPExtensionError('Control keyword "{0}" is already defined'.format(cls.keyword))
+            if cls.REQUEST_OID in _request_controls_oid:
+                raise LDAPExtensionError('Control {0} is already defined'.format(cls.REQUEST_OID))
+            _request_controls[cls.keyword] = instance
+            _request_controls_oid[cls.REQUEST_OID] = instance
+
+        if cls.RESPONSE_OID:
+            if not cls.response_attr:
+                raise ValueError('Missing response_attr on control {0}'.format(name))
+            if cls.RESPONSE_OID in _response_controls:
+                raise LDAPExtensionError('Response control OID {0} is already defined'.format(cls.RESPONSE_OID))
+            _response_controls[cls.RESPONSE_OID] = instance
 
 
 class critical(object):

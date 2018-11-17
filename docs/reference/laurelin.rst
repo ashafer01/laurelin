@@ -6,6 +6,7 @@ Subpackages
 
 .. toctree::
 
+    laurelin.extensions
     laurelin.ldap
 
 Module contents

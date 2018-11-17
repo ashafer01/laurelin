@@ -6,7 +6,8 @@ from . import rfc4511
 from . import utils
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
 from .exceptions import *
-from .extensible import Extensible
+from .extensible import add_extension
+from .extensible.ldap_extensions import LDAPExtensions
 from .filter import parse as parse_unified_filter, parse_standard_filter, parse_simple_filter
 from .ldapobject import LDAPObject
 from .modify import (
@@ -37,7 +38,6 @@ import six
 import warnings
 from base64 import b64decode
 from collections import deque
-from importlib import import_module
 from six.moves import range
 from six.moves.urllib.parse import urlparse
 from six.moves.urllib.request import urlopen
@@ -79,7 +79,7 @@ def _check_obj_kwds(kwds):
         raise TypeError('Unknown keyword arguments: {0}'.format(', '.join(bad_kwds)))
 
 
-class LDAP(Extensible):
+class LDAP(LDAPExtensions):
     """Provides the connection to the LDAP DB. All constructor parameters have a matching global default as a class
     property on :class:`LDAP`
 
@@ -126,6 +126,7 @@ class LDAP(Extensible):
                                        :class:`.FilterSyntax` constants. Can be overridden on a per-search basis
                                        by setting the ``filter_syntax`` keyword on :meth:`LDAP.search`. Defaults
                                        to ``FilterSyntax.STANDARD`` for RFC4515-compliant filter string syntax.
+    :param bool built_in_extensions_only: Set to True to raise an error when attempting to use a 3rd-party extension
 
     The class can be used as a context manager, which will automatically unbind and close the connection when the
     context manager exits.
@@ -167,6 +168,7 @@ class LDAP(Extensible):
     DEFAULT_ERROR_EMPTY_LIST = False
     DEFAULT_IGNORE_EMPTY_LIST = False
     DEFAULT_FILTER_SYNTAX = FilterSyntax.UNIFIED
+    DEFAULT_BUILT_IN_EXTENSIONS_ONLY = False
 
     # spec constants
     NO_ATTRS = '1.1'
@@ -205,23 +207,7 @@ class LDAP(Extensible):
         """Always take the default action for warnings"""
         warnings.showwarning = _showwarning_default
 
-    @staticmethod
-    def activate_extension(module_name):
-        """Import the module name and call the ``activate_extension`` function on the module.
-
-        :param str module_name: The name of the module to import and activate
-        :return: The imported module
-        :rtype: module
-        """
-        mod = import_module(module_name)
-        if hasattr(mod, 'LAURELIN_ACTIVATED'):
-            logger.debug("Extension {0} already activated".format(module_name))
-            return mod
-        if hasattr(mod, 'activate_extension'):
-            mod.activate_extension()
-        mod.LAURELIN_ACTIVATED = True
-        logger.info("Activated extension {0} (File: {1})".format(module_name, mod.__file__))
-        return mod
+    add_extension = staticmethod(add_extension)
 
     ## basic methods
 
@@ -235,7 +221,9 @@ class LDAP(Extensible):
                  deref_aliases=None, strict_modify=None, ssl_verify=None, ssl_ca_file=None, ssl_ca_path=None,
                  ssl_ca_data=None, fetch_result_refs=None, default_sasl_mech=None, sasl_fatal_downgrade_check=None,
                  default_criticality=None, follow_referrals=None, validators=None, warn_empty_list=None,
-                 error_empty_list=None, ignore_empty_list=None, filter_syntax=None):
+                 error_empty_list=None, ignore_empty_list=None, filter_syntax=None, built_in_extensions_only=None):
+
+        LDAPExtensions.__init__(self)
 
         # setup
         if server is None:
@@ -280,6 +268,8 @@ class LDAP(Extensible):
             ignore_empty_list = LDAP.DEFAULT_IGNORE_EMPTY_LIST
         if filter_syntax is None:
             filter_syntax = LDAP.DEFAULT_FILTER_SYNTAX
+        if built_in_extensions_only is None:
+            built_in_extensions_only = LDAP.DEFAULT_BUILT_IN_EXTENSIONS_ONLY
 
         self.default_search_timeout = search_timeout
         self.default_deref_aliases = deref_aliases
@@ -297,6 +287,8 @@ class LDAP(Extensible):
 
         self._tagged_objects = {}
         self._sasl_mechs = None
+
+        self._built_in_only = built_in_extensions_only
 
         self.sock_params = (connect_timeout, ssl_verify, ssl_ca_file, ssl_ca_path, ssl_ca_data)
         self.ssl_verify = ssl_verify
@@ -330,12 +322,13 @@ class LDAP(Extensible):
             if isinstance(validator, six.class_types):
                 validator = validator()
             if not isinstance(validator, Validator):
-                raise TypeError('Validators must subclass laurelin.ldap.validation.Validator')
+                raise TypeError('Validators must subclass laurelin.ldap.Validator')
             logger.info('Using validator {0}'.format(validator.__class__.__name__))
             validator.ldap_conn = self
             self.validators.append(validator)
 
         # find base_dn
+        self.root_dse = None
         self.refresh_root_dse()
         if base_dn is None:
             if 'defaultNamingContext' in self.root_dse:
@@ -1322,6 +1315,8 @@ class LDAP(Extensible):
             while len(ldif_lines) > 1 and ldif_lines[0].startswith(token):
                 control = ldif_lines.popleft()[len(token):].strip()
                 m = re.match(r'^(?P<oid>[0-9]+(\.[0-9]+)+)(?P<crit> (true|false))?(?P<value>:.+)$', control)
+                if not m:
+                    raise ValueError('Invalid control specification')
                 value = m.group('value')
                 if not value:
                     value = ''
@@ -1338,8 +1333,6 @@ class LDAP(Extensible):
                         criticality = False
                 else:
                     criticality = self.default_criticality
-                if not m:
-                    raise ValueError('Invalid control specification')
                 oid = m.group('oid')
                 try:
                     keyword = controls.get_control(oid).keyword
