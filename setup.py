@@ -16,7 +16,7 @@ setup(
     description='A pure-Python ORM-esque LDAP client.',
     long_description=long_description,
     author='Alex Shafer',
-    author_email='ashafer01@gmail.com',
+    author_email='ashafer@pm.me',
     url='https://github.com/ashafer01/laurelin',
     license='LGPLv3+',
     keywords='ldap',
