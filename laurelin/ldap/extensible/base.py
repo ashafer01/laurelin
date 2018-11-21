@@ -28,10 +28,6 @@ def add_extension(modname):
     mod = _import_extension(modname)
     ext_attr_name = getattr(mod, EXTENSION_CLSNAME).NAME
 
-    # check if the class defined a NAME
-    if ext_attr_name == BaseLaurelinExtension.NAME:
-        raise LDAPExtensionError('Extension {0}.{1} does not define a NAME'.format(modname, EXTENSION_CLSNAME))
-
     # check if the extension has already been added, return if this exact module is already loaded, exception if its
     # a different module
     try:
@@ -83,6 +79,10 @@ def _import_extension(modname):
                 raise LDAPExtensionError('{0}.{1} does not subclass laurelin.ldap.BaseLaurelinExtension'.format(
                     modname, EXTENSION_CLSNAME
                 ))
+
+            # check if the class defined a NAME
+            if ext_cls.NAME == BaseLaurelinExtension.NAME:
+                raise LDAPExtensionError('Extension {0}.{1} does not define a NAME'.format(modname, EXTENSION_CLSNAME))
 
             # call one-time setup functions
             ext_obj = ext_cls()
