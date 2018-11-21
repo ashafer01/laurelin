@@ -26,14 +26,7 @@ def add_extension(modname):
 
     # import the extension and get the extension class
     mod = _import_extension(modname)
-    try:
-        ext_cls = getattr(mod, EXTENSION_CLSNAME)
-    except AttributeError:
-        raise LDAPExtensionError('Extension {0} must define a class {1}'.format(modname, EXTENSION_CLSNAME))
-
-    # note: _import_extension has already checked that the class is the correct type if it exists
-
-    ext_attr_name = ext_cls.NAME
+    ext_attr_name = getattr(mod, EXTENSION_CLSNAME).NAME
 
     # check if the class defined a NAME
     if ext_attr_name == BaseLaurelinExtension.NAME:
@@ -64,7 +57,7 @@ def add_extension(modname):
         if ext_info['module'] != modname:
             # the module names of the 2 extensions differ; assume they are different extensions and report that the
             # NAME is already in use
-            raise LDAPExtensionError('{0} is already defined as an extension name'.format(ext_cls.NAME))
+            raise LDAPExtensionError('{0} is already defined as an extension name'.format(ext_attr_name))
         else:
             # the modules names of the 2 extensions are equal; assume they are the same extension and quietly move on
             logger.debug('Extension module {0} does not need to be added'.format(modname))
@@ -98,7 +91,7 @@ def _import_extension(modname):
             # store the instance on a class attribute
             ext_cls.INSTANCE = ext_obj
         except AttributeError:
-            pass
+            raise LDAPExtensionError('Extension {0} must define a class {1}'.format(modname, EXTENSION_CLSNAME))
         setattr(mod, flag_attr, True)
     return mod
 
