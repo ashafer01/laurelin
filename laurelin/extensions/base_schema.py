@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from laurelin.ldap import (
     rfc4512,
     rfc4514,
+    rfc4517,
     rfc4518,
     utils,
     SyntaxRule,
@@ -23,12 +24,6 @@ from six.moves import range
 class LaurelinExtension(BaseLaurelinExtension):
     NAME = 'base_schema'
 
-
-_PrintableCharacter = r"[A-Za-z0-9'()+,.=/:? -]"
-_PrintableString = _PrintableCharacter + r'+'
-
-_IA5String = r"[\x00-\x7f]*"
-_BitString = r"'[01]*'B"
 
 case_exact_prep_methods = (
     rfc4518.Transcode,
@@ -1115,7 +1110,7 @@ class LaurelinSchema(BaseLaurelinSchema):
     class BitString(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.6'
         DESC = 'Bit String'
-        regex = utils.re_anchor(_BitString)
+        regex = utils.re_anchor(rfc4517.BitString)
 
     class Boolean(SyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.7'
@@ -1128,7 +1123,7 @@ class LaurelinSchema(BaseLaurelinSchema):
     class CountryString(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.11'
         DESC = 'Country String'
-        regex = r'^' + _PrintableCharacter + r'{2}$'
+        regex = r'^' + rfc4517.PrintableCharacter + r'{2}$'
 
     class DeliveryMethod(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.14'
@@ -1360,7 +1355,7 @@ class LaurelinSchema(BaseLaurelinSchema):
     class IA5String(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.26'
         DESC = 'IA5 String'
-        regex = utils.re_anchor(_IA5String)
+        regex = utils.re_anchor(rfc4517.IA5String)
 
     class Integer(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.27'
@@ -1397,7 +1392,7 @@ class LaurelinSchema(BaseLaurelinSchema):
     class NameAndOptionalUID(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.34'
         DESC = 'Name And Optional UID'
-        regex = r'^' + rfc4514.distinguishedName + r'(?:#' + _BitString + r')?'
+        regex = r'^' + rfc4514.distinguishedName + r'(?:#' + rfc4517.BitString + r')?'
 
     class NameFormDescription(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.35'
@@ -1430,7 +1425,7 @@ class LaurelinSchema(BaseLaurelinSchema):
     class OtherMailbox(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.39'
         DESC = 'Other Mailbox'
-        regex = r'^' + _PrintableString + r'\$' + _IA5String + r'$'
+        regex = r'^' + rfc4517.PrintableString + r'\$' + rfc4517.IA5String + r'$'
 
     class PostalAddress(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.41'
@@ -1443,7 +1438,7 @@ class LaurelinSchema(BaseLaurelinSchema):
     class PrintableString(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.44'
         DESC = 'Printable String'
-        regex = utils.re_anchor(_PrintableString)
+        regex = utils.re_anchor(rfc4517.PrintableString)
 
     class SubstringAssertion(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.58'
@@ -1469,12 +1464,12 @@ class LaurelinSchema(BaseLaurelinSchema):
         _ttx_key = r'(?:graphic|control|misc|page|private)'
         _ttx_param = _ttx_key + r':' + _ttx_value
 
-        regex = utils.re_anchor(_PrintableString + r'(?:\$' + _ttx_param + r')*')
+        regex = utils.re_anchor(rfc4517.PrintableString + r'(?:\$' + _ttx_param + r')*')
 
     class TelexNumber(RegexSyntaxRule):
         OID = '1.3.6.1.4.1.1466.115.121.1.52'
         DESC = 'Telex Number'
-        regex = r'^' + _PrintableString + r'\$' + _PrintableString + r'\$' + _PrintableString + r'$'
+        regex = r'^' + rfc4517.PrintableString + r'\$' + rfc4517.PrintableString + r'\$' + rfc4517.PrintableString + r'$'
 
     ## Matching Rules
 
