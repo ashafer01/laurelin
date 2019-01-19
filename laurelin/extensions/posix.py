@@ -4,16 +4,15 @@ Includes schema definitions from RFC 2307.
 
 You should begin by tagging base objects for users and groups::
 
-    from laurelin.ldap import LDAP, Scope
-    posix = LDAP.activate_extension('laurelin.extensions.posix')
+    from laurelin.ldap import LDAP, Scope, extensions
 
     with LDAP() as ldap:
         users = ldap.base.obj('ou=People',
-                              tag=posix.USERS_BASE_TAG,
+                              tag=extensions.posix.USERS_BASE_TAG,
                               relative_search_scope=Scope.ONE,
                               rdn_attr='uid')
         groups = ldap.base.obj('ou=Groups',
-                               tag=posix.GROUPS_BASE_TAG,
+                               tag=extensions.posix.GROUPS_BASE_TAG,
                                relative_search_scope=Scope.ONE,
                                rdn_attr='cn')
 
@@ -33,50 +32,58 @@ the reference below for how to specify placement functions. (Note: the placement
 removed in a future major release. I suggest using the `compatible release operator
 <https://www.python.org/dev/peps/pep-0440/#compatible-release>`_ to declare your laurelin-ldap dependency).
 
-By default any gaps will be filled in your uid/gid number range. You can turn this feature off, and automatically
-increment the highest number by passing ``fill_gaps=False``. You can also set the module level attribute
-:attr:`.posix.DEFAULT_FILL_GAPS` to change the default setting.
+By default, the highest uid/gid number will be incremented to generate a missing attribute value. You can also elect
+to fill any gaps in the range by passing ``fill_gaps=True`` to ``add_`` functions. You can also set the extension
+attribute ``extensions.posix.FILL_GAPS`` to change the default setting.
 
 Configuration Reference
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-:attr:`.posix.MIN_AUTO_UID_NUMBER`
+``extensions.posix.MIN_AUTO_UID_NUMBER``
     Default ``1000``. The minimum uidNumber that will be automatically filled when missing from a new user creation.
 
-:attr:`.posix.MIN_AUTO_GID_NUMBER`
+``extensions.posix.MIN_AUTO_GID_NUMBER``
     Default ``1000``. The minimum gidNumber that will be automatically filled when missing from a new group creation.
 
-:attr:`.posix.DEFAULT_GIDNUMBER`
+``extensions.posix.DEFAULT_GIDNUMBER``
     Default ``1000``. The default gidNumber that will be automatically filled when missing from a new user creation.
 
-:attr:`.posix.DEFAULT_USER_RDN_ATTR`
+``extensions.posix.DEFAULT_USER_RDN_ATTR``
     Default ``'uid'``. The default RDN attribute to use when creating new users. If ``rdn_attr`` was specified on the
     tagged base object, this will not be used.
 
-:attr:`.posix.DEFAULT_GROUP_RDN_ATTR`
+``extensions.posix.DEFAULT_GROUP_RDN_ATTR``
     Default ``'cn'``. The default RDN attribute to use when creating new groups. If ``rdn_attr`` was specified on the
     tagged base object, this will not be used.
 
-:attr:`.posix.HOMEDIR_FORMAT`
+``extensions.posix.HOMEDIR_FORMAT``
     Default ``'/home/{uid}'``. Gets string formatted with the attribute keywords before getting used as the default
     ``homeDirectory`` attribute.
 
-:attr:`.posix.DEFAULT_FILL_GAPS`
-    Default ``True``. When generating uidNumber or gidNumber, fill gaps in the range. Set ``False`` to use the highest
-    known id number incremented by default.
+``extensions.posix.DEFAULT_FILL_GAPS``
+    Default ``False`` (always increment the highest number). Set ``True`` to always fille gaps in the range When
+    generating uidNumber or gidNumber.
 
-:func:`.posix.UserPlacement.select`
-    Pass this a new function that accepts an :class:`LDAP` instance as well as all of the attribute keywords passed to
-    :meth:`LDAP.add_user`. It should return a new parent DN string for the user object. The RDN will be automatically
-    generated seperately.
+``extensions.posix.UserPlacement.select()``
+    Pass this a new function that accepts an :class:`.LDAP` instance as well as all of the attribute keywords passed to
+    :meth:`LaurelinLDAPExtension.add_user`. It should return a new parent DN string for the user object. The RDN will
+    be automatically generated seperately.
 
-:func:`.posix.GroupPlacement.select`
+``extensions.posix.GroupPlacement.select()``
     Pass this a new function that accepts an :class:`LDAP` instance as well as all of the attribute keywords passed to
     :meth:`LDAP.add_group`. It should return a new parent DN string for the group object. The RDN will be
     automatically generated seperately.
 """
 from __future__ import absolute_import
-from laurelin.ldap import LDAP, LDAPObject, LDAPError, NoSearchResults, DELETE_ALL, FilterSyntax
+from laurelin.ldap import (
+    LDAP,
+    LDAPObject,
+    LDAPError,
+    NoSearchResults,
+    DELETE_ALL,
+    FilterSyntax,
+    BaseLaurelinExtension,
+)
 from laurelin.ldap.attributetype import AttributeType
 from laurelin.ldap.objectclass import ObjectClass, get_object_class
 from laurelin.ldap.utils import CaseIgnoreDict, get_one_result
@@ -84,23 +91,7 @@ from laurelin.ldap.utils import CaseIgnoreDict, get_one_result
 from datetime import datetime
 
 
-USERS_BASE_TAG = 'posix_users_base'
-GROUPS_BASE_TAG = 'posix_groups_base'
-
-# settings
-
-MIN_AUTO_UID_NUMBER = 1000
-MIN_AUTO_GID_NUMBER = 1000
-
-HOMEDIR_FORMAT = '/home/{uid}'
-
-DEFAULT_USER_RDN_ATTR = 'uid'
-DEFAULT_GROUP_RDN_ATTR = 'cn'
-DEFAULT_GIDNUMBER = '1000'
-DEFAULT_FILL_GAPS = True
-
-
-# placement stuff
+# extension declaration and placement stuff
 
 
 def _tag_flat_placement(tag):
@@ -144,7 +135,7 @@ def _idnumber_range_placement(tag, idnumber_attr, range_size):
     return idnumber_range_placement
 
 
-class PlacementDomain(object):
+class _PlacementDomain(object):
     _selected = None
 
     @classmethod
@@ -156,64 +147,81 @@ class PlacementDomain(object):
         return cls._selected(ldap_conn, **kwds)
 
 
-class UserPlacement(PlacementDomain):
-    """These are pre-defined user placement functions. :meth:`UserPlacement.FLAT` is selected by default. Pass your
-    chosen function (it doesn't have to be one of these) to ``UserPlacement.select()`` to use it with
-    :meth:`LDAP.add_user`.
+class LaurelinExtension(BaseLaurelinExtension):
+    NAME = 'posix'
 
-    Example::
+    USERS_BASE_TAG = 'posix_users_base'
+    GROUPS_BASE_TAG = 'posix_groups_base'
 
-        from laurelin.ldap import LDAP, Scope
-        posix = LDAP.activate_extension('laurelin.extensions.posix')
-        posix.UserPlacement.select(posix.UserPlacement.UID_100S)
-        with LDAP() as ldap:
-            ldap.base.obj('ou=people',
-                          tag=posix.USERS_BASE_TAG,
-                          rdn_attr='uid',
-                          relative_search_scope=Scope.SUBTREE)
-            ldap.add_user(uid='testuser1', uidNumber=4567)
-            ldap.add_user(uid='testuser2', uidNumber=5678)
+    # settings
 
-        # Produces the following tree structure:
-        # dc=example,dc=org
-        #   ou=people
-        #     ou=4500
-        #       uid=testuser1
-        #     ou=5600
-        #       uid=testuser2
-    """
+    MIN_AUTO_UID_NUMBER = 1000
+    MIN_AUTO_GID_NUMBER = 1000
 
-    FLAT = staticmethod(_tag_flat_placement(USERS_BASE_TAG))
-    YEAR = staticmethod(_tag_year_placement(USERS_BASE_TAG))
-    ALPHA = staticmethod(_alpha_placement(USERS_BASE_TAG, DEFAULT_USER_RDN_ATTR))
-    UID_100S = staticmethod(_idnumber_range_placement(USERS_BASE_TAG, 'uidNumber', 100))
-    UID_1000S = staticmethod(_idnumber_range_placement(USERS_BASE_TAG, 'uidNumber', 1000))
+    HOMEDIR_FORMAT = '/home/{uid}'
 
-    @staticmethod
-    def PRIMARY_GROUP(ldap, **kwds):
-        """Place new users below the primary group object. Error if group does not exist.
+    DEFAULT_USER_RDN_ATTR = 'uid'
+    DEFAULT_GROUP_RDN_ATTR = 'cn'
+    DEFAULT_GIDNUMBER = '1000'
+    DEFAULT_FILL_GAPS = True
 
-        Note that if using this placement function, you would need to have the same object tagged as user and group
-        base. The group base object would probably have a search scope of ``onelevel``, and the user base would have
-        ``subtree``.
+    class UserPlacement(_PlacementDomain):
+        """These are pre-defined user placement functions. :meth:`UserPlacement.FLAT` is selected by default. Pass your
+        chosen function (it doesn't have to be one of these) to ``UserPlacement.select()`` to use it with
+        :meth:`LDAP.add_user`.
+
+        Example::
+
+            from laurelin.ldap import LDAP, Scope
+            posix = LDAP.activate_extension('laurelin.extensions.posix')
+            posix.UserPlacement.select(posix.UserPlacement.UID_100S)
+            with LDAP() as ldap:
+                ldap.base.obj('ou=people',
+                              tag=posix.USERS_BASE_TAG,
+                              rdn_attr='uid',
+                              relative_search_scope=Scope.SUBTREE)
+                ldap.add_user(uid='testuser1', uidNumber=4567)
+                ldap.add_user(uid='testuser2', uidNumber=5678)
+
+            # Produces the following tree structure:
+            # dc=example,dc=org
+            #   ou=people
+            #     ou=4500
+            #       uid=testuser1
+            #     ou=5600
+            #       uid=testuser2
         """
-        group = ldap.find_group(gidNumber=_get_kwd_attr(kwds, 'gidNumber'))
-        return group.dn
 
-    _selected = FLAT
+        FLAT = staticmethod(_tag_flat_placement(USERS_BASE_TAG))
+        YEAR = staticmethod(_tag_year_placement(USERS_BASE_TAG))
+        ALPHA = staticmethod(_alpha_placement(USERS_BASE_TAG, DEFAULT_USER_RDN_ATTR))
+        UID_100S = staticmethod(_idnumber_range_placement(USERS_BASE_TAG, 'uidNumber', 100))
+        UID_1000S = staticmethod(_idnumber_range_placement(USERS_BASE_TAG, 'uidNumber', 1000))
 
+        @staticmethod
+        def PRIMARY_GROUP(ldap, **kwds):
+            """Place new users below the primary group object. Error if group does not exist.
 
-class GroupPlacement(PlacementDomain):
-    """These are pre-defined group placement functions. :meth:`GroupPlacement.FLAT` is selected by default. Pass your
-    chosen function (it doesn't have to be one of these) to ``GroupPlacement.select()`` to use it with
-    :meth:`LDAP.add_group`."""
-    FLAT = staticmethod(_tag_flat_placement(GROUPS_BASE_TAG))
-    YEAR = staticmethod(_tag_year_placement(GROUPS_BASE_TAG))
-    ALPHA = staticmethod(_alpha_placement(GROUPS_BASE_TAG, DEFAULT_GROUP_RDN_ATTR))
-    GID_100S = staticmethod(_idnumber_range_placement(GROUPS_BASE_TAG, 'gidNumber', 100))
-    GID_1000S = staticmethod(_idnumber_range_placement(GROUPS_BASE_TAG, 'gidNumber', 1000))
+            Note that if using this placement function, you would need to have the same object tagged as user and group
+            base. The group base object would probably have a search scope of ``onelevel``, and the user base would have
+            ``subtree``.
+            """
+            group = ldap.find_group(gidNumber=_get_kwd_attr(kwds, 'gidNumber'))
+            return group.dn
 
-    _selected = FLAT
+        _selected = FLAT
+
+    class GroupPlacement(_PlacementDomain):
+        """These are pre-defined group placement functions. :meth:`GroupPlacement.FLAT` is selected by default. Pass your
+        chosen function (it doesn't have to be one of these) to ``GroupPlacement.select()`` to use it with
+        :meth:`LDAP.add_group`."""
+        FLAT = staticmethod(_tag_flat_placement(GROUPS_BASE_TAG))
+        YEAR = staticmethod(_tag_year_placement(GROUPS_BASE_TAG))
+        ALPHA = staticmethod(_alpha_placement(GROUPS_BASE_TAG, DEFAULT_GROUP_RDN_ATTR))
+        GID_100S = staticmethod(_idnumber_range_placement(GROUPS_BASE_TAG, 'gidNumber', 100))
+        GID_1000S = staticmethod(_idnumber_range_placement(GROUPS_BASE_TAG, 'gidNumber', 1000))
+
+        _selected = FLAT
 
 
 # RFC 2307 Schema elements for POSIX/shadow objects

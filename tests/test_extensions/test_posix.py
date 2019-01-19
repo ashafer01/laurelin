@@ -1,6 +1,6 @@
 import unittest
 from laurelin.ldap import LDAP, Scope
-from laurelin.ldap import rfc4511, protoutils
+from laurelin.ldap import rfc4511
 from ..utils import load_schema, get_modify_value_set
 from ..mock_ldapsocket import MockSockRootDSE
 
