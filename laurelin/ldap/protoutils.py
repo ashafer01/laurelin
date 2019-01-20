@@ -3,6 +3,7 @@ from . import rfc4511
 from .exceptions import UnexpectedResponseType
 from pyasn1.error import PyAsn1Error
 import logging
+import re
 import six
 from six.moves import range
 
@@ -70,3 +71,9 @@ def get_string_component(obj, name):
     except PyAsn1Error:
         logger.debug("Returning empty string for {0} due to PyAsn1Error".format(name))
         return ''
+
+
+def split_unescaped(s, delim, maxsplit=0):
+    """Split a string s on delim when not preceeded by a backslash"""
+    delim = re.escape(delim)
+    return re.split(r'(?<!\\)' + delim, s, maxsplit)

@@ -16,6 +16,7 @@ from laurelin.ldap import (
     BaseLaurelinSchema,
 )
 from laurelin.ldap.exceptions import InvalidSyntaxError
+from laurelin.ldap.protoutils import split_unescaped
 import re
 import six
 from six.moves import range
@@ -1524,13 +1525,13 @@ class LaurelinSchema(BaseLaurelinSchema):
         SYNTAX = '1.3.6.1.4.1.1466.115.121.1.12'
 
         def _parse_dn(self, value):
-            rdns = re.split(r'(?<!\\),', value)
+            rdns = split_unescaped(value, ',')
             rdn_dicts = []
             for rdn in rdns:
-                rdn_avas = re.split(r'(?<!\\)\+', rdn)
+                rdn_avas = split_unescaped(rdn, '+')
                 rdn_dict = {}
                 for rdn_ava in rdn_avas:
-                    attr, val = re.split(r'(?<!\\)=', rdn_ava)
+                    attr, val = split_unescaped(rdn_ava, '=')
                     rdn_dict[attr] = val
                 rdn_dicts.append(rdn_dict)
             return rdn_dicts
