@@ -52,25 +52,24 @@ def validate_phone_number(s):
 
 def collapse_whitespace(s):
     """Collapse all whitespace sequences down to a single space"""
-    return re.sub('\s+', ' ', s).strip()
+    return re.sub(r'\s+', ' ', s).strip()
 
 
 def _any_case(m):
     """For use with re.sub
 
-     Convert a single-character lower-cased regex match to a character class
-     with both cases
+    Convert a single-character alphabetic regex match to a character class
+    with both cases
     """
-    return '[{0}{1}]'.format(m.group(0), m.group(0).upper())
+    return '[{0}{1}]'.format(m.group(0).lower(), m.group(0).upper())
 
 
 def escaped_regex(escape_chars):
     """
-     Convert a series of characters to a regular expression that requires LDAP
-     hex escapes or any single character excluding escape_chars
+    Generate a parenthesized regex subpattern representing any one character, excluding those
+    in escape_chars, or an LDAP hex escape string representing any one escape_char
 
-     Result will be a parenthesized subpattern that can be repeated to form a
-     larger string.
+    This parenthesized regex can be repeated with + or * to form a string
     """
 
     # ensure no duplicate characters
