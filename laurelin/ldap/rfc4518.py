@@ -210,7 +210,8 @@ class Insignificant:
     def space(value):
         value = value.strip()
         value = re.sub(' +', '  ', value)
-        value = u' {0} '.format(value)
+        # unclear why this is in the spec, it seems pointless and causes problems with use on the server
+        #value = u' {0} '.format(value)
         return value
 
     @staticmethod

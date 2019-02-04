@@ -46,22 +46,22 @@ class AttrsDict(CaseIgnoreDict):
             return False
 
     def __setitem__(self, attr, values):
-        self.validate_attr(attr)
-        self.validate_values(values)
+        AttrsDict.validate_attr(attr)
+        AttrsDict.validate_values(values)
         CaseIgnoreDict.__setitem__(self, attr, values)
 
     def setdefault(self, attr, default=None):
-        self.validate_attr(attr)
+        AttrsDict.validate_attr(attr)
         if default is None:
             default = []
         try:
-            self.validate_values(default)
+            AttrsDict.validate_values(default)
         except TypeError as e:
             raise TypeError('invalid default - {0}'.format(str(e)))
         return CaseIgnoreDict.setdefault(self, attr, default)
 
     def update(self, attrs_dict):
-        self.validate(attrs_dict)
+        AttrsDict.validate(attrs_dict)
         CaseIgnoreDict.update(self, attrs_dict)
 
     @staticmethod
