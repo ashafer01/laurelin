@@ -612,7 +612,7 @@ class LDAP(LDAPExtensions):
         if self.sock.unbound:
             raise ConnectionUnbound()
         try:
-            self.get(dn, [])
+            self.get(dn, [LDAP.NO_ATTRS])
             return True
         except NoSearchResults:
             return False

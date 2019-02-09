@@ -1,6 +1,13 @@
 Changelog
 =========
 
+2.0.1
+-----
+
+Released 2019.02.09
+
+* Fix: Correctly request no attributes be returned for ``LDAP.exists()``
+
 2.0.0
 -----
 
