@@ -281,8 +281,7 @@ Defining matching rules takes a little more effort. Matching rules must subclass
 Required class attributes include:
 
 
-* ``OID`` - the numeric OID of this rule. Note that this does not need to be IANA-registered to work in laurelin, but it
-  still must be globally unique.
+* ``OID`` - the numeric OID of this rule (see section below about OIDs).
 * ``NAME`` - the name of the rule. Must also be globally unique. This is usually how matching rules are referenced in
   attribute type specs (see ``caseExactMatch`` in above example).
 * ``SYNTAX`` - the numeric OID of the syntax rule that assertion values must match.
@@ -324,8 +323,7 @@ argument, and must raise :exc:`.InvalidSyntaxError` when it is incorrect.
 
 In all cases, you must define the following attributes on your syntax rule class:
 
-* ``OID`` - the numeric OID of the rule. As with matching rules, there is no requirement that this is IANA-registered,
-  but it must be globally unique.
+* ``OID`` - the numeric OID of the rule (See section below about OIDs).
 * ``DESC`` - a brief description of the rule. This is mainly used in exception messages.
 
 Regex syntax rules must also define:
@@ -361,6 +359,17 @@ class is defined, i.e. at import time.
 The :meth:`.LaurelinRegistrar.require` method then invokes the ``.register()`` method on each schema element or control
 class defined in the same module. This causes the element to be mapped according to its class, name, and OID - which are
 ultimately what is needed for laurelin to make use of the object.
+
+OIDs
+----
+
+Controls and schema elements all need an OID to be defined. You should obtain a `Private Enterprise Number
+<https://pen.iana.org/pen/PenApplication.page>`_ from IANA for any OIDs that you publish to the internet (and probably
+for any that you don't as well). This is completely free and usually only takes a few days to process.
+
+
+The OID you get from IANA should be used as the root of your namespace, and you can define the structure below it as you
+see fit.
 
 Validators
 ----------
