@@ -1,6 +1,14 @@
 Changelog
 =========
 
+2.0.2
+-----
+
+Released 2019.02.12
+
+* Fix: make extension requirements align with specification
+* Update documentation with OID information
+
 2.0.1
 -----
 
