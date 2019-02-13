@@ -20,6 +20,7 @@ source on `GitHub <https://github.com/ashafer01/laurelin>`_.
    controls
    changelog
    reference
+   oid
    testing_setup
 
 
