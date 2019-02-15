@@ -74,11 +74,18 @@ Public API Definition
 * ``laurelin.ldap.rfc*``
 * ``laurelin.ldap.protoutils``
 * ``laurelin.ldap.config``
-* ``laurelin.extensions``
 
-Note that stability of any 3rd party extensions with names hard coded into the laurelin core code cannot be guaranteed.
-The stability guarantee applies only to built-in extensions shipped with laurelin-ldap in the ``laurelin.extensions``
-package (There are no 3rd party extensions defined at this time).
+Built-in extensions defined in ``laurelin.extensions`` are stable insofar as the interfaces they present via their
+``LaurelinExtension``, ``LaurelinLDAPExtension``, and ``LaurelinLDAPObjectExtension`` instances, control keywords and
+response attributes, and schema element availability. Importing extensions directly is not recommended, and any other
+objects in extension modules should not be considered stable.
+
+The stability of any 3rd party extensions with names hard coded into the laurelin source at
+``laurelin.ldap.extensible.base.Extensible.AVAILABLE_EXTENSIONS`` or any future location cannot be guaranteed. (There
+are no 3rd party extensions defined at this time). To guarantee no 3rd party extensions are used, and thus a complete
+stability assurance, set ``LDAP.DEFAULT_BUILT_IN_EXTENSIONS_ONLY = True`` or pass ``built_in_extensions_only=True`` to
+your ``LDAP()`` constructor.
+
 
 If the user should venture into other modules outside of the declared public API above, I strongly suggest pinning your
 version. I also strongly advise against EVER calling a private function or method (with underscore prefix).
