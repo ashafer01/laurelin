@@ -1,6 +1,13 @@
 Changelog
 =========
 
+2.0.3
+-----
+
+Released 2019.02.14
+
+* No code changes. Clarified stability guarantee for ``laurelin.extensions``
+
 2.0.2
 -----
 
