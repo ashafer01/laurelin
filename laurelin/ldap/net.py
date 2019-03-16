@@ -28,6 +28,32 @@ _next_sock_id = 0
 logger = logging.getLogger(__name__)
 
 
+def parse_host_uri(host_uri):
+    parts = host_uri.split('://')
+    if len(parts) == 1:
+        netloc = unquote(parts[0])
+        if netloc[0] == '/':
+            scheme = 'ldapi'
+        else:
+            scheme = 'ldap'
+    elif len(parts) == 2:
+        scheme = parts[0]
+        netloc = unquote(parts[1])
+    else:
+        raise LDAPError('Invalid host_uri')
+    return scheme, netloc
+
+
+def host_port(netloc, default_port):
+    hp = netloc.rsplit(':', 1)
+    host = hp[0]
+    if len(hp) < 2:
+        port = default_port
+    else:
+        port = int(hp[1])
+    return host, port
+
+
 class LDAPSocket(object):
     """Holds a connection to an LDAP server.
 
@@ -79,18 +105,7 @@ class LDAPSocket(object):
 
     def _parse_uri(self, host_uri):
         # parse host_uri
-        parts = host_uri.split('://')
-        if len(parts) == 1:
-            netloc = unquote(parts[0])
-            if netloc[0] == '/':
-                scheme = 'ldapi'
-            else:
-                scheme = 'ldap'
-        elif len(parts) == 2:
-            scheme = parts[0]
-            netloc = unquote(parts[1])
-        else:
-            raise LDAPError('Invalid host_uri')
+        scheme, netloc = parse_host_uri(host_uri)
         self.uri = '{0}://{1}'.format(scheme, netloc)
         return scheme, netloc
 
@@ -149,12 +164,7 @@ class LDAPSocket(object):
         self._sock.settimeout(None)
 
     def _inet_connect(self, netloc, default_port):
-        ap = netloc.rsplit(':', 1)
-        self.host = ap[0]
-        if len(ap) == 1:
-            port = default_port
-        else:
-            port = int(ap[1])
+        self.host, port = host_port(netloc, default_port)
         try:
             self._sock = create_connection((self.host, port), self.connect_timeout)
             logger.debug('Connected to {0}:{1} on #{2}'.format(self.host, port, self.ID))

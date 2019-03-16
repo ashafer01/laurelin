@@ -9,7 +9,7 @@ from parsimonious.exceptions import ParseError
 import six
 from six.moves import range
 
-from . import rfc4511
+from . import rfc4511, rfc4515
 from .exceptions import LDAPError
 
 escape_map = [
@@ -34,77 +34,7 @@ def escape(text):
     return text
 
 
-ava_grammar = '''
-      rfc4515_ava    = substring / simple / extensible
-      simple         = attr filtertype assertionvalue
-      filtertype     = approx / greaterorequal / lessorequal / equal
-      equal          = EQUALS
-      approx         = TILDE EQUALS
-      greaterorequal = RANGLE EQUALS
-      lessorequal    = LANGLE EQUALS
-      extensible     = ( ( attr dnattrs? matchingrule? COLON EQUALS assertionvalue )
-                       / ( dnattrs? matchingrule COLON EQUALS assertionvalue ) )
-      substring      = attr EQUALS initial? any final?
-      initial        = assertionvalue
-      any            = ASTERISK (assertionvalue ASTERISK)*
-      final          = assertionvalue
-      attr           = attributedescription
-
-      attributedescription = attributetype options
-      attributetype        = oid
-      options              = ( SEMI option )*
-      option               = keychar+
-
-      dnattrs        = COLON "dn"
-      matchingrule   = COLON oid
-
-      oid = descr / numericoid
-
-      numericoid = number ( DOT number )+
-      number     = DIGIT / ( LDIGIT DIGIT+ )
-      DIGIT      = ~r"[0-9]"
-      LDIGIT     = ~r"[1-9]"
-
-      descr       = keystring
-      keystring   = leadkeychar keychar*
-      leadkeychar = ALPHA
-      keychar     = ALPHA / DIGIT / HYPHEN
-      ALPHA       = ~r"[A-Za-z]"
-
-      assertionvalue = valueencoding
-      valueencoding  = (normal / escaped)*
-      normal         = ~r"[^\\0()*\\\\]"
-      escaped        = ESC HEX HEX
-      HEX            = DIGIT / ~r"[A-Fa-f]"
-
-      EQUALS   = "="
-      TILDE    = "~"
-      LANGLE   = "<"
-      RANGLE   = ">"
-      COLON    = ":"
-      ASTERISK = "*"
-      DOT      = "."
-      HYPHEN   = "-"
-      SEMI     = ";"
-      ESC      = "\\\\"
-'''
-
-rfc4515_filter_grammar = '''
-      standard_filter = LPAREN filtercomp RPAREN
-      filtercomp      = and / or / not / rfc4515_ava
-      and             = AMPERSAND filterlist
-      or              = VERTBAR filterlist
-      not             = EXCLAMATION standard_filter
-      filterlist      = standard_filter+
-''' + ava_grammar + '''
-      LPAREN      = "("
-      RPAREN      = ")"
-      AMPERSAND   = "&"
-      VERTBAR     = "|"
-      EXCLAMATION = "!"
-'''
-
-_rfc4515_filter_grammar = Grammar(rfc4515_filter_grammar)
+_rfc4515_filter_grammar = Grammar(rfc4515.filter)
 
 
 def parse_standard_filter(filter_str):
