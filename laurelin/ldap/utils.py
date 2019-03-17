@@ -123,6 +123,7 @@ def escaped_regex(escape_chars):
 class CaseIgnoreDict(dict):
     """A dictionary with case-insensitive keys and storage of last actual key casing"""
     def __init__(self, plaindict=None):
+        dict.__init__(self)
         self._keys = {}
         if plaindict is not None:
             self.update(plaindict)

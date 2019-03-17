@@ -173,7 +173,7 @@ laurelin_logic_grammar = '''
 laurelin_filter_grammar = laurelin_logic_grammar + '''
     term        = not_exp / paren_term / ava
     ava         = "(" rfc4515_ava ")"
-''' + ava_grammar
+''' + rfc4515.item
 
 _laurelin_filter_grammar = Grammar(laurelin_filter_grammar)
 
@@ -258,7 +258,7 @@ def _handle_term(term_node):
 
 unified_filter_grammar = laurelin_logic_grammar + '''
     term        = not_exp / paren_term / standard_filter
-''' + rfc4515_filter_grammar
+''' + rfc4515.filter
 
 _unified_filter_grammar = Grammar(unified_filter_grammar)
 
