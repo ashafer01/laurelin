@@ -25,7 +25,7 @@ from .rules import SyntaxRule, RegexSyntaxRule, MatchingRule, EqualityMatchingRu
 from .schema import SchemaValidator
 from .validation import Validator
 
-import pyasn1.type.univ
+from .pyasn1.type import univ as _pyasn1_type_univ
 
 
 def dc(domain):
@@ -91,4 +91,4 @@ def _enum_repr(enum_obj):
     return '{0}({1})'.format(enum_obj.__class__.__name__, namerepr)
 
 
-pyasn1.type.univ.Enumerated.__repr__ = _enum_repr
+_pyasn1_type_univ.Enumerated.__repr__ = _enum_repr

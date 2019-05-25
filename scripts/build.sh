@@ -12,6 +12,8 @@ fi
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 cd ..
 
+./scripts/build_pyasn1.sh
+
 echo -n "Building "
 cat VERSION
 
@@ -19,5 +21,5 @@ rm -rf dist/*
 rm -rf build
 rm -rf laurelin_ldap.egg-info
 
-python3.6 setup.py sdist
-python3.6 setup.py bdist_wheel --universal
+python3 setup.py sdist
+python3 setup.py bdist_wheel --universal

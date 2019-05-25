@@ -47,11 +47,11 @@
 # EXTENSIBILITY IMPLIED
 
 from __future__ import absolute_import
-from pyasn1.type.univ import OctetString, Integer, Sequence, Choice, SequenceOf, Boolean, Null, Enumerated, SetOf
-from pyasn1.type.namedtype import NamedTypes, NamedType, OptionalNamedType, DefaultedNamedType
-from pyasn1.type.constraint import ValueRangeConstraint, SingleValueConstraint, ValueSizeConstraint
-from pyasn1.type.namedval import NamedValues
-from pyasn1.type.tag import tagClassApplication, tagFormatConstructed, Tag, tagClassContext, tagFormatSimple
+from .pyasn1.type.univ import OctetString, Integer, Sequence, Choice, SequenceOf, Boolean, Null, Enumerated, SetOf
+from .pyasn1.type.namedtype import NamedTypes, NamedType, OptionalNamedType, DefaultedNamedType
+from .pyasn1.type.constraint import ValueRangeConstraint, SingleValueConstraint, ValueSizeConstraint
+from .pyasn1.type.namedval import NamedValues
+from .pyasn1.type.tag import tagClassApplication, tagFormatConstructed, Tag, tagClassContext, tagFormatSimple
 
 # constants
 # maxInt INTEGER ::= 2147483647 -- (2^^31 - 1) --

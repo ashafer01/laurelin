@@ -44,6 +44,6 @@ setup(
         'Intended Audience :: System Administrators',
     ],
     namespace_packages=['laurelin', 'laurelin.extensions'],
-    packages=find_packages(exclude=['tests']),
+    packages=find_packages(exclude=['tests', 'pyasn1']),
     install_requires=install_requires,
 )
