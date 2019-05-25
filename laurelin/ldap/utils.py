@@ -126,7 +126,10 @@ class CaseIgnoreDict(dict):
         dict.__init__(self)
         self._keys = {}
         if plaindict is not None:
-            self.update(plaindict)
+            if isinstance(plaindict, dict):
+                self.update(plaindict)
+            else:
+                raise TypeError('plaindict')
 
     def __setitem__(self, key, value):
         self._keys[key.lower()] = key
