@@ -1,6 +1,10 @@
 """Imports and defines the core of the public API"""
 
 from __future__ import absolute_import
+from . import pyasn1 as _internal_pyasn1
+import sys
+sys.modules['pyasn1'] = _internal_pyasn1
+
 from .attributetype import get_attribute_type, AttributeType
 from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
@@ -24,7 +28,6 @@ from .objectclass import get_object_class, ObjectClass, ExtensibleObjectClass
 from .rules import SyntaxRule, RegexSyntaxRule, MatchingRule, EqualityMatchingRule
 from .schema import SchemaValidator
 from .validation import Validator
-
 from .pyasn1.type import univ as _pyasn1_type_univ
 
 
