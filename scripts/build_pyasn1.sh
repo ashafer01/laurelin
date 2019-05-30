@@ -38,6 +38,7 @@ mv build/pyasn1 ../../laurelin/ldap
 # clean
 rm -rf build dist *.egg-info
 mv orig_MANIFSET.in MANIFEST.in
+git reset --hard  # un-patch the submodule
 popd
 popd
 popd
