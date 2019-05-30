@@ -1,6 +1,14 @@
 Changelog
 =========
 
+2.0.4
+-----
+
+Released 2019.05.29
+
+* Switch to an internal pyasn1
+* Fix issue with binary data
+
 2.0.3
 -----
 
