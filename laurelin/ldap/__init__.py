@@ -1,9 +1,6 @@
 """Imports and defines the core of the public API"""
 
 from __future__ import absolute_import
-from . import pyasn1 as _internal_pyasn1
-import sys
-sys.modules['pyasn1'] = _internal_pyasn1
 
 from .attributetype import get_attribute_type, AttributeType
 from .base import LDAP, LDAPURI
