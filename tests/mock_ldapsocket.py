@@ -3,8 +3,8 @@ from laurelin.ldap import rfc4511, protoutils
 from laurelin.ldap.net import LDAPSocket
 
 from collections import deque
-from pyasn1.codec.ber.encoder import encode as ber_encode
-from pyasn1.codec.ber.decoder import decode as ber_decode
+from laurelin.ldap.pyasn1.codec.ber.encoder import encode as ber_encode
+from laurelin.ldap.pyasn1.codec.ber.decoder import decode as ber_decode
 from warnings import warn
 
 from .mock_saslclient import MockSASLClient
