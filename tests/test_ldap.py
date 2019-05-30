@@ -9,8 +9,9 @@ from laurelin.ldap import (
 )
 import laurelin.ldap.base
 import inspect
+import six
 import unittest
-from .mock_ldapsocket import MockLDAPSocket
+from .mock_ldapsocket import MockLDAPSocket, MockSockRootDSE
 from base64 import b64encode
 from laurelin.ldap.validation import Validator
 
@@ -240,6 +241,24 @@ class TestLDAP(unittest.TestCase):
 
         # TODO: verify we get a warning when response controls are returned with a searchResultRef
         # TODO: test with fetch_result_refs set True, will need to mock SearchReferenceHandle
+
+    def test_binary_data(self):
+        """Ensure binary data doesn't cause explosions"""
+        mock_sock = MockSockRootDSE()
+        ldap = LDAP(mock_sock)
+
+        test_dn = 'cn=foo'
+        text_attr = 'textAttrKey'
+        bin_attr = 'binAttrKey'
+        mock_sock.add_search_res_entry(test_dn, {
+            text_attr: ['text attribute'],
+            bin_attr: [b'\xf5\xf6\x42\xff'],
+        })
+        mock_sock.add_search_res_done(test_dn)
+
+        obj = ldap.get(test_dn)
+        self.assertTrue(isinstance(obj[text_attr][0], six.string_types))
+        self.assertTrue(isinstance(obj[bin_attr][0], six.binary_type))
 
     def test_search_error_response(self):
         """Ensure non-success results for search are handled correctly"""
