@@ -8,14 +8,14 @@ from glob import glob
 from socket import create_connection, socket, error as SocketError
 from six.moves.urllib.parse import unquote
 from collections import deque
-from pyasn1.codec.ber.encoder import encode as ber_encode
-from pyasn1.codec.ber.decoder import decode as ber_decode
-from pyasn1.error import SubstrateUnderrunError
 from puresasl.client import SASLClient
 
 from .rfc4511 import LDAPMessage, ResultCode
 from .exceptions import LDAPError, LDAPSASLError, LDAPConnectionError, LDAPUnsolicitedMessage, UnexpectedResponseType
 from .protoutils import pack, unpack
+from .pyasn1.codec.ber.encoder import encode as ber_encode
+from .pyasn1.codec.ber.decoder import decode as ber_decode
+from .pyasn1.error import SubstrateUnderrunError
 
 try:
     from socket import AF_UNIX

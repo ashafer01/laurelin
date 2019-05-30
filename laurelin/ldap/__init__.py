@@ -1,6 +1,7 @@
 """Imports and defines the core of the public API"""
 
 from __future__ import absolute_import
+
 from .attributetype import get_attribute_type, AttributeType
 from .base import LDAP, LDAPURI
 from .constants import Scope, DerefAliases, DELETE_ALL, FilterSyntax
@@ -24,8 +25,7 @@ from .objectclass import get_object_class, ObjectClass, ExtensibleObjectClass
 from .rules import SyntaxRule, RegexSyntaxRule, MatchingRule, EqualityMatchingRule
 from .schema import SchemaValidator
 from .validation import Validator
-
-import pyasn1.type.univ
+from .pyasn1.type import univ as _pyasn1_type_univ
 
 
 def dc(domain):
@@ -91,4 +91,4 @@ def _enum_repr(enum_obj):
     return '{0}({1})'.format(enum_obj.__class__.__name__, namerepr)
 
 
-pyasn1.type.univ.Enumerated.__repr__ = _enum_repr
+_pyasn1_type_univ.Enumerated.__repr__ = _enum_repr
