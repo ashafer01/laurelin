@@ -15,7 +15,7 @@ before_install:
   - docker run --name openldap -p 127.0.0.1:10389:389 -p 127.0.0.1:10636:636 --env LDAP_TLS_VERIFY_CLIENT=never --detach ashafer01/openldap:1.3.0 --loglevel debug
   - docker run --name 389ds -p 127.0.0.1:11389:389 --detach jtgasper3/389ds-basic
 install:
-  - ./scripts/build.sh
+  - ./scripts/build.sh --force
   - pip install ./dist/*.whl
 script:
   - nosetests
