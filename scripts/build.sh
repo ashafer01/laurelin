@@ -1,16 +1,17 @@
 #!/bin/bash
 
-if [[ "$(git rev-parse --abbrev-ref HEAD)" != "master" ]]; then
-    echo -n "Not on master branch, continue? "
-    read choice
-    if [[ ! "$choice" =~ ^[yY] ]]; then
-        echo "Bailing."
-        exit
+if [[ "$1" != "--force" ]]; then
+    if [[ "$(git rev-parse --abbrev-ref HEAD)" != "master" ]]; then
+        echo -n "Not on master branch, continue? "
+        read choice
+        if [[ ! "$choice" =~ ^[yY] ]]; then
+            echo "Bailing."
+            exit
+        fi
     fi
 fi
 
-cd "$( dirname "${BASH_SOURCE[0]}" )"
-cd ..
+cd "$(git rev-parse --show-toplevel)"
 
 ./scripts/build_pyasn1.sh
 
