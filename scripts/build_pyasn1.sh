@@ -35,12 +35,12 @@ mv _tmp_init pyasn1/__init__.py
 # install the sdist locally
 rm -rf build
 mkdir build
-if which pip3; then
+if [[ "$(python3 --version 2>&1)" =~ ^Python\ 3 ]] || [[ "$(python --version 2>&1)" =~ ^Python\ 3 ]]; then
     pip="pip3"
 else
     pip="pip"
 fi
-$pip install -t build dist/pyasn1-*.tar.gz
+${pip} install -t build dist/pyasn1-*.tar.gz
 
 # move the installed package into laurelin.ldap
 mv build/pyasn1 ../../laurelin/ldap
