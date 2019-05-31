@@ -9,7 +9,7 @@ name="container-$tag"
 
 set -e
 
-./scripts/build.sh --force
+./scripts/build.sh "" "" --force
 
 docker build -f ./scripts/dist_test/Dockerfile -t "$tag" .
 docker run --name "$name" -it "$tag"
