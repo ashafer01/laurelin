@@ -1,5 +1,8 @@
 #!/bin/bash
 
+PYTHON=${1:-python3}
+PIP=${2:-pip3}
+
 echo "Building internal pyasn1"
 
 pushd "$(git rev-parse --show-toplevel)"
@@ -29,18 +32,13 @@ find . -name '*.py' -exec sed $sed_flags -e 's/^import pyasn1(\.[^ ]+)?$/import 
 find . -name '*.gdbsd' -delete
 
 # build patched sdist
-python3 setup.py sdist
+${PYTHON} setup.py sdist
 mv _tmp_init pyasn1/__init__.py
 
 # install the sdist locally
 rm -rf build
 mkdir build
-if [[ "$(python3 --version 2>&1)" =~ ^Python\ 3 ]] || [[ "$(python --version 2>&1)" =~ ^Python\ 3 ]]; then
-    pip="pip3"
-else
-    pip="pip"
-fi
-${pip} install -t build dist/pyasn1-*.tar.gz
+${PIP} install -t build dist/pyasn1-*.tar.gz
 
 # move the installed package into laurelin.ldap
 mv build/pyasn1 ../../laurelin/ldap
