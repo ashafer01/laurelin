@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-PYTHON="python3"
-PIP="pip3"
+PYTHON="${1:-python3}"
+PIP="${2:-pip3}"
 
 cd "$(git rev-parse --show-toplevel)"
 
