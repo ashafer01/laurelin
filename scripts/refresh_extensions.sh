@@ -1,21 +1,19 @@
 #!/bin/bash
 set -e
 
-PYTHON="python3"
-PIP="pip3"
+PYTHON="${1:-python3}"
+PIP="${2:-pip3}"
 
-cd "$( dirname "${BASH_SOURCE[0]}" )"
+cd "$(git rev-parse --show-toplevel)"
 
 echo -n "Generating latest extension requirements file..."
-"$PYTHON" generate_extension_reqs.py
+"$PYTHON" ./scripts/generate_extension_reqs.py
 echo "done"
 
 echo "=== Installing all extension requirements ==="
-"$PIP" install --user -r ../extensions-requirements.txt
+"$PIP" install --user -r extensions-requirements.txt
 echo "=== Install complete ==="
 
-"$PYTHON" generate_extension_properties.py
+"$PYTHON" ./scripts/generate_extension_properties.py
 
 echo "Done."
-
-

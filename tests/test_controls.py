@@ -3,7 +3,7 @@ from laurelin.ldap import LDAP, critical, extensions
 from laurelin.extensions import pagedresults
 from .mock_ldapsocket import MockLDAPSocket
 from laurelin.ldap import rfc4511
-from pyasn1.codec.ber.encoder import encode as ber_encode
+from laurelin.ldap.pyasn1.codec.ber.encoder import encode as ber_encode
 
 
 class TestControls(unittest.TestCase):

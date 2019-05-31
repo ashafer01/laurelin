@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 from . import rfc4511
 from .exceptions import UnexpectedResponseType
-from pyasn1.error import PyAsn1Error
+from .pyasn1.error import PyAsn1Error
 import logging
 import six
 from six.moves import range

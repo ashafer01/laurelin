@@ -32,10 +32,10 @@ Note: When getting pages in a loop, you may set the cookie value to an empty str
 from laurelin.ldap import Control, BaseLaurelinExtension, LDAPError
 from laurelin.ldap.protoutils import get_string_component
 from laurelin.ldap.rfc4511 import Integer0ToMax
-from pyasn1.codec.ber.encoder import encode as ber_encode
-from pyasn1.codec.ber.decoder import decode as ber_decode
-from pyasn1.type.univ import OctetString, Sequence
-from pyasn1.type.namedtype import NamedTypes, NamedType
+from laurelin.ldap.pyasn1.codec.ber.encoder import encode as ber_encode
+from laurelin.ldap.pyasn1.codec.ber.decoder import decode as ber_decode
+from laurelin.ldap.pyasn1.type.univ import OctetString, Sequence
+from laurelin.ldap.pyasn1.type.namedtype import NamedTypes, NamedType
 
 OID = '1.2.840.113556.1.4.319'
 

@@ -19,6 +19,7 @@
 #
 import os
 import sys
+from datetime import date
 from sphinx.domains.python import PythonDomain
 from sphinx.ext.autodoc import FunctionDocumenter
 sys.path.insert(0, os.path.abspath('.'))
@@ -58,7 +59,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'laurelin'
-copyright = '2018, Alex Shafer'
+copyright = str(date.today().year) + ', Alex Shafer'
 author = 'Alex Shafer'
 
 # The version info for the project you're documenting, acts as replacement for

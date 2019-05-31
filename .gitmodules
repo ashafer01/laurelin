@@ -1,0 +1,3 @@
+[submodule "pyasn1"]
+	path = modules/pyasn1
+	url = https://github.com/ashafer01/pyasn1

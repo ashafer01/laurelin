@@ -1,7 +1,7 @@
 #!/bin/bash
 
-cd "$( dirname "${BASH_SOURCE[0]}" )"
-cd ../docs
+cd "$(git rev-parse --show-toplevel)"
+cd docs
 
 rm -rf _build/*
 rm -rf reference/*
